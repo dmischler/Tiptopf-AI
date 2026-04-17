@@ -1,4 +1,4 @@
--- ReciPin MVP Phase 1
+-- Tiptopf-AI MVP Phase 1
 -- Supabase schema, RLS, and storage policies
 
 create extension if not exists pgcrypto;

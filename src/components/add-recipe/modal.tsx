@@ -19,13 +19,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import type { ParsedRecipe } from '@/types'
+import type { ParsedRecipe, Recipe } from '@/types'
 
 type ModalPhase = 'input' | 'parsing' | 'preview' | 'saving'
 
 type AddRecipeModalProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onRecipeSaved?: (recipe: Recipe) => void
 }
 
 type ExtractedRecipePayload = ParsedRecipe & {
@@ -46,7 +47,7 @@ function buildEditableState(recipe: ExtractedRecipePayload): EditableRecipePrevi
   }
 }
 
-export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
+export function AddRecipeModal({ open, onOpenChange, onRecipeSaved }: AddRecipeModalProps) {
   const [activeTab, setActiveTab] = useState<'image' | 'url'>('image')
   const [phase, setPhase] = useState<ModalPhase>('input')
   const [progressStage, setProgressStage] = useState<Stage>('fetching')
@@ -172,12 +173,19 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
         sourceType: previewState.sourceType,
       })
 
+      let persistedImageUrl = saved.image_url as string | null
+
       if (replacementImageFile) {
         const imageFormData = new FormData()
         imageFormData.append('recipeId', saved.id)
         imageFormData.append('image', replacementImageFile)
-        await uploadRecipeImage(imageFormData)
+        persistedImageUrl = await uploadRecipeImage(imageFormData)
       }
+
+      onRecipeSaved?.({
+        ...(saved as Recipe),
+        image_url: persistedImageUrl,
+      })
 
       toast.success('Recipe saved to your library.')
       onOpenChange(false)

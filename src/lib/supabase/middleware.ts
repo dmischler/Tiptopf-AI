@@ -16,7 +16,7 @@ type CookieList = {
   }
 }[]
 
-const PUBLIC_PATHS = ['/login', '/signup', '/forgot-password', '/reset-password']
+const PUBLIC_PATHS = ['/', '/login', '/signup', '/forgot-password', '/reset-password']
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((path) => pathname.startsWith(path))
@@ -57,7 +57,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup')) {
+  if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup' || request.nextUrl.pathname === '/')) {
     const url = request.nextUrl.clone()
     url.pathname = '/library'
     return NextResponse.redirect(url)

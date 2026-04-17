@@ -61,7 +61,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         </form>
 
         <p className="mt-4 text-center text-sm text-muted-foreground">
-          New to ReciPin?{' '}
+          New to Tiptopf-AI?{' '}
           <Link href="/signup" className="text-foreground underline-offset-4 hover:underline">
             Create an account
           </Link>

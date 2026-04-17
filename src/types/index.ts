@@ -13,10 +13,12 @@ export interface Recipe {
   is_favorite: boolean;
   image_url: string | null;
   source_url: string | null;
-  source_type: 'image' | 'url';
+  source_type: RecipeSourceType;
   created_at: string;
   updated_at: string;
 }
+
+export type RecipeSourceType = 'image' | 'url' | 'manual';
 
 export type RecipeCategory =
   | 'starter'
@@ -54,3 +56,4 @@ export interface ParsedRecipe {
 
 export type SortOption = 'newest' | 'oldest' | 'prep_time' | 'rating';
 export type FilterOption = 'all' | 'favorites' | RecipeCategory;
+export type LibraryCategoryFilter = 'all' | RecipeCategory;

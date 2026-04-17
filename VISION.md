@@ -1,6 +1,6 @@
 # VISION.md
 
-**Project Name:** ReciPin  
+**Project Name:** Tiptopf-AI  
 **Tagline:** Your beautiful, AI-powered Pinterest-style recipe library — upload a photo or URL and watch it transform into a searchable, sortable, dark-mode collection of recipes.
 
 **Version:** 1.0 (MVP)  
@@ -10,7 +10,7 @@
 
 ## 1. Vision & Project Overview
 
-ReciPin is a modern, multi-user web application that lets anyone instantly turn a phone photo of a recipe or a recipe website URL into a beautifully formatted recipe card.  
+Tiptopf-AI is a modern, multi-user web application that lets anyone instantly turn a phone photo of a recipe or a recipe website URL into a beautifully formatted recipe card.  
 
 The entire library lives in a **dark-mode Pinterest-style masonry grid** — visually stunning, fast, and delightful to browse. Users can search, filter by category (starter, main, dessert, etc.), sort, mark favorites, and rate recipes.  
 

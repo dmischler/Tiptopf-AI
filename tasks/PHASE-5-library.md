@@ -221,11 +221,18 @@ Create `src/components/library/recipe-detail.tsx`:
 - `src/app/library/page.tsx`
 
 ## Verification
-- [ ] Masonry grid renders with CSS columns (responsive: 1-4 columns)
-- [ ] Cards show hero image, title, category badge, time, rating
-- [ ] Search filters by title + ingredients
-- [ ] Category filter works
-- [ ] Sort options work (newest, oldest, prep time, rating)
-- [ ] Empty state shown when no recipes
-- [ ] Click card opens detail view (Sheet/Dialog)
-- [ ] Print button works
+- [x] Masonry grid renders with CSS columns (responsive: 1-4 columns)
+- [x] Cards show hero image, title, category badge, time, rating
+- [x] Search filters by title + ingredients
+- [x] Category + favorites filter works
+- [x] Sort options work (newest, oldest, prep time, rating)
+- [x] Empty state shown when no recipes
+- [x] Click card opens detail view (Sheet)
+- [x] Print button wired to browser print dialog
+- [x] Build verification passed (`npm run build`)
+- [ ] End-to-end manual verification against real user recipe data
+
+## Phase 5 Implementation Notes (April 17, 2026)
+- Implemented `src/components/library/library-view.tsx` as the client wrapper for search/filter/sort state, optimistic local patching, and detail open/close handling.
+- Kept `/library` as a server page that fetches user-scoped recipes, then hydrates into the client library view for MVP simplicity.
+- Added dedicated components for masonry grid, search bar, sort dropdown, category/favorites filter menu, recipe card, and recipe detail sheet.

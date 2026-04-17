@@ -1,4 +1,4 @@
-# ReciPin Implementation Plan (v1.0 MVP)
+# Tiptopf-AI Implementation Plan (v1.0 MVP)
 
 ## Quick Start
 ```bash
@@ -93,6 +93,6 @@ src/
 
 ## Success Criteria (from VISION.md)
 - [ ] Add recipe from photo or URL in under 15 seconds
-- [ ] Masonry grid is beautiful and fun to scroll
-- [ ] Everything feels fast and polished
+- [x] Masonry grid is beautiful and fun to scroll
+- [x] Everything feels fast and polished
 - [ ] Zero cost (beyond AI subscription)

@@ -134,7 +134,7 @@ interface FetchResult {
 export async function fetchRecipeUrl(url: string): Promise<FetchResult> {
   const response = await fetch(url, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; ReciPin/1.0)',
+      'User-Agent': 'Mozilla/5.0 (compatible; Tiptopf-AI/1.0)',
     },
   })
 

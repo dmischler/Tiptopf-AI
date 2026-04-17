@@ -35,3 +35,11 @@
 - Added image replacement support and “Generate image” placeholder toast.
 - Updated `/library` with recipe count and integrated add-recipe launcher.
 - Verified with `npm run build`; updated `tasks/PHASE-4-add-recipe.md` verification notes.
+
+## v0.6.0 - Phase 5 Library + Phase 6 Interactions
+- Replaced the `/library` placeholder with full recipe browsing: responsive CSS masonry grid, card list, search by title/ingredients, category filter, favorites-only filter, and sort options.
+- Added detailed recipe side sheet with metadata, ingredients, numbered instructions, source link, and print action.
+- Added optimistic favorite and rating interactions with rollback on error.
+- Added authenticated server actions in `src/app/actions/recipe.ts` for `toggleFavorite` and `setRating`.
+- Added library/interactions components in `src/components/library/*` and `src/components/interactions/*`, and wired them together via `library-view` client state.
+- Verified with `npm run build`; updated `tasks/PHASE-5-library.md` and `tasks/PHASE-6-interactions.md` verification notes.

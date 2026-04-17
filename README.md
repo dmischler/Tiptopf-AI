@@ -1,4 +1,4 @@
-# ReciPin
+# Tiptopf-AI
 
 Your beautiful, AI-powered Pinterest-style recipe library.
 

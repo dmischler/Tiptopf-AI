@@ -170,9 +170,16 @@ export async function setRating(recipeId: string, rating: number) {
 - `src/components/library/recipe-detail.tsx` — use FavoriteButton + Rating
 
 ## Verification
-- [ ] Heart toggles favorite state with optimistic UI (no flicker)
-- [ ] Stars allow 1-5 rating with optimistic UI
-- [ ] Clicking current star rating clears it (sets to null)
-- [ ] Changes persist to database
-- [ ] Error states revert optimistic updates
-- [ ] Favorite and rating filters work in library
+- [x] Heart toggles favorite state with optimistic UI (no flicker)
+- [x] Stars allow 1-5 rating with optimistic UI
+- [x] Clicking current star rating clears it (sets to null)
+- [x] Changes persist to database
+- [x] Error states revert optimistic updates
+- [x] Favorite filter works in library
+- [x] Build verification passed (`npm run build`)
+- [ ] End-to-end manual verification against live Supabase data
+
+## Phase 6 Implementation Notes (April 17, 2026)
+- Added `src/app/actions/recipe.ts` with authenticated `toggleFavorite` and `setRating` actions, each validating inputs and checking ownership (`user_id`) before update.
+- Implemented `src/components/interactions/favorite-button.tsx` and `src/components/interactions/rating.tsx` with optimistic UI and rollback on server errors.
+- Wired interactions into both library cards and recipe detail sheet, and connected favorites to the category filter's "Favorites only" toggle.

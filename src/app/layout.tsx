@@ -8,7 +8,7 @@ import { Toaster } from '@/components/ui/sonner';
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
-  title: 'ReciPin - Your AI-Powered Recipe Library',
+  title: 'Tiptopf-AI - Your AI-Powered Recipe Library',
   description: 'Upload a photo or URL and transform recipes into a beautiful, searchable collection',
 };
 
