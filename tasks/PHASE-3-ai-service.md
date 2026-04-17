@@ -299,8 +299,15 @@ export async function extractRecipeFromImage(
 - `src/app/actions/extract-recipe.ts` (server action wrapping above)
 
 ## Verification
-- [ ] Can stream recipe extraction from text
-- [ ] Can fetch URL and extract recipe content (JSON-LD + fallback)
-- [ ] Can download and store URL images in Supabase Storage
-- [ ] Can process phone images via multi-modal AI (discarded after)
-- [ ] Model name works with OpenCode Go endpoint
+- [x] Implemented AI service files and extract actions (`src/lib/ai/*`, `src/app/actions/extract-recipe.ts`)
+- [x] Implemented URL fetcher with JSON-LD first and HTML fallback
+- [x] Implemented URL image download to Supabase storage helper
+- [x] Implemented image extraction path (image used transiently, not stored)
+- [x] Build verification passed (`npm run build`)
+- [ ] Live API verification against OpenCode endpoint (model id + key required)
+- [ ] End-to-end extraction verification with real URL/image input in browser
+
+## Phase 3 Implementation Notes (April 17, 2026)
+- Added `OPENCODE_MODEL_ID` override support while defaulting to `MiniMax-M2.7`.
+- Kept extraction outputs normalized to existing `ParsedRecipe` shape.
+- Added a temporary `as any` cast for `streamText` model typing due to upstream package type mismatch in current dependency versions.

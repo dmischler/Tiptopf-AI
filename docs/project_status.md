@@ -19,3 +19,10 @@
 - Added `src/lib/crypto.ts` and integrated browser-side API key encryption before DB save.
 - Added root redirect (`/`) and a temporary protected `/library` page placeholder.
 - Verified with `npm run build`; updated `tasks/PHASE-2-auth.md` verification notes.
+
+## v0.4.0 - Phase 3 AI Service Layer
+- Added AI service modules for prompts, model resolution, text extraction, URL fetching, and image extraction.
+- Added server action wrappers for URL and image recipe extraction in `src/app/actions/extract-recipe.ts`.
+- Implemented JSON-LD recipe parsing with HTML fallback and optional image import into Supabase storage.
+- Added environment-based model override support (`OPENCODE_MODEL_ID`) with default `MiniMax-M2.7`.
+- Verified compilation with `npm run build`; updated `tasks/PHASE-3-ai-service.md` verification notes.
