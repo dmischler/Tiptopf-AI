@@ -26,3 +26,12 @@
 - Implemented JSON-LD recipe parsing with HTML fallback and optional image import into Supabase storage.
 - Added environment-based model override support (`OPENCODE_MODEL_ID`) with default `MiniMax-M2.7`.
 - Verified compilation with `npm run build`; updated `tasks/PHASE-3-ai-service.md` verification notes.
+
+## v0.5.0 - Phase 4 Add Recipe Flow
+- Added complete add-recipe UI flow: FAB, modal, image upload tab, URL tab, progress state, and preview.
+- Added save/upload server actions in `src/app/actions/add-recipe.ts`.
+- Wired extraction actions into modal for URL and image paths.
+- Added minimal editable preview fields (title, category, difficulty, servings) with read-only ingredients/instructions.
+- Added image replacement support and “Generate image” placeholder toast.
+- Updated `/library` with recipe count and integrated add-recipe launcher.
+- Verified with `npm run build`; updated `tasks/PHASE-4-add-recipe.md` verification notes.

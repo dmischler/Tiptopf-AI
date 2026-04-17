@@ -255,15 +255,19 @@ export async function extractFromImageAction(imageBase64: string) {
 - `src/app/actions/extract-recipe.ts`
 
 ## Verification
-- [ ] FAB visible on library page
-- [ ] Modal opens with Image/URL tabs
-- [ ] Image upload works (file select + camera)
-- [ ] URL fetch works and shows progress
-- [ ] Streaming display shows AI parsing progress
-- [ ] Preview allows editing title, category, difficulty, servings
-- [ ] Ingredients and instructions are read-only
-- [ ] "Generate Image" shows "coming soon" toast
-- [ ] "Replace Image" allows uploading a new image
-- [ ] Recipe saves to database with correct source_type
-- [ ] Phone images are NOT stored in Supabase
-- [ ] URL images get downloaded to Supabase Storage
+- [x] FAB added to `/library` and opens modal
+- [x] Modal includes image/url tabs and phase states (`input -> parsing -> preview -> saving`)
+- [x] Image upload supports file select, drag/drop, and camera capture
+- [x] URL extraction wired through server action with staged progress UI
+- [x] Preview supports editing title/category/difficulty/servings
+- [x] Ingredients/instructions kept read-only in preview
+- [x] `Generate Image` placeholder implemented with toast
+- [x] `Replace Image` flow implemented and uploads on save
+- [x] Save action writes recipe with correct `source_type`
+- [x] Build verification passed (`npm run build`)
+- [ ] End-to-end manual verification against configured Supabase + AI keys
+
+## Phase 4 Implementation Notes (April 17, 2026)
+- Kept implementation intentionally simple: no extra client state library, just local component state.
+- Phone images are processed transiently for extraction and never uploaded automatically.
+- URL-derived image upload remains in Phase 3 service; manual replacement uploads at save time in Phase 4.
