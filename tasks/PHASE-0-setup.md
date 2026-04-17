@@ -21,10 +21,12 @@ Packages already installed (from package.json):
 ### 0.2 Initialize shadcn/ui
 ```bash
 npx shadcn@latest init -d -y
-npx shadcn@latest add button input label textarea dialog tabs card badge avatar form toast switch select dropdown-menu separator sheet
+npx shadcn@latest add input label textarea dialog tabs card badge avatar switch select dropdown-menu separator sheet sonner
 ```
 
 This creates `components.json` and installs the required shadcn/ui components.
+
+> **Plan correction:** In current `base-nova`, `toast` may not exist in the registry. `sonner` is the supported toast/toaster path.
 
 ### 0.3 Configure Environment Variables
 `.env.example` already exists. Add a `SUPABASE_SERVICE_ROLE_KEY` entry for server-side operations:
@@ -64,6 +66,12 @@ Delete the current placeholder. Supabase client files will be created in PHASE-2
 - DELETE `src/lib/supabase.ts` — replaced by PHASE-2 files
 
 ## Verification
-- [ ] `npm run dev` starts without errors
-- [ ] shadcn/ui components render (test with a simple Button)
-- [ ] All new dependencies listed in package.json
+- [x] `npm install` completed and lockfile updated
+- [x] shadcn/ui initialized (`components.json`, core UI components created)
+- [x] `npm run build` passes (used as non-interactive verification)
+- [x] All new dependencies listed in package.json
+
+## Phase 0 Implementation Notes (April 17, 2026)
+- `next.config.js` already matched the scoped Supabase remote pattern, so no extra change was required.
+- `npm run lint` prompted for first-time interactive setup in this repository, so build validation was used instead.
+- `src/lib/supabase.ts` did not exist yet, so there was nothing to delete in this phase.

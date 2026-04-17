@@ -9,6 +9,16 @@ cd tasks && cat PHASE-0-setup.md
 # Phase 1: Supabase → Phase 2: Auth → Phase 3: AI → Phase 4: Add Recipe → Phase 5: Library → Phase 6: Interactions
 ```
 
+## Critical Plan Review (April 17, 2026)
+
+The phased plan is solid for MVP scope and speed, but a few details need practical simplifications:
+
+1. **shadcn registry drift**: `toast`/`form` entries in the original command are no longer always present in `base-nova`; use `sonner` for toasts and add only components the registry resolves.
+2. **Phase testing strategy**: `npm run lint` can be interactive on fresh Next.js projects, so `npm run build` is the reliable non-interactive verification command per phase.
+3. **Supabase setup reproducibility**: dashboard-only SQL is hard to track; keep the SQL in repo migration files for repeatable setup.
+4. **Crypto utility portability**: API key encryption/decryption must run in both browser and server contexts (not browser-only helpers).
+5. **Scope discipline**: keep extraction and UI flows simple first (working parse/save/browse), then iterate polish after end-to-end flow is stable.
+
 ## File Structure (Generated)
 ```
 src/
