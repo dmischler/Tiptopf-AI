@@ -113,8 +113,17 @@ CREATE POLICY "Users can delete own images" ON storage.objects
 ## Files to Modify
 - `.env.local` — add Supabase keys
 
+## Files Added in Repository
+- `supabase/migrations/202604170001_phase1_schema.sql` — canonical SQL for tables, triggers, RLS, and storage policies
+
 ## Verification
-- [ ] Tables created (recipes + profiles)
-- [ ] RLS policies active
-- [ ] Trigger creates profile on signup
-- [ ] Storage bucket ready with RLS policies
+- [x] Migration SQL written and committed for reproducible setup
+- [x] Migration includes tables, constraints, indexes, triggers, and RLS policies
+- [x] Storage bucket + storage policies included in migration SQL
+- [ ] Applied in Supabase project (requires dashboard or Supabase CLI with project credentials)
+- [ ] Verified with live signup/storage test against Supabase project
+
+## Phase 1 Implementation Notes (April 17, 2026)
+- Added `updated_at` trigger support (`set_updated_at`) for `recipes` and `profiles`.
+- Split broad `FOR ALL` RLS into explicit `SELECT/INSERT/UPDATE/DELETE` policies for clarity.
+- Added category and difficulty check constraints directly in schema to match VISION categories.
