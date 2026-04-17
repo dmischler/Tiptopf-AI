@@ -248,10 +248,16 @@ Create `src/app/profile/page.tsx`:
 - `src/lib/supabase.ts` (replaced by client.ts + server.ts)
 
 ## Verification
-- [ ] User can sign up (email verification required)
-- [ ] User can log in and see library
-- [ ] Unauthenticated users redirected to /login
-- [ ] Authenticated users redirected away from auth pages
-- [ ] Theme toggle works (dark/light, stored in localStorage)
-- [ ] API key can be saved encrypted to profiles table
-- [ ] API key can be decrypted and displayed masked
+- [x] Auth routes and middleware implemented (`/login`, `/signup`, `/forgot-password`, `/reset-password`)
+- [x] Protected route behavior implemented (`/library`, `/profile` redirect to `/login` when not authenticated)
+- [x] Theme provider + toggle implemented with localStorage key `recipin-theme`
+- [x] API key form implemented with client-side encryption and profile save action
+- [x] Build verification passed (`npm run build`)
+- [ ] End-to-end Supabase auth verification in browser (requires configured Supabase project and keys)
+- [ ] Live encryption/decryption round-trip against real `profiles` row
+
+## Phase 2 Implementation Notes (April 17, 2026)
+- Kept auth flow simple with server actions and query-param feedback messages.
+- Added a minimal `/library` placeholder page so redirects have a valid destination before Phase 5.
+- Added `/` redirect logic: authenticated users go to `/library`, others to `/login`.
+- Used `sonner` toaster for lightweight UX feedback without extra complexity.

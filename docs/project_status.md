@@ -11,3 +11,11 @@
 - Implemented `recipes` and `profiles` schema, indexes, constraints, profile-on-signup trigger, and `updated_at` triggers.
 - Added explicit RLS policies for app tables and storage policies for `recipe-images` bucket.
 - Updated `tasks/PHASE-1-supabase.md` with implementation notes and current verification state.
+
+## v0.3.0 - Phase 2 Auth Foundation
+- Added Supabase SSR clients and middleware route protection (`src/lib/supabase/*`, `src/middleware.ts`).
+- Implemented auth pages and server actions for sign in, sign up, password reset, and sign out.
+- Added profile page with theme toggle and encrypted API key storage flow.
+- Added `src/lib/crypto.ts` and integrated browser-side API key encryption before DB save.
+- Added root redirect (`/`) and a temporary protected `/library` page placeholder.
+- Verified with `npm run build`; updated `tasks/PHASE-2-auth.md` verification notes.
