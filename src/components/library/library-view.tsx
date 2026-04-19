@@ -213,22 +213,13 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
       })
     }
 
-    let removedIndex = -1
-    setRecipes((current) => {
-      const index = current.findIndex((item) => item.id === recipe.id)
-      removedIndex = index
-      if (index < 0) {
-        return current
-      }
-
-      const next = [...current]
-      next.splice(index, 1)
-      return next
-    })
+    const removedIndex = recipes.findIndex((item) => item.id === recipe.id)
 
     if (removedIndex < 0) {
       return
     }
+
+    setRecipes((current) => current.filter((item) => item.id !== recipe.id))
 
     setSelectedRecipeId((currentSelected) => (currentSelected === recipe.id ? null : currentSelected))
     queueDeletion(recipe, removedIndex)
