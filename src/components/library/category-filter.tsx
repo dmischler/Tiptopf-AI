@@ -6,6 +6,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -56,8 +57,9 @@ export function CategoryFilter({ value, onChange }: CategoryFilterProps) {
         </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Category</DropdownMenuLabel>
-        {CATEGORY_ITEMS.map((item) => (
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Category</DropdownMenuLabel>
+          {CATEGORY_ITEMS.map((item) => (
           <DropdownMenuItem
             key={item.value}
             closeOnClick={false}
@@ -68,6 +70,7 @@ export function CategoryFilter({ value, onChange }: CategoryFilterProps) {
             {value.category === item.value ? <Check className="h-4 w-4" /> : null}
           </DropdownMenuItem>
         ))}
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
           closeOnClick={false}

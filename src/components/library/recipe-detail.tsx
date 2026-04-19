@@ -85,12 +85,27 @@ const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard']
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
+const CATEGORY_LABELS: Record<RecipeCategory, string> = {
+  starter: 'Vorspeise',
+  main: 'Hauptgericht',
+  dessert: 'Dessert',
+  side: 'Beilage',
+  breakfast: 'Frühstück',
+  snack: 'Snack',
+}
+
+const DIFFICULTY_LABELS: Record<Difficulty, string> = {
+  easy: 'Einfach',
+  medium: 'Mittel',
+  hard: 'Schwer',
+}
+
 function formatCategoryLabel(category: Recipe['category']) {
-  return category[0].toUpperCase() + category.slice(1)
+  return CATEGORY_LABELS[category]
 }
 
 function formatDifficultyLabel(difficulty: Recipe['difficulty']) {
-  return difficulty[0].toUpperCase() + difficulty.slice(1)
+  return DIFFICULTY_LABELS[difficulty]
 }
 
 function toInstructionSteps(instructions: string) {
@@ -466,11 +481,11 @@ export function RecipeDetail({
           }
         }}
       >
-        <DialogContent className="w-full max-w-2xl p-0 sm:max-w-2xl" showCloseButton>
+        <DialogContent className="w-full max-w-2xl gap-0 p-0 sm:max-w-2xl" showCloseButton>
           {mode === 'view' ? (
-            <>
+            <div className="flex h-[calc(100vh-2rem)] min-h-0 flex-col">
               {currentRecipe.image_url ? (
-                <div className="relative aspect-[4/3] w-full">
+                <div className="relative h-40 w-full shrink-0 sm:h-48">
                   <Image
                     src={currentRecipe.image_url}
                     alt={currentRecipe.title}
@@ -480,15 +495,15 @@ export function RecipeDetail({
                   />
                 </div>
               ) : (
-                <div className="flex aspect-[4/3] w-full items-center justify-center bg-muted/40 text-sm text-muted-foreground">
+                <div className="flex h-40 w-full shrink-0 items-center justify-center bg-muted/40 text-sm text-muted-foreground sm:h-48">
                   No image available
                 </div>
               )}
 
-              <DialogHeader className="gap-3 border-b border-border/70 px-5 pb-3 pt-5 pr-12">
+              <DialogHeader className="gap-2 border-b border-border/70 px-5 pb-2 pt-4 pr-12">
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-2">
-                    <DialogTitle className="text-xl leading-tight">{currentRecipe.title}</DialogTitle>
+                    <DialogTitle className="text-lg leading-tight">{currentRecipe.title}</DialogTitle>
                     <div className="flex flex-wrap gap-2">
                       <Badge className={CATEGORY_CLASS[currentRecipe.category]}>
                         {formatCategoryLabel(currentRecipe.category)}
@@ -512,36 +527,36 @@ export function RecipeDetail({
                 </div>
 
                 <DialogDescription>
-                  View details, rating, and source information for this recipe.
+                  Details, Bewertung und Quelleninformationen für dieses Rezept anzeigen.
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="max-h-[calc(90vh-16rem)] space-y-6 overflow-y-auto px-5 pb-6 pt-4">
+              <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 pb-6 pt-4">
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <InfoItem
-                    label="Prep"
+                    label="Vorbereitung"
                     value={currentRecipe.prep_time > 0 ? `${currentRecipe.prep_time} min` : '—'}
                     icon={<Timer className="h-4 w-4 text-muted-foreground" />}
                   />
                   <InfoItem
-                    label="Cook"
+                    label="Kochen"
                     value={currentRecipe.cook_time > 0 ? `${currentRecipe.cook_time} min` : '—'}
                     icon={<Clock className="h-4 w-4 text-muted-foreground" />}
                   />
                   <InfoItem
-                    label="Total"
+                    label="Gesamt"
                     value={totalTime > 0 ? `${totalTime} min` : '—'}
                     icon={<Clock className="h-4 w-4 text-muted-foreground" />}
                   />
                   <InfoItem
-                    label="Servings"
+                    label="Portionen"
                     value={currentRecipe.servings > 0 ? String(currentRecipe.servings) : '—'}
                     icon={<UtensilsCrossed className="h-4 w-4 text-muted-foreground" />}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">Your rating</div>
+                  <div className="text-sm font-medium">Ihre Bewertung</div>
                   <Rating
                     recipeId={currentRecipe.id}
                     initialRating={currentRecipe.rating}
@@ -552,7 +567,7 @@ export function RecipeDetail({
 
                 <section className="space-y-3">
                   <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    Ingredients
+                    Zutaten
                   </h4>
                   <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed">
                     {currentRecipe.ingredients.map((ingredient, index) => (
@@ -563,7 +578,7 @@ export function RecipeDetail({
 
                 <section className="space-y-3">
                   <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    Instructions
+                    Anleitung
                   </h4>
                   <ol className="space-y-3">
                     {instructionSteps.map((step, index) => (
@@ -580,7 +595,7 @@ export function RecipeDetail({
                 <div className="flex flex-wrap gap-2 pt-2">
                   <Button type="button" variant="outline" onClick={() => window.print()}>
                     <Printer className="mr-2 h-4 w-4" />
-                    Print
+                    Drucken
                   </Button>
 
                   {currentRecipe.source_url ? (
@@ -590,23 +605,23 @@ export function RecipeDetail({
                       render={<Link href={currentRecipe.source_url} target="_blank" rel="noreferrer" />}
                     >
                       <ExternalLink className="mr-2 h-4 w-4" />
-                      Open source
+                      Quelle öffnen
                     </Button>
                   ) : null}
                 </div>
               </div>
-            </>
+            </div>
           ) : (
             <>
               <DialogHeader className="gap-2 border-b border-border/70 px-5 pb-4 pt-5 pr-12">
-                <DialogTitle>Edit recipe</DialogTitle>
-                <DialogDescription>Update recipe details and save your changes.</DialogDescription>
+                <DialogTitle>Rezept bearbeiten</DialogTitle>
+                <DialogDescription>Rezeptdetails aktualisieren und Änderungen speichern.</DialogDescription>
               </DialogHeader>
 
               <div className="max-h-[calc(90vh-9rem)] space-y-4 overflow-y-auto px-5 pb-5 pt-4">
                 <div className="grid gap-4 rounded-xl border border-border/70 bg-muted/30 p-4 md:grid-cols-2">
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="recipe-edit-title">Title</Label>
+<div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="recipe-edit-servings">Portionen</Label>
                     <Input
                       id="recipe-edit-title"
                       value={draft.title}
@@ -626,7 +641,7 @@ export function RecipeDetail({
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Category</Label>
+                    <Label>Kategorie</Label>
                     <Select
                       value={draft.category}
                       onValueChange={(value) =>
@@ -641,12 +656,12 @@ export function RecipeDetail({
                       }
                     >
                       <SelectTrigger className="w-full bg-background/70" disabled={isSaving}>
-                        <SelectValue placeholder="Category" />
+                        <SelectValue>{CATEGORY_LABELS[draft.category]}</SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {CATEGORIES.map((category) => (
                           <SelectItem key={category} value={category}>
-                            {formatCategoryLabel(category)}
+                            {CATEGORY_LABELS[category]}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -654,7 +669,7 @@ export function RecipeDetail({
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Difficulty</Label>
+                    <Label>Schwierigkeit</Label>
                     <Select
                       value={draft.difficulty}
                       onValueChange={(value) =>
@@ -669,12 +684,12 @@ export function RecipeDetail({
                       }
                     >
                       <SelectTrigger className="w-full bg-background/70" disabled={isSaving}>
-                        <SelectValue placeholder="Difficulty" />
+                        <SelectValue>{DIFFICULTY_LABELS[draft.difficulty]}</SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {DIFFICULTIES.map((difficulty) => (
                           <SelectItem key={difficulty} value={difficulty}>
-                            {formatDifficultyLabel(difficulty)}
+                            {DIFFICULTY_LABELS[difficulty]}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -704,7 +719,7 @@ export function RecipeDetail({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="recipe-edit-cook">Cook time (minutes)</Label>
+                    <Label htmlFor="recipe-edit-cook">Kochzeit (Minuten)</Label>
                     <Input
                       id="recipe-edit-cook"
                       type="number"
@@ -725,8 +740,8 @@ export function RecipeDetail({
                     />
                   </div>
 
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="recipe-edit-servings">Servings</Label>
+<div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="recipe-edit-prep">Vorbereitungszeit (Minuten)</Label>
                     <Input
                       id="recipe-edit-servings"
                       type="number"
@@ -749,7 +764,7 @@ export function RecipeDetail({
                 </div>
 
                 <div className="space-y-3 rounded-xl border border-border/70 bg-muted/25 p-4">
-                  <Label>Image</Label>
+                  <Label>Bild</Label>
                   {currentImageUrl ? (
                     <div className="relative h-56 overflow-hidden rounded-xl border border-border/70 bg-background/70 sm:h-72">
                       {currentImageUrl.startsWith('blob:') ? (
@@ -772,13 +787,13 @@ export function RecipeDetail({
                     </div>
                   ) : (
                     <div className="rounded-xl border border-dashed border-border/70 bg-background/60 p-6 text-sm text-muted-foreground">
-                      No image yet. Use Find image or replace it manually.
+                      Noch kein Bild. Bild suchen oder manuell ersetzen.
                     </div>
                   )}
 
                   {imageMeta?.creditName ? (
                     <div className="text-xs text-muted-foreground">
-                      Photo by{' '}
+                      Foto von{' '}
                       {imageMeta.creditUrl ? (
                         <a
                           href={imageMeta.creditUrl}
@@ -808,7 +823,7 @@ export function RecipeDetail({
                       />
                       <span className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-background/70 px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/60">
                         <Upload className="h-4 w-4" />
-                        Replace image
+                        Bild ersetzen
                       </span>
                     </label>
 
@@ -825,13 +840,13 @@ export function RecipeDetail({
                       ) : (
                         <ImageIcon className="h-4 w-4" />
                       )}
-                      {isFindingImage ? 'Finding image...' : 'Find image'}
+                      {isFindingImage ? 'Bild wird gesucht...' : 'Bild suchen'}
                     </Button>
                   </div>
                 </div>
 
                 <div className="space-y-2 rounded-xl border border-border/70 bg-muted/25 p-4">
-                  <Label htmlFor="recipe-edit-ingredients">Ingredients (one per line)</Label>
+                  <Label htmlFor="recipe-edit-ingredients">Zutaten (eine pro Zeile)</Label>
                   <textarea
                     id="recipe-edit-ingredients"
                     value={draft.ingredientsText}
@@ -852,7 +867,7 @@ export function RecipeDetail({
                 </div>
 
                 <div className="space-y-2 rounded-xl border border-border/70 bg-muted/25 p-4">
-                  <Label htmlFor="recipe-edit-instructions">Instructions (one step per line)</Label>
+                  <Label htmlFor="recipe-edit-instructions">Anleitung (ein Schritt pro Zeile)</Label>
                   <textarea
                     id="recipe-edit-instructions"
                     value={draft.instructionsText}
@@ -880,7 +895,7 @@ export function RecipeDetail({
                     disabled={isSaving}
                   >
                     <Trash2 className="h-4 w-4" />
-                    Delete recipe
+                    Rezept löschen
                   </Button>
 
                   <div className="flex flex-wrap gap-2">
@@ -893,11 +908,11 @@ export function RecipeDetail({
                       }}
                       disabled={isSaving}
                     >
-                      Cancel
+                      Abbrechen
                     </Button>
                     <Button type="button" onClick={() => void handleSaveEdit()} disabled={isSaving}>
                       {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                      Save
+                      Speichern
                     </Button>
                   </div>
                 </div>
@@ -930,15 +945,15 @@ export function RecipeDetail({
       <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
         <DialogContent className="w-full max-w-md p-0 sm:max-w-md">
           <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 pr-12">
-            <DialogTitle>Delete recipe?</DialogTitle>
+            <DialogTitle>Rezept löschen?</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this recipe? This cannot be undone.
+              Sind Sie sicher, dass Sie dieses Rezept löschen möchten? Dies kann nicht rückgängig gemacht werden.
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex justify-end gap-2 px-5 py-4">
             <Button type="button" variant="outline" onClick={() => setConfirmDeleteOpen(false)}>
-              Cancel
+              Abbrechen
             </Button>
             <Button
               type="button"
@@ -949,7 +964,7 @@ export function RecipeDetail({
                 onRecipeDeleteRequested?.(currentRecipe)
               }}
             >
-              Delete
+              Löschen
             </Button>
           </div>
         </DialogContent>

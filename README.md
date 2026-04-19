@@ -70,3 +70,4 @@ npm run lint
 - API keys are still encrypted in the browser before being saved.
 - Image uploads from URL are downloaded and persisted locally.
 - For deployment details on Raspberry Pi and Tailscale, see `docs/local-pi-deployment.md`.
+- UI language: German

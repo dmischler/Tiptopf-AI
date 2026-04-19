@@ -13,6 +13,21 @@ import type { Difficulty, ParsedRecipe, RecipeCategory } from '@/types'
 const CATEGORIES: RecipeCategory[] = ['starter', 'main', 'dessert', 'side', 'breakfast', 'snack']
 const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard']
 
+const CATEGORY_LABELS: Record<RecipeCategory, string> = {
+  starter: 'Vorspeise',
+  main: 'Hauptgericht',
+  dessert: 'Dessert',
+  side: 'Beilage',
+  breakfast: 'Frühstück',
+  snack: 'Snack',
+}
+
+const DIFFICULTY_LABELS: Record<Difficulty, string> = {
+  easy: 'Einfach',
+  medium: 'Mittel',
+  hard: 'Schwer',
+}
+
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
@@ -88,7 +103,7 @@ export function RecipePreview({
     <div className="space-y-5">
       <div className="grid gap-4 rounded-xl border border-border/70 bg-muted/30 p-4 md:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="preview-title">Title</Label>
+          <Label htmlFor="preview-title">Titel</Label>
           <Input
             id="preview-title"
             value={value.title}
@@ -99,18 +114,18 @@ export function RecipePreview({
         </div>
 
         <div className="space-y-2">
-          <Label>Category</Label>
+          <Label>Kategorie</Label>
           <Select
             value={value.category}
             onValueChange={(category) => update({ category: category as RecipeCategory })}
           >
             <SelectTrigger className="w-full bg-background/70">
-              <SelectValue placeholder="Select category" />
+              <SelectValue>{CATEGORY_LABELS[value.category]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {CATEGORIES.map((category) => (
                 <SelectItem key={category} value={category}>
-                  {category}
+                  {CATEGORY_LABELS[category]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -118,18 +133,18 @@ export function RecipePreview({
         </div>
 
         <div className="space-y-2">
-          <Label>Difficulty</Label>
+          <Label>Schwierigkeit</Label>
           <Select
             value={value.difficulty}
             onValueChange={(difficulty) => update({ difficulty: difficulty as Difficulty })}
           >
             <SelectTrigger className="w-full bg-background/70">
-              <SelectValue placeholder="Select difficulty" />
+              <SelectValue>{DIFFICULTY_LABELS[value.difficulty]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {DIFFICULTIES.map((difficulty) => (
                 <SelectItem key={difficulty} value={difficulty}>
-                  {difficulty}
+                  {DIFFICULTY_LABELS[difficulty]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -137,7 +152,7 @@ export function RecipePreview({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="preview-servings">Servings</Label>
+          <Label htmlFor="preview-servings">Portionen</Label>
           <Input
             id="preview-servings"
             type="number"
@@ -154,7 +169,7 @@ export function RecipePreview({
       </div>
 
       <div className="space-y-3 rounded-xl border border-border/70 bg-muted/25 p-4">
-        <Label>Image</Label>
+        <Label>Bild</Label>
         {value.imageUrl ? (
           <div className="relative h-56 overflow-hidden rounded-xl border border-border/70 bg-background/70 sm:h-72">
             {isRemoteImage ? (
@@ -173,13 +188,13 @@ export function RecipePreview({
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-border/70 bg-background/60 p-6 text-sm text-muted-foreground">
-            No image yet. Use Find image or replace it manually.
+            Noch kein Bild. Bild suchen oder manuell ersetzen.
           </div>
         )}
 
         {imageCreditName ? (
           <div className="text-xs text-muted-foreground">
-            Photo by{' '}
+            Foto von{' '}
             {imageCreditUrl ? (
               <a href={imageCreditUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2">
                 {imageCreditName}
@@ -204,7 +219,7 @@ export function RecipePreview({
             />
             <span className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-background/70 px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/60">
               <Upload className="h-4 w-4" />
-              Replace image
+              Bild ersetzen
             </span>
           </label>
 
@@ -222,14 +237,14 @@ export function RecipePreview({
             disabled={disabled || !onFindImage || isFindingImage}
           >
             {isFindingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
-            {isFindingImage ? 'Finding image...' : 'Find image'}
+            {isFindingImage ? 'Bild wird gesucht...' : 'Bild suchen'}
           </Button>
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2 rounded-xl border border-border/70 bg-muted/25 p-4">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">Ingredients (read-only)</Label>
+          <Label className="text-xs uppercase tracking-wide text-muted-foreground">Zutaten (schreibgeschützt)</Label>
           <div className="max-h-56 overflow-y-auto rounded-lg border border-border/70 bg-background/60 p-3 text-sm">
             <ul className="space-y-1">
               {parsedRecipe.ingredients.map((ingredient, index) => (
@@ -240,7 +255,7 @@ export function RecipePreview({
         </div>
 
         <div className="space-y-2 rounded-xl border border-border/70 bg-muted/25 p-4">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">Instructions (read-only)</Label>
+          <Label className="text-xs uppercase tracking-wide text-muted-foreground">Anleitung (schreibgeschützt)</Label>
           <div className="max-h-56 overflow-y-auto rounded-lg border border-border/70 bg-background/60 p-3 text-sm whitespace-pre-wrap">
             {parsedRecipe.instructions}
           </div>
@@ -249,22 +264,22 @@ export function RecipePreview({
 
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
         <span>
-          Prep: {parsedRecipe.prep_time ?? '—'} min · Cook: {parsedRecipe.cook_time ?? '—'} min · Source:{' '}
+          Vorbereitung: {parsedRecipe.prep_time ?? '—'} min · Kochen: {parsedRecipe.cook_time ?? '—'} min · Quelle:{' '}
           {value.sourceType}
         </span>
         {value.sourceUrl && (
           <a href={value.sourceUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2">
-            Open source URL
+            Quell-URL öffnen
           </a>
         )}
       </div>
 
       <div className="flex flex-wrap justify-end gap-2">
         <Button type="button" variant="outline" onClick={onCancel} disabled={disabled}>
-          Discard
+          Verwerfen
         </Button>
         <Button type="button" onClick={() => void onSave()} disabled={disabled || !value.title.trim()}>
-          Save to library
+          In Bibliothek speichern
         </Button>
       </div>
     </div>

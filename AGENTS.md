@@ -28,6 +28,7 @@
 - Difficulty: easy, medium, hard
 - URL images are downloaded and persisted locally
 - API key encrypted client-side before persistence
+- UI language: German
 
 ## Code Organization
 - Keep UI and backend code separated
