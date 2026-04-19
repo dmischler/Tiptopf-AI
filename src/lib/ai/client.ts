@@ -56,4 +56,12 @@ export function resolveAiModelId() {
   return normalizeModelId(process.env.OPENCODE_MODEL_ID || DEFAULT_MODEL_ID)
 }
 
+export function getApiKey(): string {
+  const apiKey = process.env.OPENCODE_API_KEY
+  if (!apiKey) {
+    throw new Error('OPENCODE_API_KEY is not set in environment variables')
+  }
+  return apiKey
+}
+
 export { DEFAULT_BASE_URL }

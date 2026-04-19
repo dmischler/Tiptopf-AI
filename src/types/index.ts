@@ -33,8 +33,6 @@ export type Difficulty = 'easy' | 'medium' | 'hard';
 export interface Profile {
   id: string;
   email: string;
-  encrypted_api_key: string | null;
-  api_base_url: string;
   created_at: string;
   updated_at: string;
 }

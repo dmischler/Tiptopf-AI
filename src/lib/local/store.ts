@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 
-import { DEFAULT_BASE_URL } from '@/lib/ai/client'
 import type { Difficulty, Profile, Recipe, RecipeCategory, RecipeSourceType } from '@/types'
 
 import { getDataDir, getStoreFilePath } from '@/lib/local/paths'
@@ -35,11 +34,6 @@ type UpdateRecipeInput = Partial<
   >
 >
 
-type SaveProfileSettingsInput = {
-  encryptedApiKey: string | null
-  apiBaseUrl: string
-}
-
 let writeQueue: Promise<void> = Promise.resolve()
 
 function nowIso() {
@@ -52,8 +46,6 @@ function createDefaultProfile(): Profile {
   return {
     id: LOCAL_PROFILE_ID,
     email: LOCAL_PROFILE_EMAIL,
-    encrypted_api_key: null,
-    api_base_url: DEFAULT_BASE_URL,
     created_at: now,
     updated_at: now,
   }
@@ -179,11 +171,6 @@ function normalizeProfile(value: unknown): Profile {
   return {
     id: base.id,
     email: base.email,
-    encrypted_api_key: toStringOrNull(value.encrypted_api_key),
-    api_base_url:
-      typeof value.api_base_url === 'string' && value.api_base_url.trim()
-        ? value.api_base_url
-        : base.api_base_url,
     created_at: toIsoOrNow(value.created_at),
     updated_at: toIsoOrNow(value.updated_at),
   }
@@ -368,26 +355,4 @@ export async function updateRecipeRating(recipeId: string, rating: number | null
 export async function getProfile() {
   const store = await readStore()
   return store.profile
-}
-
-export async function saveProfileSettings(input: SaveProfileSettingsInput) {
-  return runMutatingStoreOperation((store) => {
-    const now = nowIso()
-    const current = normalizeProfile(store.profile)
-
-    store.profile = {
-      ...current,
-      id: LOCAL_PROFILE_ID,
-      email: LOCAL_PROFILE_EMAIL,
-      encrypted_api_key:
-        input.encryptedApiKey && input.encryptedApiKey.trim().length > 0
-          ? input.encryptedApiKey
-          : current.encrypted_api_key,
-      api_base_url: input.apiBaseUrl,
-      created_at: current.created_at,
-      updated_at: now,
-    }
-
-    return store.profile
-  })
 }

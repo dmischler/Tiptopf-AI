@@ -28,8 +28,9 @@ Set values:
 
 ```env
 DATA_DIR=/home/pi/tiptopf-data
-NEXT_PUBLIC_SITE_URL=http://<tailscale-hostname-or-ip>:3000
+OPENCODE_API_KEY=your_opencode_api_key
 # Optional
+# OPENCODE_BASE_URL=https://opencode.ai/zen/v1
 # OPENCODE_MODEL_ID=minimax-m2.5
 ```
 
@@ -88,8 +89,6 @@ With `DATA_DIR=/home/pi/tiptopf-data`:
 - `profile` with:
   - `id` (`local-device`)
   - `email` (`local@tiptopf.local`)
-  - `encrypted_api_key`
-  - `api_base_url`
 
 ## Image handling
 
@@ -116,7 +115,7 @@ tar -xzf tiptopf-backup.tar.gz -C /home/pi
 
 - App does not enforce login in Option A.
 - Restrict access using Tailscale ACLs/users/devices.
-- API keys are encrypted client-side before persistence.
+- API key is set via `OPENCODE_API_KEY` in `.env.local`.
 - Keep `.env.local` private and out of git.
 
 ## Troubleshooting
@@ -138,5 +137,4 @@ tar -xzf tiptopf-backup.tar.gz -C /home/pi
 1. Open `/library`
 2. Add a recipe from URL
 3. Replace recipe image
-4. Open `/profile`, save API settings
-5. Restart app process and confirm data persists
+4. Restart app process and confirm data persists

@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { SearchX } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -242,9 +241,6 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
             {recipes.length} recipe{recipes.length === 1 ? '' : 's'} across your personal collection.
           </p>
         </div>
-        <Button variant="outline" nativeButton={false} render={<Link href="/profile" />}>
-          Profile settings
-        </Button>
       </div>
 
       <div className="grid gap-2 md:grid-cols-[1fr_auto_auto]">

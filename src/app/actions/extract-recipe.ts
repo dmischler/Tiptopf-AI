@@ -2,18 +2,16 @@
 
 import { z } from 'zod'
 
-import { decryptApiKey } from '@/lib/crypto'
 import { extractRecipeFromText } from '@/lib/ai/extractor'
 import { generateRecipeImageWithAi } from '@/lib/ai/image-generator'
 import { searchPexelsImages } from '@/lib/ai/image-search'
 import { searchMealDbImages } from '@/lib/ai/meal-db'
 import type { RecipeCategory } from '@/types'
 import type { RecipeImageCandidate, ResolvedRecipeImage } from '@/lib/ai/image-types'
-import { DEFAULT_BASE_URL } from '@/lib/ai/client'
+import { DEFAULT_BASE_URL, getApiKey, resolveAiBaseUrl } from '@/lib/ai/client'
 import { fetchRecipeUrl } from '@/lib/ai/url-fetcher'
 import { extractRecipeFromImage } from '@/lib/ai/image-handler'
 import { downloadImageToLocalStorage, saveRecipeImageBytes } from '@/lib/local/images'
-import { getProfile, LOCAL_PROFILE_ID } from '@/lib/local/store'
 
 const categorySchema = z.enum(['starter', 'main', 'dessert', 'side', 'breakfast', 'snack'])
 const titleSchema = z.string().trim().min(1).max(180)
@@ -26,29 +24,6 @@ const findRecipeImageInputSchema = z.object({
 })
 
 type FindRecipeImageInput = z.infer<typeof findRecipeImageInputSchema>
-
-type UserApiConfig = {
-  apiKey: string
-  baseUrl: string
-}
-
-async function getUserApiConfig(): Promise<UserApiConfig> {
-  const profile = await getProfile()
-  const userId = LOCAL_PROFILE_ID
-
-  if (!profile?.encrypted_api_key) {
-    throw new Error(
-      'No API key configured in profile settings. Add one for pages without structured recipe metadata.'
-    )
-  }
-
-  const apiKey = await decryptApiKey(profile.encrypted_api_key, userId)
-
-  return {
-    apiKey,
-    baseUrl: profile.api_base_url || DEFAULT_BASE_URL,
-  }
-}
 
 function buildImageSearchQuery(title: string, category: RecipeCategory) {
   const suffixByCategory: Record<RecipeCategory, string> = {
@@ -79,21 +54,15 @@ async function collectImageCandidates(title: string, category: RecipeCategory): 
 }
 
 async function generateRecipeImage(input: FindRecipeImageInput): Promise<ResolvedRecipeImage | null> {
-  let config: UserApiConfig
-
-  try {
-    config = await getUserApiConfig()
-  } catch {
-    return null
-  }
+  const baseUrl = resolveAiBaseUrl(process.env.OPENCODE_BASE_URL)
 
   try {
     const generated = await generateRecipeImageWithAi({
       title: input.title,
       category: input.category,
       ingredients: input.ingredients,
-      apiKey: config.apiKey,
-      baseUrl: config.baseUrl,
+      apiKey: getApiKey(),
+      baseUrl,
     })
 
     if (generated.bytes) {
@@ -175,8 +144,8 @@ export async function extractFromUrlAction(url: string) {
   let recipe = structuredRecipe
 
   if (!recipe) {
-    const { apiKey, baseUrl } = await getUserApiConfig()
-    recipe = await extractRecipeFromText(content, apiKey, baseUrl, true)
+    const baseUrl = resolveAiBaseUrl(process.env.OPENCODE_BASE_URL)
+    recipe = await extractRecipeFromText(content, getApiKey(), baseUrl, true)
   }
 
   let storedImageUrl: string | null = null
@@ -201,8 +170,8 @@ export async function extractFromImageAction(imageBase64: string) {
     throw new Error('No image payload provided')
   }
 
-  const { apiKey, baseUrl } = await getUserApiConfig()
-  const recipe = await extractRecipeFromImage(imageBase64, apiKey, baseUrl)
+  const baseUrl = resolveAiBaseUrl(process.env.OPENCODE_BASE_URL)
+  const recipe = await extractRecipeFromImage(imageBase64, getApiKey(), baseUrl)
 
   return {
     ...recipe,
