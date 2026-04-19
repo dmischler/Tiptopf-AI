@@ -602,6 +602,7 @@ export function RecipeDetail({
                     <Button
                       type="button"
                       variant="outline"
+                      nativeButton={false}
                       render={<Link href={currentRecipe.source_url} target="_blank" rel="noreferrer" />}
                     >
                       <ExternalLink className="mr-2 h-4 w-4" />
@@ -656,12 +657,14 @@ export function RecipeDetail({
                       }
                     >
                       <SelectTrigger className="w-full bg-background/70" disabled={isSaving}>
-                        <SelectValue>{CATEGORY_LABELS[draft.category]}</SelectValue>
+                        <SelectValue>
+                          {(val) => (val ? CATEGORY_LABELS[val as RecipeCategory] : 'Kategorie')}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {CATEGORIES.map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {CATEGORY_LABELS[category]}
+                        {CATEGORIES.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {CATEGORY_LABELS[cat]}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -684,12 +687,14 @@ export function RecipeDetail({
                       }
                     >
                       <SelectTrigger className="w-full bg-background/70" disabled={isSaving}>
-                        <SelectValue>{DIFFICULTY_LABELS[draft.difficulty]}</SelectValue>
+                        <SelectValue>
+                          {(val) => (val ? DIFFICULTY_LABELS[val as Difficulty] : 'Schwierigkeit')}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {DIFFICULTIES.map((difficulty) => (
-                          <SelectItem key={difficulty} value={difficulty}>
-                            {DIFFICULTY_LABELS[difficulty]}
+                        {DIFFICULTIES.map((diff) => (
+                          <SelectItem key={diff} value={diff}>
+                            {DIFFICULTY_LABELS[diff]}
                           </SelectItem>
                         ))}
                       </SelectContent>

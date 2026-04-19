@@ -7,7 +7,22 @@ import { FavoriteButton } from '@/components/interactions/favorite-button'
 import { Rating } from '@/components/interactions/rating'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import type { Recipe } from '@/types'
+import type { Difficulty, Recipe, RecipeCategory } from '@/types'
+
+const CATEGORY_LABELS: Record<RecipeCategory, string> = {
+  starter: 'Vorspeise',
+  main: 'Hauptgericht',
+  dessert: 'Dessert',
+  side: 'Beilage',
+  breakfast: 'Frühstück',
+  snack: 'Snack',
+}
+
+const DIFFICULTY_LABELS: Record<Difficulty, string> = {
+  easy: 'Einfach',
+  medium: 'Mittel',
+  hard: 'Schwer',
+}
 
 type RecipeCardProps = {
   recipe: Recipe
@@ -31,11 +46,11 @@ function formatTotalTime(prepTime: number, cookTime: number) {
 }
 
 function formatCategoryLabel(category: Recipe['category']) {
-  return category[0].toUpperCase() + category.slice(1)
+  return CATEGORY_LABELS[category]
 }
 
 function formatDifficultyLabel(difficulty: Recipe['difficulty']) {
-  return difficulty[0].toUpperCase() + difficulty.slice(1)
+  return DIFFICULTY_LABELS[difficulty]
 }
 
 export function RecipeCard({ recipe, onOpen, onFavoriteChange, onRatingChange }: RecipeCardProps) {

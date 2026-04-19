@@ -120,7 +120,9 @@ export function RecipePreview({
             onValueChange={(category) => update({ category: category as RecipeCategory })}
           >
             <SelectTrigger className="w-full bg-background/70">
-              <SelectValue>{CATEGORY_LABELS[value.category]}</SelectValue>
+              <SelectValue>
+                {(val) => (val ? CATEGORY_LABELS[val as RecipeCategory] : 'Kategorie')}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {CATEGORIES.map((category) => (
@@ -139,7 +141,9 @@ export function RecipePreview({
             onValueChange={(difficulty) => update({ difficulty: difficulty as Difficulty })}
           >
             <SelectTrigger className="w-full bg-background/70">
-              <SelectValue>{DIFFICULTY_LABELS[value.difficulty]}</SelectValue>
+              <SelectValue>
+                {(val) => (val ? DIFFICULTY_LABELS[val as Difficulty] : 'Schwierigkeit')}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {DIFFICULTIES.map((difficulty) => (

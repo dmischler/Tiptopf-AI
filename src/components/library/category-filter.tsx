@@ -25,20 +25,20 @@ type CategoryFilterProps = {
 }
 
 const CATEGORY_ITEMS: Array<{ value: LibraryCategoryFilter; label: string }> = [
-  { value: 'all', label: 'All categories' },
-  { value: 'starter', label: 'Starter' },
-  { value: 'main', label: 'Main' },
+  { value: 'all', label: 'Alle Kategorien' },
+  { value: 'starter', label: 'Vorspeise' },
+  { value: 'main', label: 'Hauptgericht' },
   { value: 'dessert', label: 'Dessert' },
-  { value: 'side', label: 'Side' },
-  { value: 'breakfast', label: 'Breakfast' },
+  { value: 'side', label: 'Beilage' },
+  { value: 'breakfast', label: 'Frühstück' },
   { value: 'snack', label: 'Snack' },
 ]
 
 export function CategoryFilter({ value, onChange }: CategoryFilterProps) {
-  const activeCategoryLabel = CATEGORY_ITEMS.find((item) => item.value === value.category)?.label ?? 'All categories'
+  const activeCategoryLabel = CATEGORY_ITEMS.find((item) => item.value === value.category)?.label ?? 'Alle Kategorien'
 
   const buttonLabel = value.favoritesOnly
-    ? `${activeCategoryLabel} · Favorites`
+    ? `${activeCategoryLabel} · Favoriten`
     : activeCategoryLabel
 
   return (
@@ -58,7 +58,7 @@ export function CategoryFilter({ value, onChange }: CategoryFilterProps) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Category</DropdownMenuLabel>
+          <DropdownMenuLabel>Kategorie</DropdownMenuLabel>
           {CATEGORY_ITEMS.map((item) => (
           <DropdownMenuItem
             key={item.value}
@@ -77,7 +77,7 @@ export function CategoryFilter({ value, onChange }: CategoryFilterProps) {
           checked={value.favoritesOnly}
           onCheckedChange={(checked) => onChange({ ...value, favoritesOnly: checked })}
         >
-          Favorites only
+          Nur Favoriten
         </DropdownMenuCheckboxItem>
       </DropdownMenuContent>
     </DropdownMenu>

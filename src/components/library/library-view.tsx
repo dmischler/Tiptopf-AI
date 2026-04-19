@@ -147,7 +147,7 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
 
       pendingDeletionRef.current = null
       void deleteRecipeAction(recipe.id).catch((error) => {
-        const message = error instanceof Error ? error.message : 'Failed to delete recipe.'
+        const message = error instanceof Error ? error.message : 'Rezept konnte nicht wiederhergestellt werden.'
         setRecipes((current) => insertRecipeAt(current, recipe, index))
         toast.error(message)
       })
@@ -195,7 +195,7 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
         )
       })
       .catch((error) => {
-        const message = error instanceof Error ? error.message : 'Failed to restore recipe.'
+        const message = error instanceof Error ? error.message : 'Wiederherstellen fehlgeschlagen.'
         toast.error(message)
       })
   }
@@ -207,7 +207,7 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
       pendingDeletionRef.current = null
 
       void deleteRecipeAction(previousPending.recipe.id).catch((error) => {
-        const message = error instanceof Error ? error.message : 'Failed to finalize previous deletion.'
+        const message = error instanceof Error ? error.message : 'Löschen fehlgeschlagen.'
         toast.error(message)
       })
     }
@@ -223,10 +223,10 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
     setSelectedRecipeId((currentSelected) => (currentSelected === recipe.id ? null : currentSelected))
     queueDeletion(recipe, removedIndex)
 
-    toast.success('Recipe deleted', {
+    toast.success('Rezept gelöscht', {
       duration: 30_000,
       action: {
-        label: 'Undo',
+        label: 'Rückgängig',
         onClick: () => handleUndoDelete(recipe.id),
       },
     })
@@ -236,9 +236,9 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-8 pb-24 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Your library</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">Deine Bibliothek</h1>
           <p className="text-sm text-muted-foreground">
-            {recipes.length} recipe{recipes.length === 1 ? '' : 's'} across your personal collection.
+            {recipes.length} Rezept{recipes.length === 1 ? '' : 'e'} in deiner persönlichen Sammlung.
           </p>
         </div>
       </div>
@@ -252,9 +252,9 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
       {recipes.length === 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>No recipes yet</CardTitle>
+            <CardTitle>Noch keine Rezepte</CardTitle>
             <CardDescription>
-              Click the floating + button to add your first recipe from an image or URL.
+              Klicke auf den schwebenden + Button, um dein erstes Rezept aus einem Bild oder einer URL hinzuzufügen.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -262,7 +262,7 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
         <Card>
           <CardContent className="flex items-center gap-3 py-6 text-sm text-muted-foreground">
             <SearchX className="h-5 w-5" />
-            No recipes match your current search and filter settings.
+            Deine aktuellen Such- und Filtereinstellungen ergeben keine Rezepte.
           </CardContent>
         </Card>
       ) : (

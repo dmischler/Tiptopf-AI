@@ -15,23 +15,25 @@ type SortDropdownProps = {
 }
 
 const LABELS: Record<SortOption, string> = {
-  newest: 'Newest',
-  oldest: 'Oldest',
-  prep_time: 'Prep time',
-  rating: 'Highest rating',
+  newest: 'Neueste',
+  oldest: 'Älteste',
+  prep_time: 'Zubereitungszeit',
+  rating: 'Höchste Bewertung',
 }
 
 export function SortDropdown({ value, onChange }: SortDropdownProps) {
   return (
     <Select value={value} onValueChange={(next) => onChange(next as SortOption)}>
       <SelectTrigger className="h-9 w-full sm:w-44">
-        <SelectValue>{LABELS[value]}</SelectValue>
+        <SelectValue>
+          {(val) => (val ? LABELS[val as SortOption] : LABELS.newest)}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent align="end">
-        <SelectItem value="newest">Newest</SelectItem>
-        <SelectItem value="oldest">Oldest</SelectItem>
-        <SelectItem value="prep_time">Prep time (shortest)</SelectItem>
-        <SelectItem value="rating">Rating (highest)</SelectItem>
+        <SelectItem value="newest">Neueste</SelectItem>
+        <SelectItem value="oldest">Älteste</SelectItem>
+        <SelectItem value="prep_time">Zubereitungszeit</SelectItem>
+        <SelectItem value="rating">Höchste Bewertung</SelectItem>
       </SelectContent>
     </Select>
   )
