@@ -14,7 +14,14 @@ Return ONLY valid JSON (no markdown, no explanations) with this exact shape:
 }
 
 Rules:
-- Keep recipe language as-is.
+- Translate all output text to German (title, ingredients, instructions) regardless of input language.
+- Convert imperial units to metric equivalents where relevant:
+  - oz/lb -> g
+  - cups/tbsp/tsp/fl oz -> ml
+  - °F -> °C
+  - inches -> cm
+  - normalize common cooking shorthand to practical metric values when possible.
+- Format instructions as clearly separated numbered steps, one step per line (1. ..., 2. ...).
 - If unknown, use null for times/servings.
 - Category must be one allowed value.
 - Difficulty defaults to "medium" when unclear.

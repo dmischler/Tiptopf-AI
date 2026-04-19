@@ -2,7 +2,10 @@
 
 import Link from 'next/link'
 import { SearchX } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
+
+import { deleteRecipeAction, restoreRecipe } from '@/app/actions/recipe'
 
 import { AddRecipeLauncher } from '@/components/add-recipe/launcher'
 import {
@@ -20,6 +23,28 @@ import type { Recipe, SortOption } from '@/types'
 
 type LibraryViewProps = {
   initialRecipes: Recipe[]
+}
+
+type RecipePatch = Partial<
+  Pick<
+    Recipe,
+    | 'is_favorite'
+    | 'rating'
+    | 'title'
+    | 'ingredients'
+    | 'instructions'
+    | 'prep_time'
+    | 'cook_time'
+    | 'servings'
+    | 'category'
+    | 'difficulty'
+  >
+>
+
+type PendingDeletion = {
+  recipe: Recipe
+  index: number
+  timeoutId: ReturnType<typeof setTimeout>
 }
 
 const DEFAULT_FILTER: CategoryFilterValue = {
@@ -59,6 +84,16 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
   const [sortOption, setSortOption] = useState<SortOption>('newest')
   const [filterValue, setFilterValue] = useState<CategoryFilterValue>(DEFAULT_FILTER)
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null)
+  const pendingDeletionRef = useRef<PendingDeletion | null>(null)
+
+  useEffect(() => {
+    return () => {
+      const pending = pendingDeletionRef.current
+      if (pending) {
+        clearTimeout(pending.timeoutId)
+      }
+    }
+  }, [])
 
   const filteredRecipes = useMemo(() => {
     const query = searchTerm.trim().toLowerCase()
@@ -91,13 +126,120 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
     [recipes, selectedRecipeId]
   )
 
-  function patchRecipe(
-    recipeId: string,
-    patch: Partial<Pick<Recipe, 'is_favorite' | 'rating'>>
-  ) {
+  function patchRecipe(recipeId: string, patch: RecipePatch) {
     setRecipes((current) =>
       current.map((recipe) => (recipe.id === recipeId ? { ...recipe, ...patch } : recipe))
     )
+  }
+
+  function insertRecipeAt(recipesList: Recipe[], recipe: Recipe, index: number) {
+    const next = [...recipesList]
+    const targetIndex = Math.max(0, Math.min(index, next.length))
+    next.splice(targetIndex, 0, recipe)
+    return next
+  }
+
+  function queueDeletion(recipe: Recipe, index: number) {
+    const timeoutId = setTimeout(() => {
+      const pending = pendingDeletionRef.current
+      if (!pending || pending.recipe.id !== recipe.id) {
+        return
+      }
+
+      pendingDeletionRef.current = null
+      void deleteRecipeAction(recipe.id).catch((error) => {
+        const message = error instanceof Error ? error.message : 'Failed to delete recipe.'
+        setRecipes((current) => insertRecipeAt(current, recipe, index))
+        toast.error(message)
+      })
+    }, 30_000)
+
+    pendingDeletionRef.current = {
+      recipe,
+      index,
+      timeoutId,
+    }
+  }
+
+  function handleUndoDelete(recipeId: string) {
+    const pending = pendingDeletionRef.current
+    if (!pending || pending.recipe.id !== recipeId) {
+      return
+    }
+
+    clearTimeout(pending.timeoutId)
+    pendingDeletionRef.current = null
+
+    setRecipes((current) => {
+      if (current.some((item) => item.id === pending.recipe.id)) {
+        return current
+      }
+
+      return insertRecipeAt(current, pending.recipe, pending.index)
+    })
+
+    void restoreRecipe(pending.recipe)
+      .then((restored) => {
+        setRecipes((current) => {
+          const index = current.findIndex((item) => item.id === pending.recipe.id)
+          if (index < 0) {
+            return [restored as Recipe, ...current.filter((item) => item.id !== restored.id)]
+          }
+
+          const next = [...current]
+          next[index] = restored as Recipe
+          return next
+        })
+
+        setSelectedRecipeId((currentSelected) =>
+          currentSelected === pending.recipe.id ? restored.id : currentSelected
+        )
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : 'Failed to restore recipe.'
+        toast.error(message)
+      })
+  }
+
+  function handleDeleteRequested(recipe: Recipe) {
+    const previousPending = pendingDeletionRef.current
+    if (previousPending) {
+      clearTimeout(previousPending.timeoutId)
+      pendingDeletionRef.current = null
+
+      void deleteRecipeAction(previousPending.recipe.id).catch((error) => {
+        const message = error instanceof Error ? error.message : 'Failed to finalize previous deletion.'
+        toast.error(message)
+      })
+    }
+
+    let removedIndex = -1
+    setRecipes((current) => {
+      const index = current.findIndex((item) => item.id === recipe.id)
+      removedIndex = index
+      if (index < 0) {
+        return current
+      }
+
+      const next = [...current]
+      next.splice(index, 1)
+      return next
+    })
+
+    if (removedIndex < 0) {
+      return
+    }
+
+    setSelectedRecipeId((currentSelected) => (currentSelected === recipe.id ? null : currentSelected))
+    queueDeletion(recipe, removedIndex)
+
+    toast.success('Recipe deleted', {
+      duration: 30_000,
+      action: {
+        label: 'Undo',
+        onClick: () => handleUndoDelete(recipe.id),
+      },
+    })
   }
 
   return (
@@ -167,6 +309,12 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
           if (!selectedRecipe) return
           patchRecipe(selectedRecipe.id, { rating: value })
         }}
+        onRecipeUpdated={(updatedRecipe) => {
+          setRecipes((current) =>
+            current.map((item) => (item.id === updatedRecipe.id ? updatedRecipe : item))
+          )
+        }}
+        onRecipeDeleteRequested={handleDeleteRequested}
       />
 
       <AddRecipeLauncher

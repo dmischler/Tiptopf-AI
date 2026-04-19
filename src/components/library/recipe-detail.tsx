@@ -2,21 +2,45 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import type { ReactNode } from 'react'
-import { Clock, ExternalLink, Printer, Timer, UtensilsCrossed } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import {
+  Clock,
+  ExternalLink,
+  ImageIcon,
+  Loader2,
+  Pencil,
+  Printer,
+  Timer,
+  Trash2,
+  Upload,
+  UtensilsCrossed,
+} from 'lucide-react'
+import { toast } from 'sonner'
 
+import { uploadRecipeImage } from '@/app/actions/add-recipe'
+import {
+  applyRecipeImageCandidateAction,
+  generateRecipeImageAction,
+  searchRecipeImageCandidatesAction,
+} from '@/app/actions/extract-recipe'
+import { editRecipe, setRecipeImage } from '@/app/actions/recipe'
+import { ImageSelectionModal } from '@/components/add-recipe/image-selection-modal'
 import { FavoriteButton } from '@/components/interactions/favorite-button'
 import { Rating } from '@/components/interactions/rating'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
-import type { Recipe } from '@/types'
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import type { RecipeImageCandidate } from '@/lib/ai/image-types'
+import type { Difficulty, Recipe, RecipeCategory } from '@/types'
 
 type RecipeDetailProps = {
   recipe: Recipe | null
@@ -24,6 +48,27 @@ type RecipeDetailProps = {
   onOpenChange: (open: boolean) => void
   onFavoriteChange?: (value: boolean) => void
   onRatingChange?: (value: number | null) => void
+  onRecipeUpdated?: (recipe: Recipe) => void
+  onRecipeDeleteRequested?: (recipe: Recipe) => void
+}
+
+type EditMode = 'view' | 'edit'
+
+type RecipeDraft = {
+  title: string
+  category: RecipeCategory
+  difficulty: Difficulty
+  prepTime: string
+  cookTime: string
+  servings: string
+  ingredientsText: string
+  instructionsText: string
+  imageUrl: string | null
+}
+
+type ImageMeta = {
+  creditName?: string
+  creditUrl?: string
 }
 
 const CATEGORY_CLASS: Record<Recipe['category'], string> = {
@@ -34,6 +79,11 @@ const CATEGORY_CLASS: Record<Recipe['category'], string> = {
   breakfast: 'bg-yellow-500/20 text-yellow-300',
   snack: 'bg-orange-500/20 text-orange-300',
 }
+
+const CATEGORIES: RecipeCategory[] = ['starter', 'main', 'dessert', 'side', 'breakfast', 'snack']
+const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard']
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 function formatCategoryLabel(category: Recipe['category']) {
   return category[0].toUpperCase() + category.slice(1)
@@ -56,6 +106,41 @@ function toInstructionSteps(instructions: string) {
   return lines.map((line) => line.replace(/^\d+[.)]\s*/, ''))
 }
 
+function toNonEmptyLines(value: string) {
+  return value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+}
+
+function toDraft(recipe: Recipe): RecipeDraft {
+  return {
+    title: recipe.title,
+    category: recipe.category,
+    difficulty: recipe.difficulty,
+    prepTime: recipe.prep_time > 0 ? String(recipe.prep_time) : '',
+    cookTime: recipe.cook_time > 0 ? String(recipe.cook_time) : '',
+    servings: recipe.servings > 0 ? String(recipe.servings) : '',
+    ingredientsText: recipe.ingredients.join('\n'),
+    instructionsText: toInstructionSteps(recipe.instructions).join('\n'),
+    imageUrl: recipe.image_url,
+  }
+}
+
+function parseOptionalInt(value: string, min: number, field: string) {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return null
+  }
+
+  const parsed = Number(trimmed)
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < min) {
+    throw new Error(`${field} must be an integer ${min === 0 ? '0 or higher' : `${min} or higher`}.`)
+  }
+
+  return parsed
+}
+
 function InfoItem({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
   return (
     <div className="rounded-lg border border-border/70 bg-background/40 p-3">
@@ -74,130 +159,801 @@ export function RecipeDetail({
   onOpenChange,
   onFavoriteChange,
   onRatingChange,
+  onRecipeUpdated,
+  onRecipeDeleteRequested,
 }: RecipeDetailProps) {
-  if (!recipe) {
+  const [mode, setMode] = useState<EditMode>('view')
+  const [draft, setDraft] = useState<RecipeDraft | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [replacementImageFile, setReplacementImageFile] = useState<File | null>(null)
+  const [replacementImagePreviewUrl, setReplacementImagePreviewUrl] = useState<string | null>(null)
+  const [imageMeta, setImageMeta] = useState<ImageMeta | null>(null)
+  const [isFindingImage, setIsFindingImage] = useState(false)
+  const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false)
+  const [imageCandidates, setImageCandidates] = useState<RecipeImageCandidate[]>([])
+  const [isLoadingCandidates, setIsLoadingCandidates] = useState(false)
+  const [isGeneratingAiImage, setIsGeneratingAiImage] = useState(false)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+
+  useEffect(() => {
+    if (!replacementImagePreviewUrl) {
+      return
+    }
+
+    return () => {
+      URL.revokeObjectURL(replacementImagePreviewUrl)
+    }
+  }, [replacementImagePreviewUrl])
+
+  useEffect(() => {
+    if (!recipe || !open) {
+      return
+    }
+
+    setMode('view')
+    setDraft(toDraft(recipe))
+    setReplacementImageFile(null)
+    setReplacementImagePreviewUrl((current) => {
+      if (current) {
+        URL.revokeObjectURL(current)
+      }
+
+      return null
+    })
+    setImageMeta(null)
+    setIsSelectionModalOpen(false)
+    setImageCandidates([])
+    setConfirmDeleteOpen(false)
+  }, [open, recipe])
+
+  if (!recipe || !draft) {
     return null
   }
 
-  const instructionSteps = toInstructionSteps(recipe.instructions)
-  const totalTime = recipe.prep_time + recipe.cook_time
+  const currentRecipe = recipe
+  const instructionSteps = toInstructionSteps(currentRecipe.instructions)
+  const totalTime = currentRecipe.prep_time + currentRecipe.cook_time
+  const currentImageUrl = replacementImagePreviewUrl ?? draft.imageUrl
+
+  function resetDraftFromRecipe() {
+    setDraft(toDraft(currentRecipe))
+    setReplacementImageFile(null)
+    if (replacementImagePreviewUrl) {
+      URL.revokeObjectURL(replacementImagePreviewUrl)
+    }
+    setReplacementImagePreviewUrl(null)
+    setImageMeta(null)
+    setIsSelectionModalOpen(false)
+    setImageCandidates([])
+  }
+
+  function applyResolvedImage(imageUrl: string, meta: ImageMeta | null = null) {
+    if (replacementImagePreviewUrl) {
+      URL.revokeObjectURL(replacementImagePreviewUrl)
+      setReplacementImagePreviewUrl(null)
+    }
+
+    setReplacementImageFile(null)
+    setImageMeta(meta)
+    setDraft((current) => {
+      if (!current) {
+        return current
+      }
+
+      return {
+        ...current,
+        imageUrl,
+      }
+    })
+  }
+
+  async function loadImageCandidates() {
+    const currentDraft = draft
+    if (!currentDraft) {
+      return [] as RecipeImageCandidate[]
+    }
+
+    setIsLoadingCandidates(true)
+    try {
+      const candidates = await searchRecipeImageCandidatesAction(
+        currentDraft.title.trim() || currentRecipe.title,
+        currentDraft.category
+      )
+      setImageCandidates(candidates)
+      return candidates
+    } catch {
+      setImageCandidates([])
+      toast.error('Failed to search image providers right now.')
+      return [] as RecipeImageCandidate[]
+    } finally {
+      setIsLoadingCandidates(false)
+    }
+  }
+
+  async function handleFindImage() {
+    setIsFindingImage(true)
+    try {
+      const candidates = await loadImageCandidates()
+      setIsSelectionModalOpen(true)
+      if (!currentImageUrl && candidates.length === 0) {
+        toast.info('No external matches yet. You can generate an AI image in the picker.')
+      }
+    } finally {
+      setIsFindingImage(false)
+    }
+  }
+
+  async function handleGenerateAiImageFromModal() {
+    const currentDraft = draft
+    if (!currentDraft) {
+      return
+    }
+
+    setIsGeneratingAiImage(true)
+    try {
+      const resolved = await generateRecipeImageAction({
+        title: currentDraft.title.trim() || currentRecipe.title,
+        category: currentDraft.category,
+        ingredients: toNonEmptyLines(currentDraft.ingredientsText),
+      })
+
+      if (!resolved?.imageUrl) {
+        toast.error('Could not generate an image right now.')
+        return
+      }
+
+      applyResolvedImage(resolved.imageUrl, {
+        creditName: resolved.creditName,
+        creditUrl: resolved.creditUrl,
+      })
+      setIsSelectionModalOpen(false)
+      toast.success('AI image generated.')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to generate AI image.'
+      toast.error(message)
+    } finally {
+      setIsGeneratingAiImage(false)
+    }
+  }
+
+  async function handleSelectImageCandidate(candidate: RecipeImageCandidate) {
+    try {
+      const persistedUrl = await applyRecipeImageCandidateAction(candidate.url)
+      applyResolvedImage(persistedUrl, {
+        creditName: candidate.creditName,
+        creditUrl: candidate.creditUrl,
+      })
+      setIsSelectionModalOpen(false)
+      toast.success('Image updated.')
+    } catch {
+      toast.error('Failed to apply selected image.')
+    }
+  }
+
+  async function handleReplaceImage(file: File | null) {
+    if (!file) {
+      return
+    }
+
+    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+      toast.error('Only JPG, PNG, and WEBP images are supported.')
+      return
+    }
+
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error('Replacement image must be 5MB or smaller.')
+      return
+    }
+
+    if (replacementImagePreviewUrl) {
+      URL.revokeObjectURL(replacementImagePreviewUrl)
+    }
+
+    const objectUrl = URL.createObjectURL(file)
+    setReplacementImageFile(file)
+    setReplacementImagePreviewUrl(objectUrl)
+    setImageMeta(null)
+    setDraft((current) => {
+      if (!current) {
+        return current
+      }
+
+      return {
+        ...current,
+        imageUrl: objectUrl,
+      }
+    })
+    toast.success('Image replaced.')
+  }
+
+  async function handleSaveEdit() {
+    const currentDraft = draft
+    if (!currentDraft) {
+      return
+    }
+
+    const title = currentDraft.title.trim()
+    const ingredients = toNonEmptyLines(currentDraft.ingredientsText)
+    const instructionsLines = toNonEmptyLines(currentDraft.instructionsText)
+    const instructions = instructionsLines.join('\n')
+
+    if (!title) {
+      toast.error('Title is required.')
+      return
+    }
+
+    if (ingredients.length === 0) {
+      toast.error('At least one ingredient is required.')
+      return
+    }
+
+    if (!instructions) {
+      toast.error('Instructions are required.')
+      return
+    }
+
+    let prepTime: number | null
+    let cookTime: number | null
+    let servings: number | null
+
+    try {
+      prepTime = parseOptionalInt(currentDraft.prepTime, 0, 'Prep time')
+      cookTime = parseOptionalInt(currentDraft.cookTime, 0, 'Cook time')
+      servings = parseOptionalInt(currentDraft.servings, 1, 'Servings')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Invalid numeric value.'
+      toast.error(message)
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      let updated = await editRecipe(currentRecipe.id, {
+        title,
+        ingredients,
+        instructions,
+        prep_time: prepTime,
+        cook_time: cookTime,
+        servings,
+        category: currentDraft.category,
+        difficulty: currentDraft.difficulty,
+      })
+
+      if (replacementImageFile) {
+        const imageFormData = new FormData()
+        imageFormData.append('recipeId', currentRecipe.id)
+        imageFormData.append('image', replacementImageFile)
+        const uploadedImageUrl = await uploadRecipeImage(imageFormData)
+        updated = await setRecipeImage(currentRecipe.id, uploadedImageUrl)
+      } else if (
+        currentDraft.imageUrl &&
+        currentDraft.imageUrl !== currentRecipe.image_url &&
+        !currentDraft.imageUrl.startsWith('blob:')
+      ) {
+        updated = await setRecipeImage(currentRecipe.id, currentDraft.imageUrl)
+      }
+
+      onRecipeUpdated?.(updated as Recipe)
+      setMode('view')
+      setReplacementImageFile(null)
+      if (replacementImagePreviewUrl) {
+        URL.revokeObjectURL(replacementImagePreviewUrl)
+      }
+      setReplacementImagePreviewUrl(null)
+      setImageMeta(null)
+      setIsSelectionModalOpen(false)
+      setImageCandidates([])
+      setDraft(toDraft(updated as Recipe))
+      toast.success('Recipe updated.')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update recipe.'
+      toast.error(message)
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto p-0 sm:max-w-xl" showCloseButton>
-        {recipe.image_url ? (
-          <div className="relative aspect-[4/3] w-full">
-            <Image
-              src={recipe.image_url}
-              alt={recipe.title}
-              fill
-              className="object-cover"
-              sizes="(max-width: 640px) 100vw, 640px"
-            />
-          </div>
-        ) : (
-          <div className="flex aspect-[4/3] w-full items-center justify-center bg-muted/40 text-sm text-muted-foreground">
-            No image available
-          </div>
-        )}
+    <>
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => {
+          onOpenChange(nextOpen)
+          if (!nextOpen) {
+            setMode('view')
+            setConfirmDeleteOpen(false)
+            resetDraftFromRecipe()
+          }
+        }}
+      >
+        <DialogContent className="w-full max-w-2xl p-0 sm:max-w-2xl" showCloseButton>
+          {mode === 'view' ? (
+            <>
+              {currentRecipe.image_url ? (
+                <div className="relative aspect-[4/3] w-full">
+                  <Image
+                    src={currentRecipe.image_url}
+                    alt={currentRecipe.title}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 640px) 100vw, 768px"
+                  />
+                </div>
+              ) : (
+                <div className="flex aspect-[4/3] w-full items-center justify-center bg-muted/40 text-sm text-muted-foreground">
+                  No image available
+                </div>
+              )}
 
-        <SheetHeader className="gap-3 p-5 pb-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="space-y-2">
-              <SheetTitle className="text-xl leading-tight">{recipe.title}</SheetTitle>
-              <div className="flex flex-wrap gap-2">
-                <Badge className={CATEGORY_CLASS[recipe.category]}>{formatCategoryLabel(recipe.category)}</Badge>
-                <Badge variant="outline">{formatDifficultyLabel(recipe.difficulty)}</Badge>
+              <DialogHeader className="gap-3 border-b border-border/70 px-5 pb-3 pt-5 pr-12">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="space-y-2">
+                    <DialogTitle className="text-xl leading-tight">{currentRecipe.title}</DialogTitle>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge className={CATEGORY_CLASS[currentRecipe.category]}>
+                        {formatCategoryLabel(currentRecipe.category)}
+                      </Badge>
+                      <Badge variant="outline">{formatDifficultyLabel(currentRecipe.difficulty)}</Badge>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <FavoriteButton
+                      recipeId={currentRecipe.id}
+                      isFavorite={currentRecipe.is_favorite}
+                      size="md"
+                      onOptimisticChange={onFavoriteChange}
+                    />
+                    <Button type="button" variant="ghost" size="icon-sm" onClick={() => setMode('edit')}>
+                      <Pencil className="h-4 w-4" />
+                      <span className="sr-only">Edit recipe</span>
+                    </Button>
+                  </div>
+                </div>
+
+                <DialogDescription>
+                  View details, rating, and source information for this recipe.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="max-h-[calc(90vh-16rem)] space-y-6 overflow-y-auto px-5 pb-6 pt-4">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <InfoItem
+                    label="Prep"
+                    value={currentRecipe.prep_time > 0 ? `${currentRecipe.prep_time} min` : '—'}
+                    icon={<Timer className="h-4 w-4 text-muted-foreground" />}
+                  />
+                  <InfoItem
+                    label="Cook"
+                    value={currentRecipe.cook_time > 0 ? `${currentRecipe.cook_time} min` : '—'}
+                    icon={<Clock className="h-4 w-4 text-muted-foreground" />}
+                  />
+                  <InfoItem
+                    label="Total"
+                    value={totalTime > 0 ? `${totalTime} min` : '—'}
+                    icon={<Clock className="h-4 w-4 text-muted-foreground" />}
+                  />
+                  <InfoItem
+                    label="Servings"
+                    value={currentRecipe.servings > 0 ? String(currentRecipe.servings) : '—'}
+                    icon={<UtensilsCrossed className="h-4 w-4 text-muted-foreground" />}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Your rating</div>
+                  <Rating
+                    recipeId={currentRecipe.id}
+                    initialRating={currentRecipe.rating}
+                    size="md"
+                    onOptimisticChange={onRatingChange}
+                  />
+                </div>
+
+                <section className="space-y-3">
+                  <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Ingredients
+                  </h4>
+                  <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed">
+                    {currentRecipe.ingredients.map((ingredient, index) => (
+                      <li key={`${ingredient}-${index}`}>{ingredient}</li>
+                    ))}
+                  </ul>
+                </section>
+
+                <section className="space-y-3">
+                  <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Instructions
+                  </h4>
+                  <ol className="space-y-3">
+                    {instructionSteps.map((step, index) => (
+                      <li key={`${step}-${index}`} className="flex gap-3 text-sm leading-relaxed">
+                        <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
+                          {index + 1}
+                        </span>
+                        <span>{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <Button type="button" variant="outline" onClick={() => window.print()}>
+                    <Printer className="mr-2 h-4 w-4" />
+                    Print
+                  </Button>
+
+                  {currentRecipe.source_url ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      render={<Link href={currentRecipe.source_url} target="_blank" rel="noreferrer" />}
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Open source
+                    </Button>
+                  ) : null}
+                </div>
               </div>
-            </div>
+            </>
+          ) : (
+            <>
+              <DialogHeader className="gap-2 border-b border-border/70 px-5 pb-4 pt-5 pr-12">
+                <DialogTitle>Edit recipe</DialogTitle>
+                <DialogDescription>Update recipe details and save your changes.</DialogDescription>
+              </DialogHeader>
 
-            <FavoriteButton
-              recipeId={recipe.id}
-              isFavorite={recipe.is_favorite}
-              size="md"
-              onOptimisticChange={onFavoriteChange}
-            />
-          </div>
+              <div className="max-h-[calc(90vh-9rem)] space-y-4 overflow-y-auto px-5 pb-5 pt-4">
+                <div className="grid gap-4 rounded-xl border border-border/70 bg-muted/30 p-4 md:grid-cols-2">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="recipe-edit-title">Title</Label>
+                    <Input
+                      id="recipe-edit-title"
+                      value={draft.title}
+                      disabled={isSaving}
+                      className="bg-background/70"
+                      onChange={(event) =>
+                        setDraft((current) =>
+                          current
+                            ? {
+                                ...current,
+                                title: event.target.value,
+                              }
+                            : current
+                        )
+                      }
+                    />
+                  </div>
 
-          <SheetDescription className="pt-1">
-            Keep this panel open while exploring your recipe details and source.
-          </SheetDescription>
-        </SheetHeader>
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Select
+                      value={draft.category}
+                      onValueChange={(value) =>
+                        setDraft((current) =>
+                          current
+                            ? {
+                                ...current,
+                                category: value as RecipeCategory,
+                              }
+                            : current
+                        )
+                      }
+                    >
+                      <SelectTrigger className="w-full bg-background/70" disabled={isSaving}>
+                        <SelectValue placeholder="Category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CATEGORIES.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            {formatCategoryLabel(category)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-        <div className="space-y-6 px-5 pb-6">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <InfoItem
-              label="Prep"
-              value={recipe.prep_time > 0 ? `${recipe.prep_time} min` : '—'}
-              icon={<Timer className="h-4 w-4 text-muted-foreground" />}
-            />
-            <InfoItem
-              label="Cook"
-              value={recipe.cook_time > 0 ? `${recipe.cook_time} min` : '—'}
-              icon={<Clock className="h-4 w-4 text-muted-foreground" />}
-            />
-            <InfoItem
-              label="Total"
-              value={totalTime > 0 ? `${totalTime} min` : '—'}
-              icon={<Clock className="h-4 w-4 text-muted-foreground" />}
-            />
-            <InfoItem
-              label="Servings"
-              value={recipe.servings > 0 ? String(recipe.servings) : '—'}
-              icon={<UtensilsCrossed className="h-4 w-4 text-muted-foreground" />}
-            />
-          </div>
+                  <div className="space-y-2">
+                    <Label>Difficulty</Label>
+                    <Select
+                      value={draft.difficulty}
+                      onValueChange={(value) =>
+                        setDraft((current) =>
+                          current
+                            ? {
+                                ...current,
+                                difficulty: value as Difficulty,
+                              }
+                            : current
+                        )
+                      }
+                    >
+                      <SelectTrigger className="w-full bg-background/70" disabled={isSaving}>
+                        <SelectValue placeholder="Difficulty" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DIFFICULTIES.map((difficulty) => (
+                          <SelectItem key={difficulty} value={difficulty}>
+                            {formatDifficultyLabel(difficulty)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-          <div className="space-y-2">
-            <div className="text-sm font-medium">Your rating</div>
-            <Rating
-              recipeId={recipe.id}
-              initialRating={recipe.rating}
-              size="md"
-              onOptimisticChange={onRatingChange}
-            />
-          </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="recipe-edit-prep">Prep time (minutes)</Label>
+                    <Input
+                      id="recipe-edit-prep"
+                      type="number"
+                      min={0}
+                      value={draft.prepTime}
+                      disabled={isSaving}
+                      className="bg-background/70"
+                      onChange={(event) =>
+                        setDraft((current) =>
+                          current
+                            ? {
+                                ...current,
+                                prepTime: event.target.value,
+                              }
+                            : current
+                        )
+                      }
+                    />
+                  </div>
 
-          <section className="space-y-3">
-            <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Ingredients</h4>
-            <ul className="space-y-2">
-              {recipe.ingredients.map((ingredient, index) => (
-                <li key={`${ingredient}-${index}`} className="rounded-md border border-border/70 bg-background/40 px-3 py-2 text-sm">
-                  {ingredient}
-                </li>
-              ))}
-            </ul>
-          </section>
+                  <div className="space-y-2">
+                    <Label htmlFor="recipe-edit-cook">Cook time (minutes)</Label>
+                    <Input
+                      id="recipe-edit-cook"
+                      type="number"
+                      min={0}
+                      value={draft.cookTime}
+                      disabled={isSaving}
+                      className="bg-background/70"
+                      onChange={(event) =>
+                        setDraft((current) =>
+                          current
+                            ? {
+                                ...current,
+                                cookTime: event.target.value,
+                              }
+                            : current
+                        )
+                      }
+                    />
+                  </div>
 
-          <section className="space-y-3">
-            <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Instructions</h4>
-            <ol className="space-y-3">
-              {instructionSteps.map((step, index) => (
-                <li key={`${step}-${index}`} className="flex gap-3 text-sm leading-relaxed">
-                  <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
-                    {index + 1}
-                  </span>
-                  <span>{step}</span>
-                </li>
-              ))}
-            </ol>
-          </section>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="recipe-edit-servings">Servings</Label>
+                    <Input
+                      id="recipe-edit-servings"
+                      type="number"
+                      min={1}
+                      value={draft.servings}
+                      disabled={isSaving}
+                      className="bg-background/70"
+                      onChange={(event) =>
+                        setDraft((current) =>
+                          current
+                            ? {
+                                ...current,
+                                servings: event.target.value,
+                              }
+                            : current
+                        )
+                      }
+                    />
+                  </div>
+                </div>
 
-          <div className="flex flex-wrap gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => window.print()}>
-              <Printer className="mr-2 h-4 w-4" />
-              Print
+                <div className="space-y-3 rounded-xl border border-border/70 bg-muted/25 p-4">
+                  <Label>Image</Label>
+                  {currentImageUrl ? (
+                    <div className="relative h-56 overflow-hidden rounded-xl border border-border/70 bg-background/70 sm:h-72">
+                      {currentImageUrl.startsWith('blob:') ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={currentImageUrl}
+                          alt={draft.title || currentRecipe.title}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <Image
+                          src={currentImageUrl}
+                          alt={draft.title || currentRecipe.title}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 640px) 90vw, 768px"
+                        />
+                      )}
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/35 to-transparent" />
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-border/70 bg-background/60 p-6 text-sm text-muted-foreground">
+                      No image yet. Use Find image or replace it manually.
+                    </div>
+                  )}
+
+                  {imageMeta?.creditName ? (
+                    <div className="text-xs text-muted-foreground">
+                      Photo by{' '}
+                      {imageMeta.creditUrl ? (
+                        <a
+                          href={imageMeta.creditUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline underline-offset-2"
+                        >
+                          {imageMeta.creditName}
+                        </a>
+                      ) : (
+                        imageMeta.creditName
+                      )}
+                    </div>
+                  ) : null}
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex">
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/jpeg,image/png,image/webp"
+                        disabled={isSaving}
+                        onChange={(event) => {
+                          void handleReplaceImage(event.target.files?.[0] || null)
+                          event.currentTarget.value = ''
+                        }}
+                      />
+                      <span className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-background/70 px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/60">
+                        <Upload className="h-4 w-4" />
+                        Replace image
+                      </span>
+                    </label>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        void handleFindImage()
+                      }}
+                      disabled={isSaving || isFindingImage}
+                    >
+                      {isFindingImage ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <ImageIcon className="h-4 w-4" />
+                      )}
+                      {isFindingImage ? 'Finding image...' : 'Find image'}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 rounded-xl border border-border/70 bg-muted/25 p-4">
+                  <Label htmlFor="recipe-edit-ingredients">Ingredients (one per line)</Label>
+                  <textarea
+                    id="recipe-edit-ingredients"
+                    value={draft.ingredientsText}
+                    disabled={isSaving}
+                    rows={8}
+                    className="min-h-36 w-full rounded-lg border border-input bg-input/30 px-2.5 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                    onChange={(event) =>
+                      setDraft((current) =>
+                        current
+                          ? {
+                              ...current,
+                              ingredientsText: event.target.value,
+                            }
+                          : current
+                      )
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2 rounded-xl border border-border/70 bg-muted/25 p-4">
+                  <Label htmlFor="recipe-edit-instructions">Instructions (one step per line)</Label>
+                  <textarea
+                    id="recipe-edit-instructions"
+                    value={draft.instructionsText}
+                    disabled={isSaving}
+                    rows={10}
+                    className="min-h-40 w-full rounded-lg border border-input bg-input/30 px-2.5 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                    onChange={(event) =>
+                      setDraft((current) =>
+                        current
+                          ? {
+                              ...current,
+                              instructionsText: event.target.value,
+                            }
+                          : current
+                      )
+                    }
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-2">
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => setConfirmDeleteOpen(true)}
+                    disabled={isSaving}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete recipe
+                  </Button>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        resetDraftFromRecipe()
+                        setMode('view')
+                      }}
+                      disabled={isSaving}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="button" onClick={() => void handleSaveEdit()} disabled={isSaving}>
+                      {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {mode === 'edit' ? (
+        <ImageSelectionModal
+          open={isSelectionModalOpen}
+          loading={isLoadingCandidates}
+          title={draft.title || currentRecipe.title}
+          candidates={imageCandidates}
+          onOpenChange={setIsSelectionModalOpen}
+          onSelectCandidate={(candidate) => {
+            void handleSelectImageCandidate(candidate)
+          }}
+          onGenerateAi={() => {
+            void handleGenerateAiImageFromModal()
+          }}
+          onRefreshSearch={() => {
+            void loadImageCandidates()
+          }}
+          isGeneratingAi={isGeneratingAiImage}
+        />
+      ) : null}
+
+      <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <DialogContent className="w-full max-w-md p-0 sm:max-w-md">
+          <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 pr-12">
+            <DialogTitle>Delete recipe?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this recipe? This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex justify-end gap-2 px-5 py-4">
+            <Button type="button" variant="outline" onClick={() => setConfirmDeleteOpen(false)}>
+              Cancel
             </Button>
-
-            {recipe.source_url ? (
-              <Button type="button" variant="outline" render={<Link href={recipe.source_url} target="_blank" rel="noreferrer" />}>
-                <ExternalLink className="mr-2 h-4 w-4" />
-                Open source
-              </Button>
-            ) : null}
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                setConfirmDeleteOpen(false)
+                onOpenChange(false)
+                onRecipeDeleteRequested?.(currentRecipe)
+              }}
+            >
+              Delete
+            </Button>
           </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

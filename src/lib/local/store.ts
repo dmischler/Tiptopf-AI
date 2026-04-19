@@ -28,6 +28,13 @@ type CreateRecipeInput = {
   source_type: RecipeSourceType
 }
 
+type UpdateRecipeInput = Partial<
+  Omit<
+    Recipe,
+    'id' | 'user_id' | 'created_at' | 'updated_at' | 'rating' | 'is_favorite' | 'image_url'
+  >
+>
+
 type SaveProfileSettingsInput = {
   encryptedApiKey: string | null
   apiBaseUrl: string
@@ -272,6 +279,36 @@ export async function createRecipe(input: CreateRecipeInput) {
 
 function findRecipeIndex(recipes: Recipe[], recipeId: string) {
   return recipes.findIndex((recipe) => recipe.id === recipeId)
+}
+
+export async function updateRecipe(recipeId: string, input: UpdateRecipeInput) {
+  return runMutatingStoreOperation((store) => {
+    const index = findRecipeIndex(store.recipes, recipeId)
+    if (index < 0) {
+      throw new Error('Recipe not found')
+    }
+
+    const updated: Recipe = {
+      ...store.recipes[index],
+      ...input,
+      updated_at: nowIso(),
+    }
+
+    store.recipes[index] = updated
+    return updated
+  })
+}
+
+export async function deleteRecipe(recipeId: string) {
+  return runMutatingStoreOperation((store) => {
+    const index = findRecipeIndex(store.recipes, recipeId)
+    if (index < 0) {
+      throw new Error('Recipe not found')
+    }
+
+    const [removed] = store.recipes.splice(index, 1)
+    return removed
+  })
 }
 
 export async function updateRecipeImage(recipeId: string, imageUrl: string) {
