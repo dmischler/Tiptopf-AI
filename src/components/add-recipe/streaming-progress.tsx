@@ -2,12 +2,13 @@
 
 import { Loader2 } from 'lucide-react'
 
-type Stage = 'fetching' | 'parsing' | 'structuring' | 'complete' | 'error'
+type Stage = 'fetching' | 'parsing' | 'structuring' | 'finding_image' | 'complete' | 'error'
 
 const STAGE_LABELS: Record<Stage, string> = {
   fetching: 'Fetching recipe content...',
   parsing: 'AI is reading the recipe...',
   structuring: 'Structuring ingredients and steps...',
+  finding_image: 'Finding a matching recipe image...',
   complete: 'Recipe extracted!',
   error: 'Something went wrong. Please try again.',
 }

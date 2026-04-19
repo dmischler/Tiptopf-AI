@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { Upload } from 'lucide-react'
+import { ImageIcon, Loader2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -30,21 +30,31 @@ type RecipePreviewProps = {
   parsedRecipe: ParsedRecipe
   value: EditableRecipePreview
   disabled?: boolean
+  isFindingImage?: boolean
+  imageCreditName?: string | null
+  imageCreditUrl?: string | null
   onChange: (next: EditableRecipePreview) => void
   onSave: () => Promise<void> | void
   onCancel: () => void
   onReplaceImage?: (file: File) => Promise<void> | void
+  onFindImage?: () => Promise<void> | void
 }
 
 export function RecipePreview({
   parsedRecipe,
   value,
   disabled,
+  isFindingImage,
+  imageCreditName,
+  imageCreditUrl,
   onChange,
   onSave,
   onCancel,
   onReplaceImage,
+  onFindImage,
 }: RecipePreviewProps) {
+  const isRemoteImage = Boolean(value.imageUrl && /^https?:\/\//i.test(value.imageUrl))
+
   function update(next: Partial<EditableRecipePreview>) {
     onChange({
       ...value,
@@ -147,20 +157,38 @@ export function RecipePreview({
         <Label>Image</Label>
         {value.imageUrl ? (
           <div className="relative h-56 overflow-hidden rounded-xl border border-border/70 bg-background/70 sm:h-72">
-            <Image
-              src={value.imageUrl}
-              alt={value.title}
-              fill
-              className="object-cover"
-              sizes="(max-width: 640px) 90vw, 880px"
-            />
+            {isRemoteImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={value.imageUrl} alt={value.title} className="h-full w-full object-cover" />
+            ) : (
+              <Image
+                src={value.imageUrl}
+                alt={value.title}
+                fill
+                className="object-cover"
+                sizes="(max-width: 640px) 90vw, 880px"
+              />
+            )}
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/35 to-transparent" />
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-border/70 bg-background/60 p-6 text-sm text-muted-foreground">
-            No persistent image yet. Phone uploads are discarded after extraction.
+            No image yet. Use Find image or replace it manually.
           </div>
         )}
+
+        {imageCreditName ? (
+          <div className="text-xs text-muted-foreground">
+            Photo by{' '}
+            {imageCreditUrl ? (
+              <a href={imageCreditUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                {imageCreditName}
+              </a>
+            ) : (
+              imageCreditName
+            )}
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap items-center gap-2">
           <label className="inline-flex">
@@ -183,10 +211,18 @@ export function RecipePreview({
           <Button
             type="button"
             variant="outline"
-            onClick={() => toast.info('Generate Image is coming soon.')}
-            disabled={disabled}
+            onClick={() => {
+              if (!onFindImage) {
+                toast.error('Image search is not available right now.')
+                return
+              }
+
+              void onFindImage()
+            }}
+            disabled={disabled || !onFindImage || isFindingImage}
           >
-            Generate image
+            {isFindingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+            {isFindingImage ? 'Finding image...' : 'Find image'}
           </Button>
         </div>
       </div>
