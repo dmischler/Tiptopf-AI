@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
-import { createClient } from '@/lib/supabase/server'
+import { saveUploadedRecipeImage } from '@/lib/local/images'
+import { createRecipe, updateRecipeImage } from '@/lib/local/store'
 
 const categorySchema = z.enum(['starter', 'main', 'dessert', 'side', 'breakfast', 'snack'])
 const difficultySchema = z.enum(['easy', 'medium', 'hard'])
@@ -24,41 +25,22 @@ const saveRecipeSchema = z.object({
 
 export async function saveRecipe(input: z.infer<typeof saveRecipeSchema>) {
   const parsed = saveRecipeSchema.parse(input)
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    throw new Error('Not authenticated')
-  }
-
-  const { data, error } = await supabase
-    .from('recipes')
-    .insert({
-      user_id: user.id,
-      title: parsed.title,
-      ingredients: parsed.ingredients,
-      instructions: parsed.instructions,
-      prep_time: parsed.prepTime ?? 0,
-      cook_time: parsed.cookTime ?? 0,
-      servings: parsed.servings ?? 1,
-      category: parsed.category,
-      difficulty: parsed.difficulty,
-      image_url: parsed.imageUrl,
-      source_url: parsed.sourceUrl,
-      source_type: parsed.sourceType,
-    })
-    .select()
-    .single()
-
-  if (error) {
-    throw new Error(error.message)
-  }
+  const recipe = await createRecipe({
+    title: parsed.title,
+    ingredients: parsed.ingredients,
+    instructions: parsed.instructions,
+    prep_time: parsed.prepTime ?? 0,
+    cook_time: parsed.cookTime ?? 0,
+    servings: parsed.servings ?? 1,
+    category: parsed.category,
+    difficulty: parsed.difficulty,
+    image_url: parsed.imageUrl,
+    source_url: parsed.sourceUrl,
+    source_type: parsed.sourceType,
+  })
 
   revalidatePath('/library')
-  return data
+  return recipe
 }
 
 const ALLOWED_REPLACE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
@@ -84,41 +66,8 @@ export async function uploadRecipeImage(formData: FormData): Promise<string> {
     throw new Error('Image must be 5MB or smaller')
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    throw new Error('Not authenticated')
-  }
-
-  const ext = file.type.split('/')[1] || 'jpg'
-  const filePath = `${user.id}/${recipeId}.${ext}`
-
-  const { error: uploadError } = await supabase.storage
-    .from('recipe-images')
-    .upload(filePath, file, {
-      contentType: file.type,
-      upsert: true,
-    })
-
-  if (uploadError) {
-    throw new Error(uploadError.message)
-  }
-
-  const { data: publicData } = supabase.storage.from('recipe-images').getPublicUrl(filePath)
-  const imageUrl = publicData.publicUrl
-
-  const { error: updateError } = await supabase
-    .from('recipes')
-    .update({ image_url: imageUrl })
-    .eq('id', recipeId)
-    .eq('user_id', user.id)
-
-  if (updateError) {
-    throw new Error(updateError.message)
-  }
+  const imageUrl = await saveUploadedRecipeImage(file, recipeId)
+  await updateRecipeImage(recipeId, imageUrl)
 
   revalidatePath('/library')
   return imageUrl

@@ -27,12 +27,12 @@ type RecipeDetailProps = {
 }
 
 const CATEGORY_CLASS: Record<Recipe['category'], string> = {
-  starter: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300',
-  main: 'bg-amber-500/20 text-amber-800 dark:text-amber-300',
-  dessert: 'bg-rose-500/15 text-rose-700 dark:text-rose-300',
-  side: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
-  breakfast: 'bg-yellow-500/20 text-yellow-800 dark:text-yellow-300',
-  snack: 'bg-orange-500/20 text-orange-800 dark:text-orange-300',
+  starter: 'bg-cyan-500/15 text-cyan-300',
+  main: 'bg-amber-500/20 text-amber-300',
+  dessert: 'bg-rose-500/15 text-rose-300',
+  side: 'bg-emerald-500/15 text-emerald-300',
+  breakfast: 'bg-yellow-500/20 text-yellow-300',
+  snack: 'bg-orange-500/20 text-orange-300',
 }
 
 function formatCategoryLabel(category: Recipe['category']) {

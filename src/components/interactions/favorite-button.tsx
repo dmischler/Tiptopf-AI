@@ -34,10 +34,11 @@ export function FavoriteButton({
 
   function handleToggle() {
     const nextValue = !favorite
-    setFavoriteOptimistic(nextValue)
-    onOptimisticChange?.(nextValue)
 
     startTransition(async () => {
+      setFavoriteOptimistic(nextValue)
+      onOptimisticChange?.(nextValue)
+
       try {
         await toggleFavorite(recipeId, nextValue)
       } catch (error) {

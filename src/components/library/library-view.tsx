@@ -150,7 +150,7 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
             {recipes.length} recipe{recipes.length === 1 ? '' : 's'} across your personal collection.
           </p>
         </div>
-        <Button variant="outline" render={<Link href="/profile" />}>
+        <Button variant="outline" nativeButton={false} render={<Link href="/profile" />}>
           Profile settings
         </Button>
       </div>

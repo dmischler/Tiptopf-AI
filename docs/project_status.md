@@ -1,45 +1,28 @@
 # Project Status
 
-## v0.1.0 - Phase 0 Setup
-- Installed and locked project dependencies with npm.
-- Initialized shadcn/ui and added core UI primitives used by upcoming phases.
-- Added a critical plan review section in `tasks/IMPLEMENTATION.md` to keep the implementation practical.
-- Verified with `npm run build`.
-
-## v0.2.0 - Phase 1 Supabase Schema
-- Added a reproducible migration SQL file at `supabase/migrations/202604170001_phase1_schema.sql`.
-- Implemented `recipes` and `profiles` schema, indexes, constraints, profile-on-signup trigger, and `updated_at` triggers.
-- Added explicit RLS policies for app tables and storage policies for `recipe-images` bucket.
-- Updated `tasks/PHASE-1-supabase.md` with implementation notes and current verification state.
-
-## v0.3.0 - Phase 2 Auth Foundation
-- Added Supabase SSR clients and middleware route protection (`src/lib/supabase/*`, `src/middleware.ts`).
-- Implemented auth pages and server actions for sign in, sign up, password reset, and sign out.
-- Added profile page with theme toggle and encrypted API key storage flow.
-- Added `src/lib/crypto.ts` and integrated browser-side API key encryption before DB save.
-- Added root redirect (`/`) and a temporary protected `/library` page placeholder.
-- Verified with `npm run build`; updated `tasks/PHASE-2-auth.md` verification notes.
-
-## v0.4.0 - Phase 3 AI Service Layer
-- Added AI service modules for prompts, model resolution, text extraction, URL fetching, and image extraction.
-- Added server action wrappers for URL and image recipe extraction in `src/app/actions/extract-recipe.ts`.
-- Implemented JSON-LD recipe parsing with HTML fallback and optional image import into Supabase storage.
-- Added environment-based model override support (`OPENCODE_MODEL_ID`) with default `MiniMax-M2.7`.
-- Verified compilation with `npm run build`; updated `tasks/PHASE-3-ai-service.md` verification notes.
-
-## v0.5.0 - Phase 4 Add Recipe Flow
-- Added complete add-recipe UI flow: FAB, modal, image upload tab, URL tab, progress state, and preview.
-- Added save/upload server actions in `src/app/actions/add-recipe.ts`.
-- Wired extraction actions into modal for URL and image paths.
-- Added minimal editable preview fields (title, category, difficulty, servings) with read-only ingredients/instructions.
-- Added image replacement support and “Generate image” placeholder toast.
-- Updated `/library` with recipe count and integrated add-recipe launcher.
-- Verified with `npm run build`; updated `tasks/PHASE-4-add-recipe.md` verification notes.
-
-## v0.6.0 - Phase 5 Library + Phase 6 Interactions
-- Replaced the `/library` placeholder with full recipe browsing: responsive CSS masonry grid, card list, search by title/ingredients, category filter, favorites-only filter, and sort options.
-- Added detailed recipe side sheet with metadata, ingredients, numbered instructions, source link, and print action.
-- Added optimistic favorite and rating interactions with rollback on error.
-- Added authenticated server actions in `src/app/actions/recipe.ts` for `toggleFavorite` and `setRating`.
-- Added library/interactions components in `src/components/library/*` and `src/components/interactions/*`, and wired them together via `library-view` client state.
-- Verified with `npm run build`; updated `tasks/PHASE-5-library.md` and `tasks/PHASE-6-interactions.md` verification notes.
+## v0.7.0 - Local Pi Mode (Option A)
+- Migrated runtime architecture from Supabase to local filesystem persistence.
+- Added local storage modules:
+  - `src/lib/local/paths.ts`
+  - `src/lib/local/store.ts`
+  - `src/lib/local/images.ts`
+- Added local image API route: `src/app/api/images/[imageName]/route.ts`.
+- Reworked server actions to use local data and image storage:
+  - `src/app/actions/add-recipe.ts`
+  - `src/app/actions/extract-recipe.ts`
+  - `src/app/actions/profile.ts`
+  - `src/app/actions/recipe.ts`
+- Removed Supabase runtime dependencies and auth action flow:
+  - deleted `src/lib/supabase/*`
+  - deleted `src/app/actions/auth.ts`
+  - deleted `src/proxy.ts`
+- Simplified routing for no-auth mode:
+  - `/` now redirects to `/library`
+  - `/login`, `/signup`, `/forgot-password`, `/reset-password` redirect to `/library`
+- Updated profile page for single-user local/Tailscale model.
+- Updated configuration/docs:
+  - removed Supabase packages from `package.json`
+  - updated `.env.example`
+  - updated `README.md`
+  - added `docs/local-pi-deployment.md`
+  - added migration plan `tasks/LOCAL_PI_OPTION_A_PLAN.md`

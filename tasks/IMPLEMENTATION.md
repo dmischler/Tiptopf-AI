@@ -1,5 +1,8 @@
 # Tiptopf-AI Implementation Plan (v1.0 MVP)
 
+> NOTE: This document reflects the earlier Supabase-based MVP phases.
+> For the current local-only Raspberry Pi architecture (Option A), use `tasks/LOCAL_PI_OPTION_A_PLAN.md`.
+
 ## Quick Start
 ```bash
 # Phase 0: Setup (install missing deps + shadcn)

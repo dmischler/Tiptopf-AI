@@ -1,47 +1,31 @@
 'use server'
 
 import { decryptApiKey } from '@/lib/crypto'
-import { createClient } from '@/lib/supabase/server'
 import { extractRecipeFromText } from '@/lib/ai/extractor'
-import { fetchRecipeUrl, downloadImageToStorage } from '@/lib/ai/url-fetcher'
+import { DEFAULT_BASE_URL } from '@/lib/ai/client'
+import { fetchRecipeUrl } from '@/lib/ai/url-fetcher'
 import { extractRecipeFromImage } from '@/lib/ai/image-handler'
+import { downloadImageToLocalStorage } from '@/lib/local/images'
+import { getProfile, LOCAL_PROFILE_ID } from '@/lib/local/store'
 
 type UserApiConfig = {
-  userId: string
   apiKey: string
   baseUrl: string
 }
 
-const DEFAULT_BASE_URL = 'https://api.opencode.ai/v1'
-
 async function getUserApiConfig(): Promise<UserApiConfig> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    throw new Error('Not authenticated')
-  }
-
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('encrypted_api_key, api_base_url')
-    .eq('id', user.id)
-    .single()
-
-  if (error) {
-    throw new Error(error.message)
-  }
+  const profile = await getProfile()
+  const userId = LOCAL_PROFILE_ID
 
   if (!profile?.encrypted_api_key) {
-    throw new Error('No API key configured in profile settings.')
+    throw new Error(
+      'No API key configured in profile settings. Add one for pages without structured recipe metadata.'
+    )
   }
 
-  const apiKey = await decryptApiKey(profile.encrypted_api_key, user.id)
+  const apiKey = await decryptApiKey(profile.encrypted_api_key, userId)
 
   return {
-    userId: user.id,
     apiKey,
     baseUrl: profile.api_base_url || DEFAULT_BASE_URL,
   }
@@ -53,16 +37,20 @@ export async function extractFromUrlAction(url: string) {
     throw new Error('URL must start with http:// or https://')
   }
 
-  const { userId, apiKey, baseUrl } = await getUserApiConfig()
-  const { content, imageUrl } = await fetchRecipeUrl(normalizedUrl)
-  const recipe = await extractRecipeFromText(content, apiKey, baseUrl, true)
+  const { content, imageUrl, structuredRecipe } = await fetchRecipeUrl(normalizedUrl)
+  const recipe = structuredRecipe
+    ? structuredRecipe
+    : await (async () => {
+        const { apiKey, baseUrl } = await getUserApiConfig()
+        return extractRecipeFromText(content, apiKey, baseUrl, true)
+      })()
 
   let storedImageUrl: string | null = null
   if (imageUrl) {
     try {
-      storedImageUrl = await downloadImageToStorage(imageUrl, userId, crypto.randomUUID())
+      storedImageUrl = await downloadImageToLocalStorage(imageUrl, crypto.randomUUID())
     } catch {
-      storedImageUrl = imageUrl
+      storedImageUrl = null
     }
   }
 

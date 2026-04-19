@@ -1,36 +1,72 @@
 # Tiptopf-AI
 
-Your beautiful, AI-powered Pinterest-style recipe library.
+Local-first, AI-powered recipe library for a Raspberry Pi.
 
-## Getting Started
+This version runs without Supabase. It stores recipes and profile settings on local disk and is designed to be accessed remotely through Tailscale.
+
+## What changed
+
+- No app authentication flow (Option A): `/` and auth routes redirect to `/library`
+- Local JSON data store at `DATA_DIR/tiptopf.json`
+- Local image storage at `DATA_DIR/recipe-images`
+- Image serving route: `/api/images/[imageName]`
+
+## Getting started
 
 1. Clone the repository
-2. Copy `.env.example` to `.env.local` and fill in your Supabase credentials
-3. Install dependencies:
+2. Copy `.env.example` to `.env.local`
+3. Set `DATA_DIR` in `.env.local` (example: `./data`)
+4. Install dependencies:
 
 ```bash
 npm install
 ```
 
-4. Run the development server:
+5. Run development server:
 
 ```bash
 npm run dev
 ```
 
-5. Open [http://localhost:3000](http://localhost:3000)
+6. Open [http://localhost:3000](http://localhost:3000)
 
-## Setup Supabase
+## Required environment variables
 
-1. Create a new project at [supabase.com](https://supabase.com)
-2. Get your project URL and anon key
-3. Create the `recipes` table with the schema from VISION.md
-4. Enable Row Level Security
+- `DATA_DIR` — directory where local database file and images are stored
 
-## Tech Stack
+## Optional environment variables
 
-- Next.js 15 (App Router)
+- `NEXT_PUBLIC_SITE_URL` — useful when behind a reverse proxy
+- `OPENCODE_MODEL_ID` — override default model identifier
+
+## Local data layout
+
+When `DATA_DIR=./data`, the runtime storage looks like:
+
+```text
+data/
+  tiptopf.json
+  recipe-images/
+    <recipe-id>.jpg|png|webp
+```
+
+## Tech stack
+
+- Next.js App Router
 - TypeScript
 - Tailwind CSS
-- Supabase (Auth + Database + Storage)
 - Vercel AI SDK
+- Local filesystem persistence (JSON + image files)
+
+## Verification
+
+```bash
+npm run build
+npm run lint
+```
+
+## Notes
+
+- API keys are still encrypted in the browser before being saved.
+- Image uploads from URL are downloaded and persisted locally.
+- For deployment details on Raspberry Pi and Tailscale, see `docs/local-pi-deployment.md`.

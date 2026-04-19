@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "e2e": "playwright test"
   },
   "dependencies": {
@@ -14,14 +14,12 @@
     "@base-ui/react": "^1.4.0",
     "@noble/ciphers": "^1.0.0",
     "@noble/hashes": "^1.4.0",
-    "@supabase/ssr": "^0.5.0",
-    "@supabase/supabase-js": "^2.39.0",
+    "@tailwindcss/postcss": "^4.2.2",
     "ai": "^3.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.469.0",
-    "next": "15.1.0",
-    "next-themes": "^0.4.6",
+    "next": "^16.2.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "shadcn": "^4.3.0",
@@ -36,12 +34,10 @@
     "@types/node": "^20.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "autoprefixer": "^10.4.16",
     "eslint": "^8.57.1",
     "eslint-config-next": "^15.1.0",
     "globals": "^17.5.0",
-    "postcss": "^8.4.32",
-    "tailwindcss": "^3.4.0",
+    "tailwindcss": "^4.2.2",
     "typescript": "^5.3.0"
   }
 }

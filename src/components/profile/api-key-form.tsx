@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { saveProfileApiSettings } from '@/app/actions/profile'
+import { DEFAULT_BASE_URL } from '@/lib/ai/client'
 import { encryptApiKey, maskApiKey } from '@/lib/crypto'
 
 type ApiKeyFormProps = {
@@ -15,8 +16,6 @@ type ApiKeyFormProps = {
   initialEncryptedApiKey: string | null
   initialBaseUrl: string | null
 }
-
-const DEFAULT_BASE_URL = 'https://api.opencode.ai/v1'
 
 export function ApiKeyForm({
   userId,

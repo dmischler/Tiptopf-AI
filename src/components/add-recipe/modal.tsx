@@ -212,78 +212,80 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved }: AddRecipeM
         }
       }}
     >
-      <DialogContent className="max-h-[90vh] w-full max-w-3xl overflow-y-auto sm:max-w-3xl">
-        <DialogHeader>
+      <DialogContent className="w-full max-w-4xl p-0 sm:max-w-4xl">
+        <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 pr-12 sm:px-6 sm:pt-6">
           <DialogTitle>Add recipe</DialogTitle>
           <DialogDescription>
             Upload a photo or paste a URL. AI extracts the recipe structure automatically.
           </DialogDescription>
         </DialogHeader>
 
-        {phase === 'input' && (
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'image' | 'url')}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="image">Upload image</TabsTrigger>
-              <TabsTrigger value="url">Paste URL</TabsTrigger>
-            </TabsList>
+        <div className="max-h-[calc(90vh-7.5rem)] space-y-4 overflow-y-auto px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
+          {phase === 'input' && (
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'image' | 'url')}>
+              <TabsList className="grid w-full grid-cols-2 rounded-xl bg-muted/60 p-1">
+                <TabsTrigger value="image">Upload image</TabsTrigger>
+                <TabsTrigger value="url">Paste URL</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="image" className="pt-4">
-              <ImageUpload
-                onSelect={handleExtractFromImage}
-                onError={(message) => toast.error(message)}
-              />
-            </TabsContent>
+              <TabsContent value="image" className="pt-4">
+                <ImageUpload
+                  onSelect={handleExtractFromImage}
+                  onError={(message) => toast.error(message)}
+                />
+              </TabsContent>
 
-            <TabsContent value="url" className="pt-4">
-              <UrlInput
-                value={urlInput}
-                onValueChange={setUrlInput}
-                onExtract={handleExtractFromUrl}
-              />
-            </TabsContent>
-          </Tabs>
-        )}
+              <TabsContent value="url" className="pt-4">
+                <UrlInput
+                  value={urlInput}
+                  onValueChange={setUrlInput}
+                  onExtract={handleExtractFromUrl}
+                />
+              </TabsContent>
+            </Tabs>
+          )}
 
-        {phase === 'parsing' && <StreamingProgress stage={progressStage} streamText={streamText} />}
+          {phase === 'parsing' && <StreamingProgress stage={progressStage} streamText={streamText} />}
 
-        {phase === 'preview' && extractedRecipe && previewState && (
-          <RecipePreview
-            parsedRecipe={extractedRecipe}
-            value={{
-              ...previewState,
-              imageUrl: previewImageUrl,
-            }}
-            onChange={setPreviewState}
-            onSave={handleSave}
-            onCancel={() => {
-              resetState()
-              onOpenChange(false)
-            }}
-            onReplaceImage={handleReplaceImage}
-          />
-        )}
-
-        {phase === 'saving' && (
-          <div className="flex items-center justify-center gap-2 rounded-lg border border-border/70 bg-card/50 p-6 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Saving recipe...
-          </div>
-        )}
-
-        {phase !== 'saving' && phase !== 'preview' && (
-          <div className="flex justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                onOpenChange(false)
-                resetState()
+          {phase === 'preview' && extractedRecipe && previewState && (
+            <RecipePreview
+              parsedRecipe={extractedRecipe}
+              value={{
+                ...previewState,
+                imageUrl: previewImageUrl,
               }}
-            >
-              Cancel
-            </Button>
-          </div>
-        )}
+              onChange={setPreviewState}
+              onSave={handleSave}
+              onCancel={() => {
+                resetState()
+                onOpenChange(false)
+              }}
+              onReplaceImage={handleReplaceImage}
+            />
+          )}
+
+          {phase === 'saving' && (
+            <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/40 p-8 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Saving recipe...
+            </div>
+          )}
+
+          {phase !== 'saving' && phase !== 'preview' && (
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  onOpenChange(false)
+                  resetState()
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   )

@@ -58,7 +58,7 @@ export function ImageUpload({ disabled, onSelect, onError }: ImageUploadProps) {
   return (
     <div className="space-y-4">
       <div
-        className="rounded-xl border border-dashed border-border/80 bg-background/40 p-8 text-center"
+        className="rounded-xl border border-dashed border-border/80 bg-muted/35 p-8 text-center"
         onDragOver={(event) => {
           event.preventDefault()
         }}
@@ -69,7 +69,7 @@ export function ImageUpload({ disabled, onSelect, onError }: ImageUploadProps) {
         }}
       >
         <UploadCloud className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
-        <p className="text-sm text-foreground">Drag and drop a recipe photo</p>
+        <p className="text-sm font-medium text-foreground">Drag and drop a recipe photo</p>
         <p className="mt-1 text-xs text-muted-foreground">JPG, PNG, WEBP up to 10MB</p>
       </div>
 

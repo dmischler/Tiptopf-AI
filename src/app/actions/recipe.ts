@@ -3,42 +3,16 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
-import { createClient } from '@/lib/supabase/server'
+import { updateRecipeFavorite, updateRecipeRating } from '@/lib/local/store'
 
 const recipeIdSchema = z.string().uuid()
 const favoriteSchema = z.boolean()
 const ratingSchema = z.number().int().min(0).max(5)
 
-async function getAuthenticatedContext() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    throw new Error('Not authenticated')
-  }
-
-  return { supabase, user }
-}
-
 export async function toggleFavorite(recipeId: string, isFavorite: boolean) {
   const parsedRecipeId = recipeIdSchema.parse(recipeId)
   const parsedFavorite = favoriteSchema.parse(isFavorite)
-  const { supabase, user } = await getAuthenticatedContext()
-
-  const { data, error } = await supabase
-    .from('recipes')
-    .update({ is_favorite: parsedFavorite })
-    .eq('id', parsedRecipeId)
-    .eq('user_id', user.id)
-    .select('id')
-    .maybeSingle()
-
-  if (error) {
-    throw new Error(error.message)
-  }
+  const data = await updateRecipeFavorite(parsedRecipeId, parsedFavorite)
 
   if (!data) {
     throw new Error('Recipe not found')
@@ -54,19 +28,7 @@ export async function toggleFavorite(recipeId: string, isFavorite: boolean) {
 export async function setRating(recipeId: string, rating: number) {
   const parsedRecipeId = recipeIdSchema.parse(recipeId)
   const parsedRating = ratingSchema.parse(rating)
-  const { supabase, user } = await getAuthenticatedContext()
-
-  const { data, error } = await supabase
-    .from('recipes')
-    .update({ rating: parsedRating === 0 ? null : parsedRating })
-    .eq('id', parsedRecipeId)
-    .eq('user_id', user.id)
-    .select('id')
-    .maybeSingle()
-
-  if (error) {
-    throw new Error(error.message)
-  }
+  const data = await updateRecipeRating(parsedRecipeId, parsedRating === 0 ? null : parsedRating)
 
   if (!data) {
     throw new Error('Recipe not found')

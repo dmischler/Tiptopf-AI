@@ -1,6 +1,6 @@
 'use server'
 
-import { streamText } from 'ai'
+import { generateText, streamText } from 'ai'
 import { z } from 'zod'
 import { createOpenAI } from '@ai-sdk/openai'
 
@@ -38,7 +38,10 @@ function normalizeParsedRecipe(recipe: RecipeSchema, sourceType: 'image' | 'url'
 }
 
 function cleanJsonResponse(raw: string) {
-  return raw.replace(/^```json\s*/i, '').replace(/```$/i, '').trim()
+  let cleaned = raw.trim()
+  cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```$/i, '').trim()
+  cleaned = cleaned.replace(/^```\s*/i, '').replace(/```$/i, '').trim()
+  return cleaned
 }
 
 async function runExtraction(
@@ -47,24 +50,48 @@ async function runExtraction(
   apiKey: string,
   baseUrl?: string
 ) {
+  const resolvedBaseUrl = resolveAiBaseUrl(baseUrl)
+  const resolvedModelId = resolveAiModelId()
+
+  console.log('AI extraction - baseUrl:', resolvedBaseUrl)
+  console.log('AI extraction - model:', resolvedModelId)
+  console.log('AI extraction - apiKey prefix:', apiKey.slice(0, 8))
+
   const ai = createOpenAI({
     apiKey,
-    baseURL: resolveAiBaseUrl(baseUrl),
-  })
-
-  const result = await streamText({
-    model: ai(resolveAiModelId()) as any,
-    system: systemPrompt,
-    prompt: content,
+    baseURL: resolvedBaseUrl,
   })
 
   let raw = ''
-  for await (const chunk of result.textStream) {
-    raw += chunk
+  try {
+    const result = await generateText({
+      model: ai(resolvedModelId) as any,
+      system: systemPrompt,
+      prompt: content,
+    })
+    raw = result.text
+  } catch (err) {
+    console.error('generateText error:', err)
+    throw err
   }
 
-  const parsed = recipeSchema.parse(JSON.parse(cleanJsonResponse(raw)))
-  return parsed
+  console.log('AI extraction - content length:', content.length)
+  console.log('AI extraction - raw response length:', raw.length)
+
+  const cleaned = cleanJsonResponse(raw)
+  if (!cleaned) {
+    console.error('AI extraction failed - empty response. Full raw:', raw)
+    throw new Error('Empty response from AI. Check API key and model.')
+  }
+  try {
+    const parsed = recipeSchema.parse(JSON.parse(cleaned))
+    return parsed
+  } catch (parseError) {
+    console.error('JSON parse error:', parseError)
+    console.error('Raw response:', raw)
+    console.error('Cleaned response:', cleaned)
+    throw new Error(`Failed to parse AI response: ${parseError instanceof Error ? parseError.message : 'Invalid JSON'}`)
+  }
 }
 
 export async function extractRecipeFromText(
