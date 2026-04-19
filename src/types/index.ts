@@ -55,5 +55,4 @@ export interface ParsedRecipe {
 }
 
 export type SortOption = 'newest' | 'oldest' | 'prep_time' | 'rating';
-export type FilterOption = 'all' | 'favorites' | RecipeCategory;
 export type LibraryCategoryFilter = 'all' | RecipeCategory;

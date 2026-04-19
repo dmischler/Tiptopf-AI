@@ -7,7 +7,7 @@ import type { Difficulty, Profile, Recipe, RecipeCategory, RecipeSourceType } fr
 import { getDataDir, getStoreFilePath } from '@/lib/local/paths'
 
 export const LOCAL_PROFILE_ID = 'local-device'
-export const LOCAL_PROFILE_EMAIL = 'local@tiptopf.local'
+const LOCAL_PROFILE_EMAIL = 'local@tiptopf.local'
 
 type LocalStore = {
   recipes: Recipe[]

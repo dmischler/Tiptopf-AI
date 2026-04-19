@@ -1,6 +1,6 @@
 'use server'
 
-import { generateText, streamText } from 'ai'
+import { generateText } from 'ai'
 import { z } from 'zod'
 import { createOpenAI } from '@ai-sdk/openai'
 
@@ -108,24 +108,4 @@ export async function extractRecipeFromText(
   )
 
   return normalizeParsedRecipe(parsed, isUrl ? 'url' : 'image')
-}
-
-export async function streamRecipeExtraction(
-  text: string,
-  apiKey: string,
-  baseUrl?: string,
-  isUrl = false
-) {
-  const ai = createOpenAI({
-    apiKey,
-    baseURL: resolveAiBaseUrl(baseUrl),
-  })
-
-  const result = await streamText({
-    model: ai(resolveAiModelId()) as any,
-    system: isUrl ? URL_EXTRACTION_PROMPT : IMAGE_EXTRACTION_PROMPT,
-    prompt: text,
-  })
-
-  return result.toTextStreamResponse()
 }

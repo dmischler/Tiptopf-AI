@@ -1,6 +1,6 @@
 import type { Difficulty, RecipeCategory } from '@/types'
 
-export type StructuredUrlRecipe = {
+type StructuredUrlRecipe = {
   title: string
   ingredients: string[]
   instructions: string

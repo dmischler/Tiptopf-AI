@@ -27,47 +27,6 @@ const DEFAULT_FILTER: CategoryFilterValue = {
   favoritesOnly: false,
 }
 
-function toSafeNumber(value: unknown, fallback = 0) {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value
-  }
-
-  if (typeof value === 'string') {
-    const parsed = Number(value)
-    if (Number.isFinite(parsed)) {
-      return parsed
-    }
-  }
-
-  return fallback
-}
-
-function normalizeSourceType(sourceType: unknown): Recipe['source_type'] {
-  if (sourceType === 'image' || sourceType === 'url' || sourceType === 'manual') {
-    return sourceType
-  }
-
-  return 'manual'
-}
-
-function normalizeRecipe(recipe: Recipe): Recipe {
-  return {
-    ...recipe,
-    ingredients: Array.isArray(recipe.ingredients)
-      ? recipe.ingredients.map((value) => String(value)).filter((value) => value.trim().length > 0)
-      : [],
-    prep_time: Math.max(0, Math.trunc(toSafeNumber(recipe.prep_time))),
-    cook_time: Math.max(0, Math.trunc(toSafeNumber(recipe.cook_time))),
-    servings: Math.max(0, Math.trunc(toSafeNumber(recipe.servings, 1))),
-    rating:
-      recipe.rating === null || recipe.rating === undefined
-        ? null
-        : Math.max(0, Math.min(5, toSafeNumber(recipe.rating))),
-    is_favorite: Boolean(recipe.is_favorite),
-    source_type: normalizeSourceType(recipe.source_type),
-  }
-}
-
 function toMillis(iso: string) {
   const value = new Date(iso).getTime()
   return Number.isNaN(value) ? 0 : value
@@ -95,7 +54,7 @@ function sortRecipes(recipes: Recipe[], sortOption: SortOption) {
 }
 
 export function LibraryView({ initialRecipes }: LibraryViewProps) {
-  const [recipes, setRecipes] = useState(() => initialRecipes.map(normalizeRecipe))
+  const [recipes, setRecipes] = useState(initialRecipes)
   const [searchTerm, setSearchTerm] = useState('')
   const [sortOption, setSortOption] = useState<SortOption>('newest')
   const [filterValue, setFilterValue] = useState<CategoryFilterValue>(DEFAULT_FILTER)
@@ -212,10 +171,9 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
 
       <AddRecipeLauncher
         onRecipeSaved={(recipe) => {
-          const normalizedRecipe = normalizeRecipe(recipe)
           setRecipes((current) => [
-            normalizedRecipe,
-            ...current.filter((item) => item.id !== normalizedRecipe.id),
+            recipe,
+            ...current.filter((item) => item.id !== recipe.id),
           ])
         }}
       />
