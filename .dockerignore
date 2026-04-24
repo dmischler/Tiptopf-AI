@@ -1,0 +1,25 @@
+node_modules
+.next
+out
+dist
+build
+.env
+.env.local
+.env*.local
+*.env
+.DS_Store
+*.log
+.vercel
+data
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+
+# Docker
+.env.docker
+.env.docker.example
+docker-compose.override.yml

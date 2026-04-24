@@ -4,8 +4,15 @@
 - `npm run build` — primary non-interactive verification (includes TypeScript check)
 - `npm run lint` — ESLint checks
 
+## Docker
+- `docker compose up -d --build` — build and start production container
+- `docker compose stop` — stop container (data persists)
+- `docker compose down -v` — remove container and all data
+- `docker compose logs -f` — follow logs
+
 ## Environment Setup
-- Copy `.env.example` to `.env.local` before running
+- Native: Copy `.env.example` to `.env.local` before running
+- Docker: Copy `.env.docker.example` to `.env.docker` before running
 - Required env var: `DATA_DIR`
 - Optional: `NEXT_PUBLIC_SITE_URL`, `OPENCODE_MODEL_ID`
 

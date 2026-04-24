@@ -1,0 +1,26 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - tiptopf-data:/app/data
+    environment:
+      - DATA_DIR=/app/data
+      - OPENCODE_API_KEY=${OPENCODE_API_KEY}
+      - OPENCODE_BASE_URL=${OPENCODE_BASE_URL:-https://opencode.ai/zen/v1}
+      - OPENCODE_MODEL_ID=${OPENCODE_MODEL_ID:-minimax-m2.5}
+      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-}
+      - PEXELS_API_KEY=${PEXELS_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/library"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  tiptopf-data:

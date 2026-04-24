@@ -65,9 +65,26 @@ npm run build
 npm run lint
 ```
 
+## Deployment
+
+### Docker (recommended)
+
+```bash
+cp .env.docker.example .env.docker
+# edit .env.docker, insert OPENCODE_API_KEY
+docker compose up -d --build
+```
+
+Data persists in a Docker named volume — survive container restarts.
+
+For detailed Docker operations (backup, restore, update), see `docs/local-pi-deployment.md` (Option B).
+
+### Manual
+
+See `docs/local-pi-deployment.md` (Option A) for Raspberry Pi deployment without Docker.
+
 ## Notes
 
 - API keys are still encrypted in the browser before being saved.
 - Image uploads from URL are downloaded and persisted locally.
-- For deployment details on Raspberry Pi and Tailscale, see `docs/local-pi-deployment.md`.
 - UI language: German
