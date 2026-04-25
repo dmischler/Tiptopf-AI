@@ -16,6 +16,6 @@ test.describe('Tiptopf App', () => {
 
   test('library page is reachable', async ({ page }) => {
     await page.goto('/library')
-    await expect(page.getByRole('heading', { name: 'Your library' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Deine Bibliothek' })).toBeVisible()
   })
 })

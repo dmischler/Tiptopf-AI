@@ -1,6 +1,8 @@
 const LEGACY_BASE_URLS = new Set(['https://api.opencode.ai', 'https://api.opencode.ai/v1'])
 const DEFAULT_BASE_URL = 'https://opencode.ai/zen/v1'
 const DEFAULT_MODEL_ID = 'minimax-m2.5'
+const DEFAULT_IMAGE_MODEL_ID = 'gemini-2.5-flash'
+const DEFAULT_IMAGE_FALLBACK_MODEL_ID = 'gemini-3-flash-preview'
 
 const LEGACY_MODEL_IDS: Record<string, string> = {
   'minimax-m2.5': 'minimax-m2.5',
@@ -54,6 +56,14 @@ export function resolveAiBaseUrl(baseUrl?: string) {
 
 export function resolveAiModelId() {
   return normalizeModelId(process.env.OPENCODE_MODEL_ID || DEFAULT_MODEL_ID)
+}
+
+export function resolveAiImageModelId() {
+  return normalizeModelId(process.env.OPENCODE_IMAGE_MODEL_ID || DEFAULT_IMAGE_MODEL_ID)
+}
+
+export function resolveAiImageFallbackModelId() {
+  return normalizeModelId(process.env.OPENCODE_IMAGE_FALLBACK_MODEL_ID || DEFAULT_IMAGE_FALLBACK_MODEL_ID)
 }
 
 export function getApiKey(): string {

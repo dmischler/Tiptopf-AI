@@ -4,7 +4,11 @@ import { streamText } from 'ai'
 import { z } from 'zod'
 import { createOpenAI } from '@ai-sdk/openai'
 
-import { resolveAiBaseUrl, resolveAiModelId } from '@/lib/ai/client'
+import {
+  resolveAiBaseUrl,
+  resolveAiImageFallbackModelId,
+  resolveAiImageModelId,
+} from '@/lib/ai/client'
 import { IMAGE_EXTRACTION_PROMPT } from '@/lib/ai/prompts'
 import type { ParsedRecipe } from '@/types'
 
@@ -24,17 +28,19 @@ function cleanJsonResponse(raw: string) {
   return raw.replace(/^```json\s*/i, '').replace(/```$/i, '').trim()
 }
 
-export async function extractRecipeFromImage(
+async function runImageExtraction(
   imageBase64: string,
   apiKey: string,
-  baseUrl?: string
-): Promise<ParsedRecipe> {
+  baseUrl: string,
+  modelId: string
+): Promise<string> {
   const ai = createOpenAI({
     apiKey,
-    baseURL: resolveAiBaseUrl(baseUrl),
+    baseURL: baseUrl,
   })
+
   const result = await streamText({
-    model: ai(resolveAiModelId()) as any,
+    model: ai(modelId) as any,
     system: IMAGE_EXTRACTION_PROMPT,
     messages: [
       {
@@ -57,6 +63,33 @@ export async function extractRecipeFromImage(
   for await (const chunk of result.textStream) {
     raw += chunk
   }
+
+  return raw
+}
+
+export async function extractRecipeFromImage(
+  imageBase64: string,
+  apiKey: string,
+  baseUrl?: string
+): Promise<ParsedRecipe> {
+  const resolvedBaseUrl = resolveAiBaseUrl(baseUrl)
+  const primaryModel = resolveAiImageModelId()
+  const fallbackModel = resolveAiImageFallbackModelId()
+
+  let raw = ''
+  let usedModel = primaryModel
+
+  try {
+    console.log('AI image extraction - trying primary model:', primaryModel)
+    raw = await runImageExtraction(imageBase64, apiKey, resolvedBaseUrl, primaryModel)
+  } catch (primaryError) {
+    console.error('AI image extraction - primary model failed:', primaryError)
+    console.log('AI image extraction - trying fallback model:', fallbackModel)
+    raw = await runImageExtraction(imageBase64, apiKey, resolvedBaseUrl, fallbackModel)
+    usedModel = fallbackModel
+  }
+
+  console.log('AI image extraction - succeeded with model:', usedModel)
 
   const parsed = recipeSchema.parse(JSON.parse(cleanJsonResponse(raw)))
 
