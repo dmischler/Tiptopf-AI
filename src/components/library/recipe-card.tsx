@@ -26,6 +26,7 @@ const DIFFICULTY_LABELS: Record<Difficulty, string> = {
 
 type RecipeCardProps = {
   recipe: Recipe
+  index?: number
   onOpen: () => void
   onFavoriteChange?: (value: boolean) => void
   onRatingChange?: (value: number | null) => void
@@ -53,10 +54,10 @@ function formatDifficultyLabel(difficulty: Recipe['difficulty']) {
   return DIFFICULTY_LABELS[difficulty]
 }
 
-export function RecipeCard({ recipe, onOpen, onFavoriteChange, onRatingChange }: RecipeCardProps) {
+export function RecipeCard({ recipe, index = 0, onOpen, onFavoriteChange, onRatingChange }: RecipeCardProps) {
   return (
     <Card
-      className="cursor-pointer py-0 transition duration-150 hover:-translate-y-0.5 hover:shadow-lg"
+      className="cursor-pointer py-0 transition duration-150 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.985] active:shadow-md"
       onClick={onOpen}
       role="button"
       tabIndex={0}
@@ -68,13 +69,14 @@ export function RecipeCard({ recipe, onOpen, onFavoriteChange, onRatingChange }:
       }}
     >
       {recipe.image_url ? (
-        <div className="relative aspect-[4/3] w-full overflow-hidden">
+        <div className="relative aspect-[16/10] w-full overflow-hidden sm:aspect-[4/3]">
           <Image
             src={recipe.image_url}
             alt={recipe.title}
             fill
             className="object-cover"
             sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
+            priority={index < 4}
           />
         </div>
       ) : null}
@@ -98,12 +100,12 @@ export function RecipeCard({ recipe, onOpen, onFavoriteChange, onRatingChange }:
 
         <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5" />
+            <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             {formatTotalTime(recipe.prep_time, recipe.cook_time)}
           </span>
           {recipe.servings > 0 ? (
             <span className="inline-flex items-center gap-1">
-              <UtensilsCrossed className="h-3.5 w-3.5" />
+              <UtensilsCrossed className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               {recipe.servings}
             </span>
           ) : null}

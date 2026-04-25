@@ -519,7 +519,7 @@ export function RecipeDetail({
                       size="md"
                       onOptimisticChange={onFavoriteChange}
                     />
-                    <Button type="button" variant="ghost" size="icon-sm" onClick={() => setMode('edit')}>
+                    <Button type="button" variant="ghost" size="icon" className="min-h-[44px] min-w-[44px] touch-manipulation" onClick={() => setMode('edit')}>
                       <Pencil className="h-4 w-4" />
                       <span className="sr-only">Edit recipe</span>
                     </Button>
@@ -622,7 +622,7 @@ export function RecipeDetail({
               <div className="max-h-[calc(90vh-9rem)] space-y-4 overflow-y-auto px-5 pb-5 pt-4">
                 <div className="grid gap-4 rounded-xl border border-border/70 bg-muted/30 p-4 md:grid-cols-2">
 <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="recipe-edit-servings">Portionen</Label>
+                    <Label htmlFor="recipe-edit-title">Titel</Label>
                     <Input
                       id="recipe-edit-title"
                       value={draft.title}
@@ -702,7 +702,7 @@ export function RecipeDetail({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="recipe-edit-prep">Prep time (minutes)</Label>
+                    <Label htmlFor="recipe-edit-prep">Vorbereitungszeit (Minuten)</Label>
                     <Input
                       id="recipe-edit-prep"
                       type="number"
@@ -746,7 +746,7 @@ export function RecipeDetail({
                   </div>
 
 <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="recipe-edit-prep">Vorbereitungszeit (Minuten)</Label>
+                    <Label htmlFor="recipe-edit-servings">Portionen</Label>
                     <Input
                       id="recipe-edit-servings"
                       type="number"
@@ -826,7 +826,7 @@ export function RecipeDetail({
                           event.currentTarget.value = ''
                         }}
                       />
-                      <span className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-background/70 px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/60">
+                      <span className="inline-flex h-10 min-h-[44px] cursor-pointer items-center gap-2 rounded-md border border-border bg-background/70 px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/60">
                         <Upload className="h-4 w-4" />
                         Bild ersetzen
                       </span>
@@ -892,33 +892,35 @@ export function RecipeDetail({
                   />
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-2">
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={() => setConfirmDeleteOpen(true)}
-                    disabled={isSaving}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Rezept löschen
-                  </Button>
-
-                  <div className="flex flex-wrap gap-2">
+                <div className="sticky bottom-0 z-10 -mx-5 bg-background/95 px-5 py-3 backdrop-blur-sm sm:static sm:bg-transparent sm:px-0 sm:py-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-2 sm:border-t-0 sm:pt-0">
                     <Button
                       type="button"
-                      variant="outline"
-                      onClick={() => {
-                        resetDraftFromRecipe()
-                        setMode('view')
-                      }}
+                      variant="destructive"
+                      onClick={() => setConfirmDeleteOpen(true)}
                       disabled={isSaving}
                     >
-                      Abbrechen
+                      <Trash2 className="h-4 w-4" />
+                      Rezept löschen
                     </Button>
-                    <Button type="button" onClick={() => void handleSaveEdit()} disabled={isSaving}>
-                      {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                      Speichern
-                    </Button>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          resetDraftFromRecipe()
+                          setMode('view')
+                        }}
+                        disabled={isSaving}
+                      >
+                        Abbrechen
+                      </Button>
+                      <Button type="button" onClick={() => void handleSaveEdit()} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                        Speichern
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>

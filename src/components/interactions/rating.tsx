@@ -67,7 +67,7 @@ export function Rating({
             }}
             onMouseEnter={() => setHover(star)}
             disabled={isPending}
-            className="rounded p-0.5 transition-transform hover:scale-110 disabled:cursor-not-allowed"
+            className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded p-1 transition-transform hover:scale-110 active:scale-110 touch-manipulation disabled:cursor-not-allowed"
             aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
           >
             <Star

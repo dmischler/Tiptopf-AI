@@ -1,11 +1,14 @@
 import path from 'node:path'
 import { promises as fs } from 'node:fs'
+import sharp from 'sharp'
 
 import { getRecipeImagesDir } from '@/lib/local/paths'
 
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const MAX_UPLOADED_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
 const MAX_DOWNLOADED_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
+const MAX_IMAGE_WIDTH = 1200
+const IMAGE_QUALITY = 85
 
 const CONTENT_TYPE_BY_EXT: Record<string, string> = {
   '.jpg': 'image/jpeg',
@@ -83,6 +86,14 @@ function extensionFromMime(mime: string, fallbackUrl?: string) {
   return 'jpg'
 }
 
+async function resizeToWebp(bytes: Uint8Array): Promise<Uint8Array> {
+  const buffer = await sharp(Buffer.from(bytes))
+    .resize({ width: MAX_IMAGE_WIDTH, withoutEnlargement: true })
+    .webp({ quality: IMAGE_QUALITY })
+    .toBuffer()
+  return new Uint8Array(buffer)
+}
+
 async function writeRecipeImage(recipeId: string, bytes: Uint8Array, ext: string) {
   await ensureRecipeImagesDir()
   await removeRecipeImageVariants(recipeId)
@@ -108,8 +119,8 @@ export async function saveRecipeImageBytes(
     throw new Error('Only JPG, PNG, and WEBP images are supported')
   }
 
-  const ext = extensionFromMime(normalizedMime)
-  return writeRecipeImage(recipeId, bytes, ext)
+  const resized = await resizeToWebp(bytes)
+  return writeRecipeImage(recipeId, resized, 'webp')
 }
 
 export async function saveUploadedRecipeImage(file: File, recipeId: string) {
@@ -123,9 +134,9 @@ export async function saveUploadedRecipeImage(file: File, recipeId: string) {
     throw new Error('Image must be 5MB or smaller')
   }
 
-  const ext = extensionFromMime(mime)
   const bytes = new Uint8Array(await file.arrayBuffer())
-  return writeRecipeImage(recipeId, bytes, ext)
+  const resized = await resizeToWebp(bytes)
+  return writeRecipeImage(recipeId, resized, 'webp')
 }
 
 export async function downloadImageToLocalStorage(imageUrl: string, recipeId: string) {
@@ -140,10 +151,8 @@ export async function downloadImageToLocalStorage(imageUrl: string, recipeId: st
     throw new Error('Downloaded image exceeds 10MB limit')
   }
 
-  const mime = toNormalizedMime(response.headers.get('content-type'))
-  const ext = extensionFromMime(mime, imageUrl)
-
-  return writeRecipeImage(recipeId, bytes, ext)
+  const resized = await resizeToWebp(bytes)
+  return writeRecipeImage(recipeId, resized, 'webp')
 }
 
 export async function readRecipeImage(imageName: string) {

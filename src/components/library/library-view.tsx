@@ -267,10 +267,11 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
         </Card>
       ) : (
         <MasonryGrid>
-          {visibleRecipes.map((recipe) => (
+          {visibleRecipes.map((recipe, index) => (
             <MasonryItem key={recipe.id}>
               <RecipeCard
                 recipe={recipe}
+                index={index}
                 onOpen={() => setSelectedRecipeId(recipe.id)}
                 onFavoriteChange={(value) => patchRecipe(recipe.id, { is_favorite: value })}
                 onRatingChange={(value) => patchRecipe(recipe.id, { rating: value })}
