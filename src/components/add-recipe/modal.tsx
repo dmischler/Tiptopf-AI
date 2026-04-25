@@ -36,6 +36,7 @@ type AddRecipeModalProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   onRecipeSaved?: (recipe: Recipe) => void
+  initialUrl?: string
 }
 
 type ExtractedRecipePayload = ParsedRecipe & {
@@ -61,7 +62,7 @@ function buildEditableState(recipe: ExtractedRecipePayload): EditableRecipePrevi
   }
 }
 
-export function AddRecipeModal({ open, onOpenChange, onRecipeSaved }: AddRecipeModalProps) {
+export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl }: AddRecipeModalProps) {
   const [activeTab, setActiveTab] = useState<'image' | 'url'>('image')
   const [phase, setPhase] = useState<ModalPhase>('input')
   const [progressStage, setProgressStage] = useState<Stage>('fetching')
@@ -84,6 +85,14 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved }: AddRecipeM
       URL.revokeObjectURL(replacementImagePreviewUrl)
     }
   }, [replacementImagePreviewUrl])
+
+  useEffect(() => {
+    if (open && initialUrl) {
+      setActiveTab('url')
+      setUrlInput(initialUrl)
+      toast.success('URL from clipboard detected', { duration: 2000 })
+    }
+  }, [open, initialUrl])
 
   function resetState() {
     setPhase('input')
