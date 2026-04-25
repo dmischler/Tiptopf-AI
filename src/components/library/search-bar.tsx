@@ -19,7 +19,7 @@ export function SearchBar({ value, onChange, placeholder = 'Rezepte suchen...' }
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="h-9 pl-9"
+        className="pl-9"
       />
     </div>
   )

@@ -24,7 +24,7 @@ const LABELS: Record<SortOption, string> = {
 export function SortDropdown({ value, onChange }: SortDropdownProps) {
   return (
     <Select value={value} onValueChange={(next) => onChange(next as SortOption)}>
-      <SelectTrigger className="h-9 w-full sm:w-44">
+      <SelectTrigger className="w-full sm:w-44">
         <SelectValue>
           {(val) => (val ? LABELS[val as SortOption] : LABELS.newest)}
         </SelectValue>

@@ -233,7 +233,7 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-8 pb-24 sm:px-6 lg:px-8">
+    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-8 pb-[max(6rem,env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Deine Bibliothek</h1>
@@ -254,7 +254,7 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
           <CardHeader>
             <CardTitle>Noch keine Rezepte</CardTitle>
             <CardDescription>
-              Klicke auf den schwebenden + Button, um dein erstes Rezept aus einem Bild oder einer URL hinzuzufügen.
+              Füge dein erstes Rezept aus einem Bild oder einer URL hinzu.
             </CardDescription>
           </CardHeader>
         </Card>
