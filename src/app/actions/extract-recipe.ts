@@ -102,7 +102,15 @@ export async function extractFromUrlAction(url: string) {
     throw new Error('URL must start with http:// or https://')
   }
 
-  const { content, imageUrl, structuredRecipe } = await fetchRecipeUrl(normalizedUrl)
+  let fetchResult: { content: string; imageUrl: string | null; structuredRecipe: { title: string; ingredients: string[]; instructions: string; prep_time: number | null; cook_time: number | null; servings: number | null; category: import('@/types').RecipeCategory; difficulty: import('@/types').Difficulty; confidence: number } | null }
+  try {
+    fetchResult = await fetchRecipeUrl(normalizedUrl)
+  } catch (err) {
+    console.error('fetchRecipeUrl error:', err)
+    throw new Error(err instanceof Error ? err.message : 'Failed to fetch URL.')
+  }
+
+  const { content, imageUrl, structuredRecipe } = fetchResult
   let recipe = structuredRecipe
 
   if (!recipe) {
@@ -111,20 +119,26 @@ export async function extractFromUrlAction(url: string) {
     }
 
     const baseUrl = resolveAiBaseUrl(settings.opencode_base_url ?? undefined)
-    recipe = await extractRecipeFromText(
-      content,
-      settings.opencode_api_key,
-      baseUrl,
-      settings.opencode_model_id ?? undefined,
-      true
-    )
+    try {
+      recipe = await extractRecipeFromText(
+        content,
+        settings.opencode_api_key,
+        baseUrl,
+        settings.opencode_model_id ?? undefined,
+        true
+      )
+    } catch (err) {
+      console.error('extractRecipeFromText error:', err)
+      throw new Error(err instanceof Error ? err.message : 'AI extraction failed.')
+    }
   }
 
   let storedImageUrl: string | null = null
   if (imageUrl) {
     try {
       storedImageUrl = await downloadImageToLocalStorage(imageUrl, crypto.randomUUID())
-    } catch {
+    } catch (err) {
+      console.error('downloadImageToLocalStorage error:', err)
       storedImageUrl = null
     }
   }
