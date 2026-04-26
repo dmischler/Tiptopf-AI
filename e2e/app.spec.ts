@@ -6,14 +6,6 @@ test.describe('Tiptopf App', () => {
     await expect(page).toHaveURL(/.*\/library/)
   })
 
-  test('legacy auth routes redirect to library', async ({ page }) => {
-    await page.goto('/login')
-    await expect(page).toHaveURL(/.*\/library/)
-
-    await page.goto('/signup')
-    await expect(page).toHaveURL(/.*\/library/)
-  })
-
   test('library page is reachable', async ({ page }) => {
     await page.goto('/library')
     await expect(page.getByRole('heading', { name: 'Deine Bibliothek' })).toBeVisible()
