@@ -2,12 +2,12 @@
 
 import { streamText } from 'ai'
 import { z } from 'zod'
-import { createOpenAI } from '@ai-sdk/openai'
+import { createGoogleGenerativeAI } from '@ai-sdk/google'
 
 import {
-  resolveAiBaseUrl,
-  resolveAiImageFallbackModelId,
-  resolveAiImageModelId,
+  resolveGeminiBaseUrl,
+  resolveGeminiImageFallbackModelId,
+  resolveGeminiImageModelId,
 } from '@/lib/ai/client'
 import { IMAGE_EXTRACTION_PROMPT } from '@/lib/ai/prompts'
 import type { ParsedRecipe } from '@/types'
@@ -28,19 +28,9 @@ function cleanJsonResponse(raw: string) {
   return raw.replace(/^```json\s*/i, '').replace(/```$/i, '').trim()
 }
 
-async function runImageExtraction(
-  imageBase64: string,
-  apiKey: string,
-  baseUrl: string,
-  modelId: string
-): Promise<string> {
-  const ai = createOpenAI({
-    apiKey,
-    baseURL: baseUrl,
-  })
-
+async function runImageExtraction(imageDataUrl: string, model: any): Promise<string> {
   const result = await streamText({
-    model: ai(modelId) as any,
+    model,
     system: IMAGE_EXTRACTION_PROMPT,
     messages: [
       {
@@ -48,7 +38,7 @@ async function runImageExtraction(
         content: [
           {
             type: 'image',
-            image: imageBase64,
+            image: imageDataUrl,
           },
           {
             type: 'text',
@@ -68,28 +58,45 @@ async function runImageExtraction(
 }
 
 export async function extractRecipeFromImage(
-  imageBase64: string,
-  apiKey: string,
-  baseUrl?: string
+  imageDataUrl: string,
+  geminiApiKey: string,
+  geminiBaseUrl?: string,
+  geminiImageModelId?: string,
+  geminiImageFallbackModelId?: string
 ): Promise<ParsedRecipe> {
-  const resolvedBaseUrl = resolveAiBaseUrl(baseUrl)
-  const primaryModel = resolveAiImageModelId()
-  const fallbackModel = resolveAiImageFallbackModelId()
+  const sanitizedKey = geminiApiKey.trim()
+  if (!sanitizedKey) {
+    throw new Error('Gemini API-Key fehlt. Bitte im Profil hinterlegen.')
+  }
+
+  const googleOptions: { apiKey: string; baseURL?: string } = { apiKey: sanitizedKey }
+  const resolvedBaseUrl = resolveGeminiBaseUrl(geminiBaseUrl)
+  if (resolvedBaseUrl) {
+    googleOptions.baseURL = resolvedBaseUrl
+  }
+
+  const google = createGoogleGenerativeAI(googleOptions)
+  const primaryModel = resolveGeminiImageModelId(geminiImageModelId)
+  const fallbackModel = resolveGeminiImageFallbackModelId(geminiImageFallbackModelId)
 
   let raw = ''
   let usedModel = primaryModel
 
   try {
-    console.log('AI image extraction - trying primary model:', primaryModel)
-    raw = await runImageExtraction(imageBase64, apiKey, resolvedBaseUrl, primaryModel)
+    console.log('AI image extraction - trying Gemini model:', primaryModel)
+    raw = await runImageExtraction(imageDataUrl, google(primaryModel))
   } catch (primaryError) {
-    console.error('AI image extraction - primary model failed:', primaryError)
-    console.log('AI image extraction - trying fallback model:', fallbackModel)
-    raw = await runImageExtraction(imageBase64, apiKey, resolvedBaseUrl, fallbackModel)
-    usedModel = fallbackModel
+    console.error('AI image extraction - Gemini model failed:', primaryError)
+    if (fallbackModel !== primaryModel) {
+      console.log('AI image extraction - trying Gemini fallback:', fallbackModel)
+      raw = await runImageExtraction(imageDataUrl, google(fallbackModel))
+      usedModel = fallbackModel
+    } else {
+      throw primaryError
+    }
   }
 
-  console.log('AI image extraction - succeeded with model:', usedModel)
+  console.log('AI image extraction - succeeded with Gemini model:', usedModel)
 
   const parsed = recipeSchema.parse(JSON.parse(cleanJsonResponse(raw)))
 

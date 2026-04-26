@@ -110,7 +110,7 @@ export function CollectionDetailView({ collection, allRecipes }: CollectionDetai
   const selectedRecipe = allRecipes.find((r) => r.id === selectedRecipeId) ?? null
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-8 pb-[max(6rem,env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
+    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-8 pb-[max(6rem,env(safe-area-inset-bottom))] md:pb-8 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="outline" size="icon" onClick={() => router.push('/collections')}>
           <ArrowLeft className="h-4 w-4" />

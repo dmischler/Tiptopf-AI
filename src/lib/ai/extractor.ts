@@ -48,10 +48,11 @@ async function runExtraction(
   content: string,
   systemPrompt: string,
   apiKey: string,
-  baseUrl?: string
+  baseUrl?: string,
+  modelId?: string
 ) {
   const resolvedBaseUrl = resolveAiBaseUrl(baseUrl)
-  const resolvedModelId = resolveAiModelId()
+  const resolvedModelId = resolveAiModelId(modelId)
 
   console.log('AI extraction - baseUrl:', resolvedBaseUrl)
   console.log('AI extraction - model:', resolvedModelId)
@@ -98,13 +99,15 @@ export async function extractRecipeFromText(
   text: string,
   apiKey: string,
   baseUrl?: string,
+  modelId?: string,
   isUrl = false
 ): Promise<ParsedRecipe> {
   const parsed = await runExtraction(
     text,
     isUrl ? URL_EXTRACTION_PROMPT : IMAGE_EXTRACTION_PROMPT,
     apiKey,
-    baseUrl
+    baseUrl,
+    modelId
   )
 
   return normalizeParsedRecipe(parsed, isUrl ? 'url' : 'image')

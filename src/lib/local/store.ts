@@ -1,7 +1,15 @@
 import { randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 
-import type { Collection, Difficulty, Profile, Recipe, RecipeCategory, RecipeSourceType } from '@/types'
+import type {
+  AppSettings,
+  Collection,
+  Difficulty,
+  Profile,
+  Recipe,
+  RecipeCategory,
+  RecipeSourceType,
+} from '@/types'
 
 import { getDataDir, getStoreFilePath } from '@/lib/local/paths'
 import { normalizeTags } from '@/lib/utils'
@@ -13,6 +21,7 @@ type LocalStore = {
   recipes: Recipe[]
   collections: Collection[]
   profile: Profile
+  settings: AppSettings
 }
 
 type CreateRecipeInput = {
@@ -54,11 +63,25 @@ function createDefaultProfile(): Profile {
   }
 }
 
+function createDefaultSettings(): AppSettings {
+  return {
+    opencode_api_key: null,
+    opencode_base_url: null,
+    opencode_model_id: null,
+    gemini_api_key: null,
+    gemini_base_url: null,
+    gemini_image_model_id: null,
+    gemini_image_fallback_model_id: null,
+    pexels_api_key: null,
+  }
+}
+
 function createDefaultStore(): LocalStore {
   return {
     recipes: [],
     collections: [],
     profile: createDefaultProfile(),
+    settings: createDefaultSettings(),
   }
 }
 
@@ -72,6 +95,15 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function toStringOrNull(value: unknown) {
   return typeof value === 'string' ? value : null
+}
+
+function normalizeOptionalString(value: unknown) {
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
 }
 
 function toIsoOrNow(value: unknown) {
@@ -183,6 +215,25 @@ function normalizeProfile(value: unknown): Profile {
   }
 }
 
+function normalizeSettings(value: unknown): AppSettings {
+  const base = createDefaultSettings()
+
+  if (!isObject(value)) {
+    return base
+  }
+
+  return {
+    opencode_api_key: normalizeOptionalString(value.opencode_api_key),
+    opencode_base_url: normalizeOptionalString(value.opencode_base_url),
+    opencode_model_id: normalizeOptionalString(value.opencode_model_id),
+    gemini_api_key: normalizeOptionalString(value.gemini_api_key),
+    gemini_base_url: normalizeOptionalString(value.gemini_base_url),
+    gemini_image_model_id: normalizeOptionalString(value.gemini_image_model_id),
+    gemini_image_fallback_model_id: normalizeOptionalString(value.gemini_image_fallback_model_id),
+    pexels_api_key: normalizeOptionalString(value.pexels_api_key),
+  }
+}
+
 function normalizeCollection(value: unknown): Collection | null {
   if (!isObject(value)) {
     return null
@@ -222,6 +273,7 @@ function normalizeStore(value: unknown): LocalStore {
     recipes,
     collections,
     profile: normalizeProfile(value.profile),
+    settings: normalizeSettings(value.settings),
   }
 }
 
@@ -407,6 +459,52 @@ export async function updateRecipeRating(recipeId: string, rating: number | null
 export async function getProfile() {
   const store = await readStore()
   return store.profile
+}
+
+export async function getSettings() {
+  const store = await readStore()
+  return { ...store.settings }
+}
+
+export async function updateSettings(input: Partial<AppSettings>) {
+  return runMutatingStoreOperation((store) => {
+    const next = { ...store.settings }
+
+    if ('opencode_api_key' in input) {
+      next.opencode_api_key = normalizeOptionalString(input.opencode_api_key)
+    }
+
+    if ('opencode_base_url' in input) {
+      next.opencode_base_url = normalizeOptionalString(input.opencode_base_url)
+    }
+
+    if ('opencode_model_id' in input) {
+      next.opencode_model_id = normalizeOptionalString(input.opencode_model_id)
+    }
+
+    if ('gemini_api_key' in input) {
+      next.gemini_api_key = normalizeOptionalString(input.gemini_api_key)
+    }
+
+    if ('gemini_base_url' in input) {
+      next.gemini_base_url = normalizeOptionalString(input.gemini_base_url)
+    }
+
+    if ('gemini_image_model_id' in input) {
+      next.gemini_image_model_id = normalizeOptionalString(input.gemini_image_model_id)
+    }
+
+    if ('gemini_image_fallback_model_id' in input) {
+      next.gemini_image_fallback_model_id = normalizeOptionalString(input.gemini_image_fallback_model_id)
+    }
+
+    if ('pexels_api_key' in input) {
+      next.pexels_api_key = normalizeOptionalString(input.pexels_api_key)
+    }
+
+    store.settings = next
+    return { ...next }
+  })
 }
 
 // Collections

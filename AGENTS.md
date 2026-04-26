@@ -14,11 +14,11 @@
 - Native: Copy `.env.example` to `.env.local` before running
 - Docker: Copy `.env.docker.example` to `.env.docker` before running
 - Required env var: `DATA_DIR`
-- Optional: `NEXT_PUBLIC_SITE_URL`, `OPENCODE_MODEL_ID`
+- Optional: `NEXT_PUBLIC_SITE_URL`
 
 ## Architecture
 - **Next.js App Router** — primary routes: `/`, `/library`, `/profile`
-- **Server Actions** in `src/app/actions/` — `add-recipe.ts`, `extract-recipe.ts`, `profile.ts`, `recipe.ts`
+- **Server Actions** in `src/app/actions/` — `add-recipe.ts`, `extract-recipe.ts`, `recipe.ts`, `collections.ts`, `settings.ts`
 - **AI Layer** in `src/lib/ai/` — extraction and model config
 - **Local persistence** in `src/lib/local/` — `paths.ts`, `store.ts`, `images.ts`
 - **Image API route** in `src/app/api/images/[imageName]/route.ts`
@@ -34,7 +34,7 @@
 - Categories fixed: starter, main, dessert, side, breakfast, snack
 - Difficulty: easy, medium, hard
 - URL images are downloaded and persisted locally
-- API key encrypted client-side before persistence
+- API keys/config are managed in `/profile` and persisted in local store (currently unencrypted)
 - UI language: German
 
 ## Code Organization

@@ -149,15 +149,9 @@ Set the following:
 ```env
 # Required: directory for recipe data and images
 DATA_DIR=/home/pi/tiptopf-data
-
-# Required: your OpenCode Go API key for AI features
-# Get yours at https://opencode.ai
-OPENCODE_API_KEY=sk_xxxxxxxxxxxxx
-
-# Optional: only change if instructed
-# OPENCODE_BASE_URL=https://opencode.ai/zen/v1
-# OPENCODE_MODEL_ID=minimax-m2.5
 ```
+
+API keys and model/base URL settings are configured in the app at `/profile`.
 
 Save with `Ctrl+O`, then `Ctrl+X`.
 
@@ -241,7 +235,7 @@ The app opens directly to `/library`. Since there's no authentication, you're re
 ### Profile Settings
 
 Click the profile icon to:
-- Update your OpenCode API key
+- Configure OpenCode, Gemini, and Pexels API/model settings
 - Export/import your recipe collection
 
 ---
@@ -393,7 +387,7 @@ tailscale status
 ## Security Notes
 
 - **No built-in authentication** — access is controlled via Tailscale network identity
-- **Keep your `.env.local` private** — it contains your API key
+- **API keys are stored in `DATA_DIR/tiptopf.json`** (currently unencrypted)
 - **Use Tailscale ACLs** to restrict who can access your Pi
 - **Regular backups** — your recipe data is only as safe as your last backup
 

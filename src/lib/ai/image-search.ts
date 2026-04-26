@@ -19,8 +19,12 @@ const pexelsSearchResponseSchema = z.object({
   photos: z.array(pexelsPhotoSchema),
 })
 
-export async function searchPexelsImages(query: string, limit = 8): Promise<RecipeImageCandidate[]> {
-  const apiKey = process.env.PEXELS_API_KEY?.trim()
+export async function searchPexelsImages(
+  query: string,
+  pexelsApiKey: string,
+  limit = 8
+): Promise<RecipeImageCandidate[]> {
+  const apiKey = pexelsApiKey.trim()
   if (!apiKey) {
     return []
   }

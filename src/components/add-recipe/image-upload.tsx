@@ -42,13 +42,12 @@ export function ImageUpload({ disabled, onSelect, onError }: ImageUploadProps) {
 
     try {
       const dataUrl = await readFileAsDataUrl(file)
-      const base64 = dataUrl.split(',')[1] || ''
-      if (!base64) {
+      if (!dataUrl) {
         onError('Could not parse image payload.')
         return
       }
 
-      await onSelect(base64)
+      await onSelect(dataUrl)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to process image.'
       onError(message)

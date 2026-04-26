@@ -3,15 +3,15 @@
 import { z } from 'zod'
 
 import { extractRecipeFromText } from '@/lib/ai/extractor'
-import { generateRecipeImageWithAi } from '@/lib/ai/image-generator'
 import { searchPexelsImages } from '@/lib/ai/image-search'
 import { searchMealDbImages } from '@/lib/ai/meal-db'
 import type { RecipeCategory } from '@/types'
 import type { RecipeImageCandidate, ResolvedRecipeImage } from '@/lib/ai/image-types'
-import { DEFAULT_BASE_URL, getApiKey, resolveAiBaseUrl } from '@/lib/ai/client'
+import { resolveAiBaseUrl } from '@/lib/ai/client'
 import { fetchRecipeUrl } from '@/lib/ai/url-fetcher'
 import { extractRecipeFromImage } from '@/lib/ai/image-handler'
-import { downloadImageToLocalStorage, saveRecipeImageBytes } from '@/lib/local/images'
+import { downloadImageToLocalStorage } from '@/lib/local/images'
+import { getSettings } from '@/lib/local/store'
 
 const categorySchema = z.enum(['starter', 'main', 'dessert', 'side', 'breakfast', 'snack'])
 const titleSchema = z.string().trim().min(1).max(180)
@@ -38,11 +38,15 @@ function buildImageSearchQuery(title: string, category: RecipeCategory) {
   return `${title} ${suffixByCategory[category]} food photo`
 }
 
-async function collectImageCandidates(title: string, category: RecipeCategory): Promise<RecipeImageCandidate[]> {
+async function collectImageCandidates(
+  title: string,
+  category: RecipeCategory,
+  pexelsApiKey: string | null
+): Promise<RecipeImageCandidate[]> {
   const pexelsQuery = buildImageSearchQuery(title, category)
 
   try {
-    const pexelsCandidates = await searchPexelsImages(pexelsQuery, 8)
+    const pexelsCandidates = pexelsApiKey ? await searchPexelsImages(pexelsQuery, pexelsApiKey, 8) : []
     if (pexelsCandidates.length > 0) {
       return pexelsCandidates
     }
@@ -53,52 +57,14 @@ async function collectImageCandidates(title: string, category: RecipeCategory): 
   return searchMealDbImages(title, 4)
 }
 
-async function generateRecipeImage(input: FindRecipeImageInput): Promise<ResolvedRecipeImage | null> {
-  const baseUrl = resolveAiBaseUrl(process.env.OPENCODE_BASE_URL)
-
-  try {
-    const generated = await generateRecipeImageWithAi({
-      title: input.title,
-      category: input.category,
-      ingredients: input.ingredients,
-      apiKey: getApiKey(),
-      baseUrl,
-    })
-
-    if (generated.bytes) {
-      const imageUrl = await saveRecipeImageBytes(
-        generated.bytes,
-        crypto.randomUUID(),
-        generated.mimeType ?? null
-      )
-
-      return {
-        imageUrl,
-        source: 'ai',
-      }
-    }
-
-    if (generated.url) {
-      const imageUrl = await downloadImageToLocalStorage(generated.url, crypto.randomUUID())
-      return {
-        imageUrl,
-        source: 'ai',
-      }
-    }
-  } catch {
-    return null
-  }
-
-  return null
-}
-
 export async function searchRecipeImageCandidatesAction(
   title: string,
   category: RecipeCategory
 ): Promise<RecipeImageCandidate[]> {
+  const settings = await getSettings()
   const parsedTitle = titleSchema.parse(title)
   const parsedCategory = categorySchema.parse(category)
-  return collectImageCandidates(parsedTitle, parsedCategory)
+  return collectImageCandidates(parsedTitle, parsedCategory, settings.pexels_api_key)
 }
 
 export async function applyRecipeImageCandidateAction(imageUrl: string): Promise<string> {
@@ -106,16 +72,10 @@ export async function applyRecipeImageCandidateAction(imageUrl: string): Promise
   return downloadImageToLocalStorage(parsedImageUrl, crypto.randomUUID())
 }
 
-export async function generateRecipeImageAction(
-  input: FindRecipeImageInput
-): Promise<ResolvedRecipeImage | null> {
-  const parsedInput = findRecipeImageInputSchema.parse(input)
-  return generateRecipeImage(parsedInput)
-}
-
 export async function findRecipeImageAction(input: FindRecipeImageInput): Promise<ResolvedRecipeImage | null> {
+  const settings = await getSettings()
   const parsedInput = findRecipeImageInputSchema.parse(input)
-  const candidates = await collectImageCandidates(parsedInput.title, parsedInput.category)
+  const candidates = await collectImageCandidates(parsedInput.title, parsedInput.category, settings.pexels_api_key)
 
   for (const candidate of candidates) {
     try {
@@ -131,10 +91,12 @@ export async function findRecipeImageAction(input: FindRecipeImageInput): Promis
     }
   }
 
-  return generateRecipeImage(parsedInput)
+  return null
 }
 
 export async function extractFromUrlAction(url: string) {
+  const settings = await getSettings()
+
   const normalizedUrl = url.trim()
   if (!/^https?:\/\//i.test(normalizedUrl)) {
     throw new Error('URL must start with http:// or https://')
@@ -144,8 +106,18 @@ export async function extractFromUrlAction(url: string) {
   let recipe = structuredRecipe
 
   if (!recipe) {
-    const baseUrl = resolveAiBaseUrl(process.env.OPENCODE_BASE_URL)
-    recipe = await extractRecipeFromText(content, getApiKey(), baseUrl, true)
+    if (!settings.opencode_api_key) {
+      throw new Error('OpenCode API-Key fehlt. Bitte im Profil hinterlegen.')
+    }
+
+    const baseUrl = resolveAiBaseUrl(settings.opencode_base_url ?? undefined)
+    recipe = await extractRecipeFromText(
+      content,
+      settings.opencode_api_key,
+      baseUrl,
+      settings.opencode_model_id ?? undefined,
+      true
+    )
   }
 
   let storedImageUrl: string | null = null
@@ -165,13 +137,23 @@ export async function extractFromUrlAction(url: string) {
   }
 }
 
-export async function extractFromImageAction(imageBase64: string) {
-  if (!imageBase64) {
+export async function extractFromImageAction(imageDataUrl: string) {
+  const settings = await getSettings()
+  if (!settings.gemini_api_key) {
+    throw new Error('Gemini API-Key fehlt. Bitte im Profil hinterlegen.')
+  }
+
+  if (!imageDataUrl) {
     throw new Error('No image payload provided')
   }
 
-  const baseUrl = resolveAiBaseUrl(process.env.OPENCODE_BASE_URL)
-  const recipe = await extractRecipeFromImage(imageBase64, getApiKey(), baseUrl)
+  const recipe = await extractRecipeFromImage(
+    imageDataUrl,
+    settings.gemini_api_key,
+    settings.gemini_base_url ?? undefined,
+    settings.gemini_image_model_id ?? undefined,
+    settings.gemini_image_fallback_model_id ?? undefined
+  )
 
   return {
     ...recipe,

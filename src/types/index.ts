@@ -38,6 +38,17 @@ export interface Profile {
   updated_at: string;
 }
 
+export interface AppSettings {
+  opencode_api_key: string | null;
+  opencode_base_url: string | null;
+  opencode_model_id: string | null;
+  gemini_api_key: string | null;
+  gemini_base_url: string | null;
+  gemini_image_model_id: string | null;
+  gemini_image_fallback_model_id: string | null;
+  pexels_api_key: string | null;
+}
+
 export interface ParsedRecipe {
   title: string;
   ingredients: string[];

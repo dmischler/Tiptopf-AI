@@ -2,6 +2,67 @@
 
 > **Status: COMPLETED** ✅ (2026-04-26)
 
+> **Phase 2 Addendum (2026-04-26): COMPLETED** ✅
+
+## Phase 2 Addendum: Desktop Navigation + Profile-Based API Configuration
+
+This follow-up addendum documents the architecture updates requested after Phase 1.
+
+### A) Desktop Navigation
+
+- Added `src/components/layout/top-nav.tsx` for desktop (`md` and above)
+- Extracted shared navigation metadata to `src/components/layout/nav-items.ts`
+- Updated `src/components/layout/bottom-nav.tsx` to reuse shared nav items
+- Mounted `TopNav` in `src/app/layout.tsx`
+- Kept bottom nav mobile-only (`md:hidden`) and desktop top nav visible (`hidden md:block`)
+- Reduced desktop bottom spacing on main views with `md:pb-8`
+
+### B) Remove Auth/Landing Artifacts
+
+- Removed unused auth routes:
+  - `src/app/login/page.tsx`
+  - `src/app/signup/page.tsx`
+  - `src/app/forgot-password/page.tsx`
+  - `src/app/reset-password/page.tsx`
+- Root route continues to redirect to `/library` (no standalone landing/auth flow)
+
+### C) API Keys + Model Config in Profile UI (No Docker Env Dependency)
+
+- Added persistent settings type `AppSettings` in `src/types/index.ts`
+- Extended local store (`src/lib/local/store.ts`) with:
+  - `settings` object in `tiptopf.json`
+  - `getSettings()`
+  - `updateSettings()`
+- Added server actions in `src/app/actions/settings.ts`
+- Added profile UI form in `src/components/profile/settings-form.tsx`
+- Extended profile page (`src/app/profile/page.tsx`) with full API/model configuration form
+- Keys are now managed in `/profile` and persisted in local store (currently unencrypted)
+
+### D) AI Layer Refactor (Settings-Driven, Not Env-Driven)
+
+- Refactored AI helpers to accept explicit settings parameters:
+  - `src/lib/ai/client.ts`
+  - `src/lib/ai/extractor.ts`
+  - `src/lib/ai/image-handler.ts`
+  - `src/lib/ai/image-search.ts`
+- Updated extraction action orchestration in `src/app/actions/extract-recipe.ts` to:
+  - load keys/config from local settings
+  - return user-facing errors when keys are missing
+  - remove runtime dependency on API key env vars
+
+### E) Environment + Deployment Docs Cleanup
+
+- Updated:
+  - `.env.example`
+  - `.env.docker.example`
+  - `docker-compose.yml`
+  - `README.md`
+  - `docs/local-pi-deployment.md`
+  - `AGENTS.md`
+- API key env vars are no longer required; only `DATA_DIR` remains required.
+
+---
+
 This addendum provides **detailed frontend specifications** to complement the main plan. All text, labels, and UI elements are in **German** as per project design.
 
 ---

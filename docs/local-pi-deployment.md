@@ -37,15 +37,12 @@ Set values:
 
 ```env
 DATA_DIR=/home/pi/tiptopf-data
-OPENCODE_API_KEY=your_opencode_api_key
-# Optional
-# OPENCODE_BASE_URL=https://opencode.ai/zen/v1
-# OPENCODE_MODEL_ID=minimax-m2.5
 ```
 
 Notes:
 - `DATA_DIR` may be absolute or project-relative.
 - Use a persistent filesystem path for production.
+- API keys and model/base URL configuration are set inside the app at `/profile`.
 
 ## 2) Install and build
 
@@ -98,6 +95,7 @@ With `DATA_DIR=/home/pi/tiptopf-data`:
 - `profile` with:
   - `id` (`local-device`)
   - `email` (`local@tiptopf.local`)
+- `settings` with API keys and model/base URL configuration for OpenCode, Gemini, and Pexels
 
 ## Image handling
 
@@ -124,8 +122,8 @@ tar -xzf tiptopf-backup.tar.gz -C /home/pi
 
 - App does not enforce login in Option A.
 - Restrict access using Tailscale ACLs/users/devices.
-- API key is set via `OPENCODE_API_KEY` in `.env.local`.
-- Keep `.env.local` private and out of git.
+- API keys are stored in `DATA_DIR/tiptopf.json` (currently unencrypted).
+- Restrict file access on host and keep `DATA_DIR` private.
 
 ## Troubleshooting
 
@@ -173,7 +171,7 @@ This guide documents how to run Tiptopf-AI as a Docker container on any machine 
 cp .env.docker.example .env.docker
 ```
 
-Fill in your `OPENCODE_API_KEY`. All other variables are optional.
+No API keys are required in `.env.docker`; configure them in `/profile` after startup.
 
 ### 2) Build and start
 
@@ -225,6 +223,6 @@ docker compose up -d --build
 ### Security notes
 
 - App runs as non-root user inside the container
-- `OPENCODE_API_KEY` is passed via environment — keep `.env.docker` private
+- API keys are configured and stored via `/profile` in persisted app data
 - Restrict access using Tailscale ACLs/users/devices
 - Do not expose port 3000 publicly

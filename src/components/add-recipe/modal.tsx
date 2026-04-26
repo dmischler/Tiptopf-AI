@@ -9,7 +9,6 @@ import {
   extractFromImageAction,
   extractFromUrlAction,
   findRecipeImageAction,
-  generateRecipeImageAction,
   searchRecipeImageCandidatesAction,
 } from '@/app/actions/extract-recipe'
 import { saveRecipe, uploadRecipeImage } from '@/app/actions/add-recipe'
@@ -77,7 +76,7 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl }
   const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false)
   const [imageCandidates, setImageCandidates] = useState<RecipeImageCandidate[]>([])
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false)
-  const [isGeneratingAiImage, setIsGeneratingAiImage] = useState(false)
+
 
   useEffect(() => {
     if (!replacementImagePreviewUrl) return
@@ -107,7 +106,6 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl }
     setIsSelectionModalOpen(false)
     setImageCandidates([])
     setIsLoadingCandidates(false)
-    setIsGeneratingAiImage(false)
     if (replacementImagePreviewUrl) {
       URL.revokeObjectURL(replacementImagePreviewUrl)
     }
@@ -274,38 +272,6 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl }
       return [] as RecipeImageCandidate[]
     } finally {
       setIsLoadingCandidates(false)
-    }
-  }
-
-  async function handleGenerateAiImageFromModal() {
-    if (!previewState || !extractedRecipe) {
-      return
-    }
-
-    setIsGeneratingAiImage(true)
-    try {
-      const resolved = await generateRecipeImageAction({
-        title: previewState.title,
-        category: previewState.category,
-        ingredients: extractedRecipe.ingredients,
-      })
-
-      if (!resolved?.imageUrl) {
-        toast.error('Could not generate an image right now.')
-        return
-      }
-
-      applyResolvedImage(resolved.imageUrl, {
-        creditName: resolved.creditName,
-        creditUrl: resolved.creditUrl,
-      })
-      setIsSelectionModalOpen(false)
-      toast.success('AI image generated.')
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to generate AI image.'
-      toast.error(message)
-    } finally {
-      setIsGeneratingAiImage(false)
     }
   }
 
@@ -495,13 +461,9 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl }
             onSelectCandidate={(candidate) => {
               void handleSelectImageCandidate(candidate)
             }}
-            onGenerateAi={() => {
-              void handleGenerateAiImageFromModal()
-            }}
             onRefreshSearch={() => {
               void loadImageCandidates()
             }}
-            isGeneratingAi={isGeneratingAiImage}
           />
         )}
       </DialogContent>

@@ -1,8 +1,8 @@
 const LEGACY_BASE_URLS = new Set(['https://api.opencode.ai', 'https://api.opencode.ai/v1'])
-const DEFAULT_BASE_URL = 'https://opencode.ai/zen/v1'
-const DEFAULT_MODEL_ID = 'minimax-m2.5'
-const DEFAULT_IMAGE_MODEL_ID = 'gemini-2.5-flash'
-const DEFAULT_IMAGE_FALLBACK_MODEL_ID = 'gemini-3-flash-preview'
+export const DEFAULT_BASE_URL = 'https://opencode.ai/zen/v1'
+export const DEFAULT_MODEL_ID = 'minimax-m2.5'
+export const DEFAULT_GEMINI_IMAGE_MODEL_ID = 'gemini-2.0-flash'
+export const DEFAULT_GEMINI_IMAGE_FALLBACK_MODEL_ID = 'gemini-1.5-flash'
 
 const LEGACY_MODEL_IDS: Record<string, string> = {
   'minimax-m2.5': 'minimax-m2.5',
@@ -54,24 +54,22 @@ export function resolveAiBaseUrl(baseUrl?: string) {
   return normalized
 }
 
-export function resolveAiModelId() {
-  return normalizeModelId(process.env.OPENCODE_MODEL_ID || DEFAULT_MODEL_ID)
+export function resolveAiModelId(modelId?: string) {
+  return normalizeModelId(modelId || DEFAULT_MODEL_ID)
 }
 
-export function resolveAiImageModelId() {
-  return normalizeModelId(process.env.OPENCODE_IMAGE_MODEL_ID || DEFAULT_IMAGE_MODEL_ID)
-}
-
-export function resolveAiImageFallbackModelId() {
-  return normalizeModelId(process.env.OPENCODE_IMAGE_FALLBACK_MODEL_ID || DEFAULT_IMAGE_FALLBACK_MODEL_ID)
-}
-
-export function getApiKey(): string {
-  const apiKey = process.env.OPENCODE_API_KEY
-  if (!apiKey) {
-    throw new Error('OPENCODE_API_KEY is not set in environment variables')
+export function resolveGeminiBaseUrl(baseUrl?: string): string | undefined {
+  const resolved = baseUrl?.trim()
+  if (!resolved) {
+    return undefined
   }
-  return apiKey
+  return resolved
 }
 
-export { DEFAULT_BASE_URL }
+export function resolveGeminiImageModelId(modelId?: string): string {
+  return modelId?.trim() || DEFAULT_GEMINI_IMAGE_MODEL_ID
+}
+
+export function resolveGeminiImageFallbackModelId(modelId?: string): string {
+  return modelId?.trim() || DEFAULT_GEMINI_IMAGE_FALLBACK_MODEL_ID
+}

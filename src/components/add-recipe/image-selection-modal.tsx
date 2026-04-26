@@ -1,6 +1,6 @@
 'use client'
 
-import { Loader2, Sparkles } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -19,9 +19,7 @@ type ImageSelectionModalProps = {
   candidates: RecipeImageCandidate[]
   onOpenChange: (open: boolean) => void
   onSelectCandidate: (candidate: RecipeImageCandidate) => void
-  onGenerateAi: () => void
   onRefreshSearch: () => void
-  isGeneratingAi: boolean
 }
 
 export function ImageSelectionModal({
@@ -31,9 +29,7 @@ export function ImageSelectionModal({
   candidates,
   onOpenChange,
   onSelectCandidate,
-  onGenerateAi,
   onRefreshSearch,
-  isGeneratingAi,
 }: ImageSelectionModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -41,7 +37,7 @@ export function ImageSelectionModal({
         <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 pr-12 sm:px-6 sm:pt-6">
           <DialogTitle>Choose a recipe image</DialogTitle>
           <DialogDescription>
-            Search picks for <span className="font-medium text-foreground">{title}</span>. You can also generate one.
+            Search picks for <span className="font-medium text-foreground">{title}</span>.
           </DialogDescription>
         </DialogHeader>
 
@@ -78,17 +74,13 @@ export function ImageSelectionModal({
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-border/70 bg-muted/30 p-6 text-sm text-muted-foreground">
-              No external matches found. You can refresh search or generate an image with AI.
+              No external matches found. You can refresh the search.
             </div>
           )}
 
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3">
-            <Button type="button" variant="outline" onClick={onRefreshSearch} disabled={loading || isGeneratingAi}>
+            <Button type="button" variant="outline" onClick={onRefreshSearch} disabled={loading}>
               Refresh search
-            </Button>
-            <Button type="button" onClick={onGenerateAi} disabled={isGeneratingAi || loading}>
-              {isGeneratingAi ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              {isGeneratingAi ? 'Generating...' : 'Generate with AI'}
             </Button>
           </div>
         </div>

@@ -6,10 +6,11 @@ This version runs without Supabase. It stores recipes and profile settings on lo
 
 ## What changed
 
-- No app authentication flow (Option A): `/` and auth routes redirect to `/library`
+- No app authentication flow (Option A): `/` redirects to `/library` and auth routes are removed
 - Local JSON data store at `DATA_DIR/tiptopf.json`
 - Local image storage at `DATA_DIR/recipe-images`
 - Image serving route: `/api/images/[imageName]`
+- API keys and AI model settings are managed in `/profile`
 
 ## Getting started
 
@@ -37,7 +38,6 @@ npm run dev
 ## Optional environment variables
 
 - `NEXT_PUBLIC_SITE_URL` — useful when behind a reverse proxy
-- `OPENCODE_MODEL_ID` — override default model identifier
 
 ## Local data layout
 
@@ -71,7 +71,6 @@ npm run lint
 
 ```bash
 cp .env.docker.example .env.docker
-# edit .env.docker, insert OPENCODE_API_KEY
 docker compose up -d --build
 ```
 
@@ -85,6 +84,6 @@ See `docs/local-pi-deployment.md` (Option A) for Raspberry Pi deployment without
 
 ## Notes
 
-- API keys are still encrypted in the browser before being saved.
+- API keys are configured in `/profile` and persisted in local store (currently unencrypted).
 - Image uploads from URL are downloaded and persisted locally.
 - UI language: German
