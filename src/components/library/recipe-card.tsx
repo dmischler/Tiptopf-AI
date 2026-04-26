@@ -98,6 +98,21 @@ export function RecipeCard({ recipe, index = 0, onOpen, onFavoriteChange, onRati
           <Badge variant="outline">{formatDifficultyLabel(recipe.difficulty)}</Badge>
         </div>
 
+        {recipe.tags.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {recipe.tags.slice(0, 3).map((tag) => (
+              <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300">
+                {tag}
+              </span>
+            ))}
+            {recipe.tags.length > 3 && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">
+                +{recipe.tags.length - 3}
+              </span>
+            )}
+          </div>
+        ) : null}
+
         <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1">
             <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />

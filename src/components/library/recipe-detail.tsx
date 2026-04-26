@@ -6,9 +6,11 @@ import { useEffect, useState, type ReactNode } from 'react'
 import {
   Clock,
   ExternalLink,
+  FolderPlus,
   ImageIcon,
   Loader2,
   Pencil,
+  Plus,
   Printer,
   Timer,
   Trash2,
@@ -18,9 +20,9 @@ import {
 import { toast } from 'sonner'
 
 import { uploadRecipeImage } from '@/app/actions/add-recipe'
+import { addRecipeToCollectionAction, createCollectionAction } from '@/app/actions/collections'
 import {
   applyRecipeImageCandidateAction,
-  generateRecipeImageAction,
   searchRecipeImageCandidatesAction,
 } from '@/app/actions/extract-recipe'
 import { editRecipe, setRecipeImage } from '@/app/actions/recipe'
@@ -40,7 +42,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { RecipeImageCandidate } from '@/lib/ai/image-types'
-import type { Difficulty, Recipe, RecipeCategory } from '@/types'
+import type { Collection, Difficulty, Recipe, RecipeCategory } from '@/types'
 
 type RecipeDetailProps = {
   recipe: Recipe | null
@@ -50,6 +52,7 @@ type RecipeDetailProps = {
   onRatingChange?: (value: number | null) => void
   onRecipeUpdated?: (recipe: Recipe) => void
   onRecipeDeleteRequested?: (recipe: Recipe) => void
+  collections?: Collection[]
 }
 
 type EditMode = 'view' | 'edit'
@@ -64,6 +67,8 @@ type RecipeDraft = {
   ingredientsText: string
   instructionsText: string
   imageUrl: string | null
+  tags: string[]
+  tagInput: string
 }
 
 type ImageMeta = {
@@ -139,6 +144,8 @@ function toDraft(recipe: Recipe): RecipeDraft {
     ingredientsText: recipe.ingredients.join('\n'),
     instructionsText: toInstructionSteps(recipe.instructions).join('\n'),
     imageUrl: recipe.image_url,
+    tags: [...recipe.tags],
+    tagInput: '',
   }
 }
 
@@ -176,6 +183,7 @@ export function RecipeDetail({
   onRatingChange,
   onRecipeUpdated,
   onRecipeDeleteRequested,
+  collections = [],
 }: RecipeDetailProps) {
   const [mode, setMode] = useState<EditMode>('view')
   const [draft, setDraft] = useState<RecipeDraft | null>(null)
@@ -187,8 +195,10 @@ export function RecipeDetail({
   const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false)
   const [imageCandidates, setImageCandidates] = useState<RecipeImageCandidate[]>([])
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false)
-  const [isGeneratingAiImage, setIsGeneratingAiImage] = useState(false)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false)
+  const [isCreatingCollection, setIsCreatingCollection] = useState(false)
+  const [newCollectionName, setNewCollectionName] = useState('')
 
   useEffect(() => {
     if (!replacementImagePreviewUrl) {
@@ -298,39 +308,6 @@ export function RecipeDetail({
     }
   }
 
-  async function handleGenerateAiImageFromModal() {
-    const currentDraft = draft
-    if (!currentDraft) {
-      return
-    }
-
-    setIsGeneratingAiImage(true)
-    try {
-      const resolved = await generateRecipeImageAction({
-        title: currentDraft.title.trim() || currentRecipe.title,
-        category: currentDraft.category,
-        ingredients: toNonEmptyLines(currentDraft.ingredientsText),
-      })
-
-      if (!resolved?.imageUrl) {
-        toast.error('Could not generate an image right now.')
-        return
-      }
-
-      applyResolvedImage(resolved.imageUrl, {
-        creditName: resolved.creditName,
-        creditUrl: resolved.creditUrl,
-      })
-      setIsSelectionModalOpen(false)
-      toast.success('AI image generated.')
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to generate AI image.'
-      toast.error(message)
-    } finally {
-      setIsGeneratingAiImage(false)
-    }
-  }
-
   async function handleSelectImageCandidate(candidate: RecipeImageCandidate) {
     try {
       const persistedUrl = await applyRecipeImageCandidateAction(candidate.url)
@@ -432,6 +409,7 @@ export function RecipeDetail({
         servings,
         category: currentDraft.category,
         difficulty: currentDraft.difficulty,
+        tags: currentDraft.tags,
       })
 
       if (replacementImageFile) {
@@ -465,6 +443,40 @@ export function RecipeDetail({
       toast.error(message)
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  async function handleAddToCollection(collectionId: string) {
+    if (!currentRecipe) return
+    try {
+      await addRecipeToCollectionAction(collectionId, currentRecipe.id)
+      toast.success('Zur Sammlung hinzugefügt.')
+      setIsCollectionModalOpen(false)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Hinzufügen fehlgeschlagen.'
+      toast.error(message)
+    }
+  }
+
+  async function handleCreateCollectionAndAdd() {
+    if (!currentRecipe) return
+    const name = newCollectionName.trim()
+    if (!name) {
+      toast.error('Bitte gib einen Namen ein.')
+      return
+    }
+    setIsCreatingCollection(true)
+    try {
+      const collection = await createCollectionAction(name)
+      await addRecipeToCollectionAction(collection.id, currentRecipe.id)
+      setNewCollectionName('')
+      setIsCollectionModalOpen(false)
+      toast.success('Sammlung erstellt und Rezept hinzugefügt.')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erstellen fehlgeschlagen.'
+      toast.error(message)
+    } finally {
+      setIsCreatingCollection(false)
     }
   }
 
@@ -510,6 +522,15 @@ export function RecipeDetail({
                       </Badge>
                       <Badge variant="outline">{formatDifficultyLabel(currentRecipe.difficulty)}</Badge>
                     </div>
+                    {currentRecipe.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {currentRecipe.tags.map((tag) => (
+                          <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1">
@@ -609,6 +630,17 @@ export function RecipeDetail({
                       Quelle öffnen
                     </Button>
                   ) : null}
+
+                  {collections.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsCollectionModalOpen(true)}
+                    >
+                      <FolderPlus className="mr-2 h-4 w-4" />
+                      Zur Sammlung
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -850,6 +882,76 @@ export function RecipeDetail({
                   </div>
                 </div>
 
+                <div className="space-y-3 rounded-xl border border-border/70 bg-muted/25 p-4">
+                  <Label>Tags</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {draft.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1 rounded-full bg-zinc-800 px-2.5 py-1 text-xs text-zinc-300"
+                      >
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDraft((current) =>
+                              current
+                                ? { ...current, tags: current.tags.filter((t) => t !== tag) }
+                                : current
+                            )
+                          }
+                          className="ml-0.5 text-zinc-500 hover:text-zinc-200"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={draft.tagInput}
+                      disabled={isSaving}
+                      placeholder="Tag eingeben..."
+                      className="bg-background/70"
+                      onChange={(event) =>
+                        setDraft((current) =>
+                          current ? { ...current, tagInput: event.target.value } : current
+                        )
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ',') {
+                          event.preventDefault()
+                          const raw = draft.tagInput.trim().toLowerCase()
+                          if (raw && !draft.tags.includes(raw)) {
+                            setDraft((current) =>
+                              current
+                                ? { ...current, tags: [...current.tags, raw], tagInput: '' }
+                                : current
+                            )
+                          }
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={isSaving || !draft.tagInput.trim()}
+                      onClick={() => {
+                        const raw = draft.tagInput.trim().toLowerCase()
+                        if (raw && !draft.tags.includes(raw)) {
+                          setDraft((current) =>
+                            current
+                              ? { ...current, tags: [...current.tags, raw], tagInput: '' }
+                              : current
+                          )
+                        }
+                      }}
+                    >
+                      Hinzufügen
+                    </Button>
+                  </div>
+                </div>
+
                 <div className="space-y-2 rounded-xl border border-border/70 bg-muted/25 p-4">
                   <Label htmlFor="recipe-edit-ingredients">Zutaten (eine pro Zeile)</Label>
                   <textarea
@@ -939,13 +1041,9 @@ export function RecipeDetail({
           onSelectCandidate={(candidate) => {
             void handleSelectImageCandidate(candidate)
           }}
-          onGenerateAi={() => {
-            void handleGenerateAiImageFromModal()
-          }}
           onRefreshSearch={() => {
             void loadImageCandidates()
           }}
-          isGeneratingAi={isGeneratingAiImage}
         />
       ) : null}
 
@@ -973,6 +1071,58 @@ export function RecipeDetail({
             >
               Löschen
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCollectionModalOpen} onOpenChange={setIsCollectionModalOpen}>
+        <DialogContent className="w-full max-w-md p-0 sm:max-w-md">
+          <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 pr-12">
+            <DialogTitle>Zur Sammlung hinzufügen</DialogTitle>
+            <DialogDescription>
+              Wähle eine Sammlung oder erstelle eine neue.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 px-5 py-4">
+            <div className="space-y-2">
+              {collections.map((collection) => (
+                <button
+                  key={collection.id}
+                  onClick={() => void handleAddToCollection(collection.id)}
+                  className="flex w-full items-center justify-between rounded-lg border border-border/70 bg-muted/25 px-3 py-2 text-left text-sm transition-colors hover:bg-muted/50"
+                >
+                  <span>{collection.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {collection.recipe_ids.length} Rezept{collection.recipe_ids.length === 1 ? '' : 'e'}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div className="border-t border-border/70 pt-3">
+              <div className="text-xs font-medium text-muted-foreground mb-2">Neue Sammlung erstellen</div>
+              <div className="flex gap-2">
+                <Input
+                  value={newCollectionName}
+                  onChange={(event) => setNewCollectionName(event.target.value)}
+                  placeholder="Name der Sammlung"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      void handleCreateCollectionAndAdd()
+                    }
+                  }}
+                />
+                <Button
+                  onClick={() => void handleCreateCollectionAndAdd()}
+                  disabled={isCreatingCollection || !newCollectionName.trim()}
+                >
+                  {isCreatingCollection ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

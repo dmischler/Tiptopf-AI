@@ -14,6 +14,7 @@ export interface Recipe {
   image_url: string | null;
   source_url: string | null;
   source_type: RecipeSourceType;
+  tags: string[];
   created_at: string;
   updated_at: string;
 }
@@ -50,7 +51,16 @@ export interface ParsedRecipe {
   image_url?: string | null;
   source_url?: string | null;
   source_type: 'image' | 'url';
+  tags?: string[];
 }
 
 export type SortOption = 'newest' | 'oldest' | 'prep_time' | 'rating';
 export type LibraryCategoryFilter = 'all' | RecipeCategory;
+
+export interface Collection {
+  id: string;
+  name: string;
+  recipe_ids: string[];
+  created_at: string;
+  updated_at: string;
+}

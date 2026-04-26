@@ -21,6 +21,7 @@ const saveRecipeSchema = z.object({
   imageUrl: z.string().nullable(),
   sourceUrl: z.string().nullable(),
   sourceType: z.enum(['image', 'url']),
+  tags: z.array(z.string()).optional(),
 })
 
 export async function saveRecipe(input: z.infer<typeof saveRecipeSchema>) {
@@ -37,6 +38,7 @@ export async function saveRecipe(input: z.infer<typeof saveRecipeSchema>) {
     image_url: parsed.imageUrl,
     source_url: parsed.sourceUrl,
     source_type: parsed.sourceType,
+    tags: parsed.tags,
   })
 
   revalidatePath('/library')

@@ -1,15 +1,17 @@
 import { randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 
-import type { Difficulty, Profile, Recipe, RecipeCategory, RecipeSourceType } from '@/types'
+import type { Collection, Difficulty, Profile, Recipe, RecipeCategory, RecipeSourceType } from '@/types'
 
 import { getDataDir, getStoreFilePath } from '@/lib/local/paths'
+import { normalizeTags } from '@/lib/utils'
 
 export const LOCAL_PROFILE_ID = 'local-device'
 const LOCAL_PROFILE_EMAIL = 'local@tiptopf.local'
 
 type LocalStore = {
   recipes: Recipe[]
+  collections: Collection[]
   profile: Profile
 }
 
@@ -25,6 +27,7 @@ type CreateRecipeInput = {
   image_url: string | null
   source_url: string | null
   source_type: RecipeSourceType
+  tags?: string[]
 }
 
 type UpdateRecipeInput = Partial<
@@ -54,6 +57,7 @@ function createDefaultProfile(): Profile {
 function createDefaultStore(): LocalStore {
   return {
     recipes: [],
+    collections: [],
     profile: createDefaultProfile(),
   }
 }
@@ -137,6 +141,8 @@ function normalizeRecipe(value: unknown): Recipe | null {
     ? value.ingredients.map((item) => String(item)).filter((item) => item.trim().length > 0)
     : []
 
+  const tags = normalizeTags(value.tags)
+
   return {
     id,
     user_id: typeof value.user_id === 'string' && value.user_id.trim() ? value.user_id : LOCAL_PROFILE_ID,
@@ -156,6 +162,7 @@ function normalizeRecipe(value: unknown): Recipe | null {
     image_url: toStringOrNull(value.image_url),
     source_url: toStringOrNull(value.source_url),
     source_type: normalizeSourceType(value.source_type),
+    tags,
     created_at: createdAt,
     updated_at: updatedAt,
   }
@@ -176,6 +183,28 @@ function normalizeProfile(value: unknown): Profile {
   }
 }
 
+function normalizeCollection(value: unknown): Collection | null {
+  if (!isObject(value)) {
+    return null
+  }
+
+  const id = typeof value.id === 'string' && value.id.trim() ? value.id : randomUUID()
+  const createdAt = toIsoOrNow(value.created_at)
+  const updatedAt = toIsoOrNow(value.updated_at)
+
+  const recipeIds = Array.isArray(value.recipe_ids)
+    ? value.recipe_ids.map((item) => String(item)).filter((item) => item.trim().length > 0)
+    : []
+
+  return {
+    id,
+    name: typeof value.name === 'string' && value.name.trim() ? value.name.trim() : 'Unnamed Collection',
+    recipe_ids: recipeIds,
+    created_at: createdAt,
+    updated_at: updatedAt,
+  }
+}
+
 function normalizeStore(value: unknown): LocalStore {
   if (!isObject(value)) {
     return createDefaultStore()
@@ -185,25 +214,47 @@ function normalizeStore(value: unknown): LocalStore {
     ? value.recipes.map((item) => normalizeRecipe(item)).filter((item): item is Recipe => Boolean(item))
     : []
 
+  const collections = Array.isArray(value.collections)
+    ? value.collections.map((item) => normalizeCollection(item)).filter((item): item is Collection => Boolean(item))
+    : []
+
   return {
     recipes,
+    collections,
     profile: normalizeProfile(value.profile),
   }
 }
 
 async function writeStore(store: LocalStore) {
   await ensureDataDir()
-  await fs.writeFile(getStoreFilePath(), JSON.stringify(store, null, 2), 'utf8')
+  const targetPath = getStoreFilePath()
+  const tempPath = `${targetPath}.tmp`
+  await fs.writeFile(tempPath, JSON.stringify(store, null, 2), 'utf8')
+  await fs.rename(tempPath, targetPath)
 }
 
 async function readStore(): Promise<LocalStore> {
   await ensureDataDir()
+  const storePath = getStoreFilePath()
 
   try {
-    const raw = await fs.readFile(getStoreFilePath(), 'utf8')
+    const raw = await fs.readFile(storePath, 'utf8')
     return normalizeStore(JSON.parse(raw))
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      const initial = createDefaultStore()
+      await writeStore(initial)
+      return initial
+    }
+
+    if (error instanceof SyntaxError) {
+      console.error('Store file contains invalid JSON. Creating backup and resetting to default:', error)
+      try {
+        const backupPath = `${storePath}.backup.${Date.now()}`
+        await fs.rename(storePath, backupPath)
+      } catch {
+        // Ignore backup failures
+      }
       const initial = createDefaultStore()
       await writeStore(initial)
       return initial
@@ -255,6 +306,7 @@ export async function createRecipe(input: CreateRecipeInput) {
       image_url: input.image_url,
       source_url: input.source_url,
       source_type: input.source_type,
+      tags: normalizeTags(input.tags),
       created_at: now,
       updated_at: now,
     }
@@ -355,4 +407,104 @@ export async function updateRecipeRating(recipeId: string, rating: number | null
 export async function getProfile() {
   const store = await readStore()
   return store.profile
+}
+
+// Collections
+
+export async function listCollections() {
+  const store = await readStore()
+  return [...store.collections]
+}
+
+export async function getCollection(collectionId: string) {
+  const store = await readStore()
+  return store.collections.find((c) => c.id === collectionId) ?? null
+}
+
+export async function createCollection(name: string) {
+  return runMutatingStoreOperation((store) => {
+    const now = nowIso()
+    const collection: Collection = {
+      id: randomUUID(),
+      name: name.trim(),
+      recipe_ids: [],
+      created_at: now,
+      updated_at: now,
+    }
+
+    store.collections.unshift(collection)
+    return collection
+  })
+}
+
+export async function updateCollection(collectionId: string, name: string) {
+  return runMutatingStoreOperation((store) => {
+    const index = store.collections.findIndex((c) => c.id === collectionId)
+    if (index < 0) {
+      throw new Error('Collection not found')
+    }
+
+    const updated: Collection = {
+      ...store.collections[index],
+      name: name.trim(),
+      updated_at: nowIso(),
+    }
+
+    store.collections[index] = updated
+    return updated
+  })
+}
+
+export async function deleteCollection(collectionId: string) {
+  return runMutatingStoreOperation((store) => {
+    const index = store.collections.findIndex((c) => c.id === collectionId)
+    if (index < 0) {
+      throw new Error('Collection not found')
+    }
+
+    const [removed] = store.collections.splice(index, 1)
+    return removed
+  })
+}
+
+export async function addRecipeToCollection(collectionId: string, recipeId: string) {
+  return runMutatingStoreOperation((store) => {
+    const index = store.collections.findIndex((c) => c.id === collectionId)
+    if (index < 0) {
+      throw new Error('Collection not found')
+    }
+
+    const collection = store.collections[index]
+    if (collection.recipe_ids.includes(recipeId)) {
+      return collection
+    }
+
+    const updated: Collection = {
+      ...collection,
+      recipe_ids: [...collection.recipe_ids, recipeId],
+      updated_at: nowIso(),
+    }
+
+    store.collections[index] = updated
+    return updated
+  })
+}
+
+export async function removeRecipeFromCollection(collectionId: string, recipeId: string) {
+  return runMutatingStoreOperation((store) => {
+    const index = store.collections.findIndex((c) => c.id === collectionId)
+    if (index < 0) {
+      throw new Error('Collection not found')
+    }
+
+    const collection = store.collections[index]
+    const updated: Collection = {
+      ...collection,
+      recipe_ids: collection.recipe_ids.filter((id) => id !== recipeId),
+      updated_at: nowIso(),
+    }
+
+    store.collections[index] = updated
+    return updated
+  })
 }

@@ -1,9 +1,15 @@
 import { LibraryView } from '@/components/library/library-view'
-import { listRecipes } from '@/lib/local/store'
-import type { Recipe } from '@/types'
+import { listCollections, listRecipes } from '@/lib/local/store'
+import type { Recipe, Collection } from '@/types'
 
 export default async function LibraryPage() {
-  const data = await listRecipes()
+  const recipes = await listRecipes()
+  const collections = await listCollections()
 
-  return <LibraryView initialRecipes={(data ?? []) as Recipe[]} />
+  return (
+    <LibraryView
+      initialRecipes={(recipes ?? []) as Recipe[]}
+      initialCollections={(collections ?? []) as Collection[]}
+    />
+  )
 }

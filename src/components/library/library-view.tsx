@@ -7,21 +7,18 @@ import { toast } from 'sonner'
 import { deleteRecipeAction, restoreRecipe } from '@/app/actions/recipe'
 
 import { AddRecipeLauncher } from '@/components/add-recipe/launcher'
-import {
-  CategoryFilter,
-  type CategoryFilterValue,
-} from '@/components/library/category-filter'
+import { FilterBar } from '@/components/library/filter-bar'
 import { MasonryGrid, MasonryItem } from '@/components/library/masonry-grid'
 import { RecipeCard } from '@/components/library/recipe-card'
 import { RecipeDetail } from '@/components/library/recipe-detail'
-import { SearchBar } from '@/components/library/search-bar'
 import { SortDropdown } from '@/components/library/sort-dropdown'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import type { Recipe, SortOption } from '@/types'
+import type { Collection, Recipe, SortOption } from '@/types'
 
 type LibraryViewProps = {
   initialRecipes: Recipe[]
+  initialCollections?: Collection[]
 }
 
 type RecipePatch = Partial<
@@ -37,6 +34,7 @@ type RecipePatch = Partial<
     | 'servings'
     | 'category'
     | 'difficulty'
+    | 'tags'
   >
 >
 
@@ -44,11 +42,6 @@ type PendingDeletion = {
   recipe: Recipe
   index: number
   timeoutId: ReturnType<typeof setTimeout>
-}
-
-const DEFAULT_FILTER: CategoryFilterValue = {
-  category: 'all',
-  favoritesOnly: false,
 }
 
 function toMillis(iso: string) {
@@ -77,11 +70,14 @@ function sortRecipes(recipes: Recipe[], sortOption: SortOption) {
   return sorted
 }
 
-export function LibraryView({ initialRecipes }: LibraryViewProps) {
+export function LibraryView({ initialRecipes, initialCollections = [] }: LibraryViewProps) {
   const [recipes, setRecipes] = useState(initialRecipes)
+  const [collections, setCollections] = useState(initialCollections)
   const [searchTerm, setSearchTerm] = useState('')
   const [sortOption, setSortOption] = useState<SortOption>('newest')
-  const [filterValue, setFilterValue] = useState<CategoryFilterValue>(DEFAULT_FILTER)
+  const [activeCategory, setActiveCategory] = useState<string | null>(null)
+  const [activeTags, setActiveTags] = useState<string[]>([])
+  const [showQuickFilter, setShowQuickFilter] = useState(false)
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null)
   const pendingDeletionRef = useRef<PendingDeletion | null>(null)
 
@@ -94,16 +90,33 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
     }
   }, [])
 
+  const availableTags = useMemo(() => {
+    const tagSet = new Set<string>()
+    for (const recipe of recipes) {
+      for (const tag of recipe.tags) {
+        tagSet.add(tag)
+      }
+    }
+    return Array.from(tagSet).sort()
+  }, [recipes])
+
   const filteredRecipes = useMemo(() => {
     const query = searchTerm.trim().toLowerCase()
 
     return recipes.filter((recipe) => {
-      if (filterValue.category !== 'all' && recipe.category !== filterValue.category) {
+      if (activeCategory && recipe.category !== activeCategory) {
         return false
       }
 
-      if (filterValue.favoritesOnly && !recipe.is_favorite) {
+      if (showQuickFilter && recipe.prep_time + recipe.cook_time >= 30) {
         return false
+      }
+
+      if (activeTags.length > 0) {
+        const hasAllTags = activeTags.every((tag) => recipe.tags.includes(tag))
+        if (!hasAllTags) {
+          return false
+        }
       }
 
       if (!query) {
@@ -111,9 +124,14 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
       }
 
       const ingredientsText = recipe.ingredients.join(' ').toLowerCase()
-      return recipe.title.toLowerCase().includes(query) || ingredientsText.includes(query)
+      const tagsText = recipe.tags.join(' ').toLowerCase()
+      return (
+        recipe.title.toLowerCase().includes(query) ||
+        ingredientsText.includes(query) ||
+        tagsText.includes(query)
+      )
     })
-  }, [filterValue, recipes, searchTerm])
+  }, [activeCategory, activeTags, recipes, searchTerm, showQuickFilter])
 
   const visibleRecipes = useMemo(
     () => sortRecipes(filteredRecipes, sortOption),
@@ -232,6 +250,12 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
     })
   }
 
+  function handleTagToggle(tag: string) {
+    setActiveTags((current) =>
+      current.includes(tag) ? current.filter((t) => t !== tag) : [...current, tag]
+    )
+  }
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-8 pb-[max(6rem,env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -243,10 +267,22 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
         </div>
       </div>
 
-      <div className="grid gap-2 md:grid-cols-[1fr_auto_auto]">
-        <SearchBar value={searchTerm} onChange={setSearchTerm} />
-        <SortDropdown value={sortOption} onChange={setSortOption} />
-        <CategoryFilter value={filterValue} onChange={setFilterValue} />
+      <div className="space-y-3">
+        <FilterBar
+          search={searchTerm}
+          onSearchChange={setSearchTerm}
+          activeCategory={activeCategory}
+          onCategoryChange={setActiveCategory}
+          activeTags={activeTags}
+          onTagToggle={handleTagToggle}
+          showQuickFilter={showQuickFilter}
+          onQuickFilterToggle={() => setShowQuickFilter((current) => !current)}
+          availableTags={availableTags}
+          recipes={recipes}
+        />
+        <div className="flex justify-end">
+          <SortDropdown value={sortOption} onChange={setSortOption} />
+        </div>
       </div>
 
       {recipes.length === 0 ? (
@@ -303,6 +339,7 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
           )
         }}
         onRecipeDeleteRequested={handleDeleteRequested}
+        collections={collections}
       />
 
       <AddRecipeLauncher

@@ -3,6 +3,7 @@ import './globals.css';
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { Toaster } from '@/components/ui/sonner';
+import { BottomNav } from '@/components/layout/bottom-nav';
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -32,6 +33,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-background text-foreground antialiased">
         {children}
+        <BottomNav />
         <Toaster position="top-right" richColors />
       </body>
     </html>
