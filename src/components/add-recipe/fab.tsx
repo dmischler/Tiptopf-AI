@@ -11,9 +11,8 @@ export function FloatingAddButton({ onClick }: FloatingAddButtonProps) {
     <button
       type="button"
       onClick={onClick}
-      className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-black/20 transition hover:scale-[1.02] hover:shadow-xl active:scale-95 active:shadow-xl"
+      className="fixed bottom-20 right-6 z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-black/20 transition hover:scale-[1.02] hover:shadow-xl active:scale-95 active:shadow-xl md:bottom-6"
       aria-label="Add recipe"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)', paddingRight: 'env(safe-area-inset-right)' }}
     >
       <Plus className="h-6 w-6" />
     </button>
