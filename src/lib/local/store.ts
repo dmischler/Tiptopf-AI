@@ -280,7 +280,7 @@ function normalizeStore(value: unknown): LocalStore {
 async function writeStore(store: LocalStore) {
   await ensureDataDir()
   const targetPath = getStoreFilePath()
-  const tempPath = `${targetPath}.tmp`
+  const tempPath = `${targetPath}.tmp.${randomUUID()}`
   await fs.writeFile(tempPath, JSON.stringify(store, null, 2), 'utf8')
   await fs.rename(tempPath, targetPath)
 }

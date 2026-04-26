@@ -2,6 +2,8 @@ import { BackupRestoreSection } from '@/components/profile/backup-restore'
 import { SettingsForm } from '@/components/profile/settings-form'
 import { getProfile, getSettings } from '@/lib/local/store'
 
+export const dynamic = 'force-dynamic'
+
 export default async function ProfilePage() {
   const [profile, settings] = await Promise.all([getProfile(), getSettings()])
 

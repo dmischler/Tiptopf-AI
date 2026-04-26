@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation'
 import { getCollection, listRecipes } from '@/lib/local/store'
 import { CollectionDetailView } from '@/components/collections/collection-detail-view'
 
+export const dynamic = 'force-dynamic'
+
 interface CollectionDetailPageProps {
   params: Promise<{ id: string }>
 }
