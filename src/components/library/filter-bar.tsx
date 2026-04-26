@@ -1,10 +1,10 @@
 'use client'
 
-import { Check, Search, Zap } from 'lucide-react'
+import { Check, Heart, Search, Zap } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
-import type { RecipeCategory } from '@/types'
+import type { Difficulty, RecipeCategory } from '@/types'
 
 const CATEGORY_ITEMS: Array<{ value: RecipeCategory; label: string; color: string }> = [
   { value: 'starter', label: 'Vorspeise', color: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30' },
@@ -27,6 +27,12 @@ function getTagColor(index: number) {
   return TAG_COLORS[index % TAG_COLORS.length]
 }
 
+const DIFFICULTY_ITEMS: Array<{ value: Difficulty; label: string }> = [
+  { value: 'easy', label: 'Leicht' },
+  { value: 'medium', label: 'Mittel' },
+  { value: 'hard', label: 'Schwer' },
+]
+
 interface FilterBarProps {
   search: string
   onSearchChange: (value: string) => void
@@ -38,6 +44,10 @@ interface FilterBarProps {
   maxTimeLimit: number
   onMaxTimeChange: (value: number | null) => void
   availableTags: string[]
+  activeDifficulty: Difficulty | null
+  onDifficultyChange: (difficulty: Difficulty | null) => void
+  favoritesOnly: boolean
+  onFavoritesOnlyToggle: () => void
 }
 
 export function FilterBar({
@@ -51,6 +61,10 @@ export function FilterBar({
   maxTimeLimit,
   onMaxTimeChange,
   availableTags,
+  activeDifficulty,
+  onDifficultyChange,
+  favoritesOnly,
+  onFavoritesOnlyToggle,
 }: FilterBarProps) {
   const isCategoryActive = (category: RecipeCategory | null) => activeCategory === category
   const quickFilterActive = maxTime === 30
@@ -115,6 +129,40 @@ export function FilterBar({
           <span className="flex items-center gap-1.5">
             {quickFilterActive ? <Check className="h-3.5 w-3.5" /> : <Zap className="h-3.5 w-3.5" />}
             Schnell (&lt;30min)
+          </span>
+        </button>
+
+        {DIFFICULTY_ITEMS.map((item) => {
+          const active = activeDifficulty === item.value
+          return (
+            <button
+              key={item.value}
+              onClick={() => onDifficultyChange(active ? null : item.value)}
+              className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium border transition-colors ${
+                active
+                  ? 'bg-primary/20 text-primary border-primary/50'
+                  : 'bg-zinc-800/50 text-zinc-300 border-zinc-700 hover:bg-zinc-800'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                {active ? <Check className="h-3.5 w-3.5" /> : null}
+                {item.label}
+              </span>
+            </button>
+          )
+        })}
+
+        <button
+          onClick={onFavoritesOnlyToggle}
+          className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium border transition-colors ${
+            favoritesOnly
+              ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+              : 'bg-zinc-800/50 text-zinc-300 border-zinc-700 hover:bg-zinc-800'
+          }`}
+        >
+          <span className="flex items-center gap-1.5">
+            {favoritesOnly ? <Check className="h-3.5 w-3.5" /> : <Heart className="h-3.5 w-3.5" />}
+            Favoriten
           </span>
         </button>
 

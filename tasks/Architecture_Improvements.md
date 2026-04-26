@@ -1,8 +1,10 @@
-# Frontend Implementation Addendum – Phase 1 & 2 (Tiptopf-AI)
+# Frontend Implementation Addendum – Phase 1, 2 & 3 (Tiptopf-AI)
 
 > **Status: COMPLETED** ✅ (2026-04-26)
 
 > **Phase 2 Addendum (2026-04-26): COMPLETED** ✅
+
+> **Phase 3 (2026-04-26): COMPLETED** ✅
 
 ---
 
@@ -69,6 +71,46 @@ This follow-up addendum documents the architecture updates requested after Phase
 - **Tag autocomplete** in `RecipeDetail` edit mode — shows a dropdown with existing tag suggestions while typing.
 - **Collection markdown export** — added `Exportieren` button on collection detail pages that generates a `.md` file with all recipes.
 - **AI-generated tags** — extraction prompts now request up to 5 German tags; tags are persisted on save and shown in cards/detail.
+
+---
+
+## Phase 3: AI Tag Extraction, Advanced Filters, Export & Backup
+
+### A) AI Tag Extraction Loop Completion
+
+- **Fixed tag propagation** through the add-recipe flow:
+  - Extended `EditableRecipePreview` in `src/components/add-recipe/preview.tsx` with `tags: string[]`
+  - Added `TagsEditor` sub-component in preview for add/remove + autocomplete
+  - Updated `src/components/add-recipe/modal.tsx` to pass tags through to `saveRecipe`
+- **Refined prompts** in `src/lib/ai/prompts.ts`:
+  - Stricter step separation: "ONE step per line, numbered with 1., 2., 3."
+  - Explicit translation rule: "ALL output text to German"
+  - Explicit metric conversion rule with examples
+  - Tag instruction preserved: up to 5 German tags
+
+### B) FilterBar – Difficulty + Favorites
+
+- Added **difficulty filter chips** (Leicht / Mittel / Schwer) to `FilterBar`
+- Added **favorites-only toggle** (heart icon chip) to `FilterBar`
+- Updated `LibraryView` filter logic with AND-combination for difficulty + favorites
+
+### C) Export & Backup
+
+- **Individual recipe markdown export**:
+  - Added `buildRecipeMarkdown()` and `recipeMarkdownFilename()` to `src/lib/export.ts`
+  - Added Export button in `RecipeDetail` view mode (downloads `.md`)
+- **Full store backup/restore**:
+  - Added `exportStoreJson()` and `importStoreJson()` to `src/lib/local/store.ts`
+  - Added server actions `exportStoreAction` / `importStoreAction` in `src/app/actions/settings.ts`
+  - Added `BackupRestoreSection` client component in `src/components/profile/backup-restore.tsx`
+  - Integrated into `/profile` page
+
+### D) Print Stylesheet
+
+- Added `@media print` styles to `src/app/globals.css`:
+  - Hides navigation and fixed UI elements
+  - Forces white background and black text
+  - Prevents page breaks inside images and lists
 
 ---
 
@@ -277,11 +319,16 @@ interface CollectionCardProps {
 | `src/components/library/library-view.tsx` | Modify     | High     | ✅ Integrated FilterBar + time slider |
 | `src/app/layout.tsx`                      | Modify     | Medium   | ✅ Added TopNav + BottomNav |
 | `src/components/ui/slider.tsx`            | New        | High     | ✅ shadcn/ui slider component |
+| `src/components/add-recipe/preview.tsx`   | Modify     | High     | ✅ Tag editing in add-recipe preview |
+| `src/components/add-recipe/modal.tsx`     | Modify     | High     | ✅ Tags propagated to save action |
+| `src/lib/export.ts`                       | Modify     | Medium   | ✅ Individual recipe markdown export |
+| `src/components/profile/backup-restore.tsx`| New       | Medium   | ✅ Backup/restore UI |
+| `src/app/globals.css`                     | Modify     | Low      | ✅ Print stylesheet |
 
 ---
 
 **Next Step Recommendation**  
-Phase 1 & 2 are fully implemented. Future enhancements could include:
+Phase 1, 2 & 3 are fully implemented. Future enhancements could include:
 - Recipe import from Markdown or JSON
 - Full-text search across ingredients and instructions
 - Image optimization pipeline (WebP conversion, responsive srcset)

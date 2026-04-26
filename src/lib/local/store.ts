@@ -588,6 +588,31 @@ export async function addRecipeToCollection(collectionId: string, recipeId: stri
   })
 }
 
+export async function exportStoreJson(): Promise<string> {
+  const store = await readStore()
+  return JSON.stringify(store, null, 2)
+}
+
+export async function importStoreJson(raw: string) {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw new Error('Ungültiges JSON Format.')
+  }
+
+  if (!isObject(parsed)) {
+    throw new Error('Ungültiges Store-Format.')
+  }
+
+  if (!Array.isArray(parsed.recipes) || !Array.isArray(parsed.collections)) {
+    throw new Error('Store muss Rezepte und Sammlungen enthalten.')
+  }
+
+  const normalized = normalizeStore(parsed)
+  await writeStore(normalized)
+}
+
 export async function removeRecipeFromCollection(collectionId: string, recipeId: string) {
   return runMutatingStoreOperation((store) => {
     const index = store.collections.findIndex((c) => c.id === collectionId)

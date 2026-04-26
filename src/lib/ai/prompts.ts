@@ -15,14 +15,17 @@ Return ONLY valid JSON (no markdown, no explanations) with this exact shape:
 }
 
 Rules:
-- Translate all output text to German (title, ingredients, instructions) regardless of input language.
+- Translate ALL output text to German (title, ingredients, instructions, tags) regardless of input language.
 - Convert imperial units to metric equivalents where relevant:
   - oz/lb -> g
   - cups/tbsp/tsp/fl oz -> ml
   - °F -> °C
   - inches -> cm
   - normalize common cooking shorthand to practical metric values when possible.
-- Format instructions as clearly separated numbered steps, one step per line (1. ..., 2. ...).
+- Format instructions as STRICTLY separated numbered steps, ONE step per line, numbered with "1. ", "2. ", "3. " etc.
+  - NEVER combine multiple steps into a single line.
+  - NEVER use bullet points or dashes for steps.
+  - Each line must contain exactly one numbered cooking step.
 - If unknown, use null for times/servings.
 - Category must be one allowed value.
 - Difficulty defaults to "medium" when unclear.

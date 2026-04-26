@@ -58,6 +58,7 @@ function buildEditableState(recipe: ExtractedRecipePayload): EditableRecipePrevi
     imageUrl: recipe.image_url ?? null,
     sourceUrl: recipe.source_url ?? null,
     sourceType: recipe.source_type,
+    tags: recipe.tags ?? [],
   }
 }
 
@@ -327,7 +328,7 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl }
         imageUrl: replacementImageFile ? null : previewState.imageUrl,
         sourceUrl: previewState.sourceUrl,
         sourceType: previewState.sourceType,
-        tags: extractedRecipe.tags,
+        tags: previewState.tags,
       })
 
       let persistedImageUrl = saved.image_url as string | null

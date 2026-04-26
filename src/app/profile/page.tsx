@@ -1,3 +1,4 @@
+import { BackupRestoreSection } from '@/components/profile/backup-restore'
 import { SettingsForm } from '@/components/profile/settings-form'
 import { getProfile, getSettings } from '@/lib/local/store'
 
@@ -32,6 +33,10 @@ export default async function ProfilePage() {
       </section>
 
       <SettingsForm settings={settings} />
+
+      <div className="border-t border-border/70 pt-6" />
+
+      <BackupRestoreSection />
     </main>
   )
 }

@@ -86,6 +86,50 @@ export function buildCollectionMarkdown(collection: Collection, recipes: Recipe[
   return sections.join('\n')
 }
 
+export function buildRecipeMarkdown(recipe: Recipe) {
+  const sections: string[] = []
+  const totalTime = recipe.prep_time + recipe.cook_time
+
+  sections.push(`# ${recipe.title}`)
+  sections.push('')
+  sections.push(`- Kategorie: ${categoryLabel(recipe.category)}`)
+  sections.push(`- Schwierigkeit: ${difficultyLabel(recipe.difficulty)}`)
+  sections.push(`- Vorbereitung: ${recipe.prep_time > 0 ? `${recipe.prep_time} min` : '—'}`)
+  sections.push(`- Kochen: ${recipe.cook_time > 0 ? `${recipe.cook_time} min` : '—'}`)
+  sections.push(`- Gesamtzeit: ${totalTime > 0 ? `${totalTime} min` : '—'}`)
+  sections.push(`- Portionen: ${recipe.servings > 0 ? recipe.servings : '—'}`)
+
+  if (recipe.tags.length > 0) {
+    sections.push(`- Tags: ${recipe.tags.join(', ')}`)
+  }
+
+  if (recipe.source_url) {
+    sections.push(`- Quelle: ${recipe.source_url}`)
+  }
+
+  sections.push('')
+  sections.push('## Zutaten')
+  sections.push('')
+  for (const ingredient of recipe.ingredients) {
+    sections.push(`- ${ingredient}`)
+  }
+
+  sections.push('')
+  sections.push('## Anleitung')
+  sections.push('')
+  for (const instruction of formatInstructions(recipe.instructions)) {
+    sections.push(instruction)
+  }
+
+  sections.push('')
+  return sections.join('\n')
+}
+
+export function recipeMarkdownFilename(recipeTitle: string) {
+  const slug = slugify(recipeTitle)
+  return `${slug || 'rezept'}.md`
+}
+
 export function collectionMarkdownFilename(collectionName: string) {
   const slug = slugify(collectionName)
   return `${slug || 'sammlung'}.md`

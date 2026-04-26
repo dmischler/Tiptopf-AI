@@ -20,6 +20,7 @@ import {
 import { toast } from 'sonner'
 
 import { uploadRecipeImage } from '@/app/actions/add-recipe'
+import { buildRecipeMarkdown, recipeMarkdownFilename } from '@/lib/export'
 import { addRecipeToCollectionAction, createCollectionAction } from '@/app/actions/collections'
 import {
   applyRecipeImageCandidateAction,
@@ -627,6 +628,28 @@ export function RecipeDetail({
                   <Button type="button" variant="outline" onClick={() => window.print()}>
                     <Printer className="mr-2 h-4 w-4" />
                     Drucken
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const markdown = buildRecipeMarkdown(currentRecipe)
+                      const fileName = recipeMarkdownFilename(currentRecipe.title)
+                      const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
+                      const url = URL.createObjectURL(blob)
+                      const anchor = document.createElement('a')
+                      anchor.href = url
+                      anchor.download = fileName
+                      document.body.append(anchor)
+                      anchor.click()
+                      anchor.remove()
+                      URL.revokeObjectURL(url)
+                      toast.success('Rezept exportiert.')
+                    }}
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Exportieren
                   </Button>
 
                   {currentRecipe.source_url ? (

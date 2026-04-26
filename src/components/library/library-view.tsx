@@ -13,7 +13,7 @@ import { RecipeCard } from '@/components/library/recipe-card'
 import { RecipeDetail } from '@/components/library/recipe-detail'
 import { SortDropdown } from '@/components/library/sort-dropdown'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import type { Collection, Recipe, RecipeCategory, SortOption } from '@/types'
+import type { Collection, Difficulty, Recipe, RecipeCategory, SortOption } from '@/types'
 
 type LibraryViewProps = {
   initialRecipes: Recipe[]
@@ -77,6 +77,8 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
   const [activeCategory, setActiveCategory] = useState<RecipeCategory | null>(null)
   const [activeTags, setActiveTags] = useState<string[]>([])
   const [maxTime, setMaxTime] = useState<number | null>(null)
+  const [activeDifficulty, setActiveDifficulty] = useState<Difficulty | null>(null)
+  const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null)
   const pendingDeletionRef = useRef<PendingDeletion | null>(null)
 
@@ -116,6 +118,14 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
         return false
       }
 
+      if (activeDifficulty && recipe.difficulty !== activeDifficulty) {
+        return false
+      }
+
+      if (favoritesOnly && !recipe.is_favorite) {
+        return false
+      }
+
       if (maxTime !== null && recipe.prep_time + recipe.cook_time > maxTime) {
         return false
       }
@@ -139,7 +149,7 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
         tagsText.includes(query)
       )
     })
-  }, [activeCategory, activeTags, maxTime, recipes, searchTerm])
+  }, [activeCategory, activeDifficulty, activeTags, favoritesOnly, maxTime, recipes, searchTerm])
 
   const visibleRecipes = useMemo(
     () => sortRecipes(filteredRecipes, sortOption),
@@ -287,6 +297,10 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
           maxTimeLimit={maxTimeLimit}
           onMaxTimeChange={setMaxTime}
           availableTags={availableTags}
+          activeDifficulty={activeDifficulty}
+          onDifficultyChange={setActiveDifficulty}
+          favoritesOnly={favoritesOnly}
+          onFavoritesOnlyToggle={() => setFavoritesOnly((v) => !v)}
         />
         <div className="flex justify-end">
           <SortDropdown value={sortOption} onChange={setSortOption} />

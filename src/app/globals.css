@@ -58,3 +58,34 @@
     -webkit-tap-highlight-color: transparent;
   }
 }
+
+@media print {
+  nav,
+  .fixed,
+  [data-state="open"] > [role="dialog"] + [data-state="open"] {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  main {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+
+  img {
+    max-width: 100%;
+    page-break-inside: avoid;
+  }
+
+  h1, h2, h3, h4 {
+    page-break-after: avoid;
+  }
+
+  ol, ul {
+    page-break-inside: avoid;
+  }
+}

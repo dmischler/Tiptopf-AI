@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
-import { getSettings, updateSettings } from '@/lib/local/store'
+import { exportStoreJson, getSettings, importStoreJson, updateSettings } from '@/lib/local/store'
 
 const optionalTrimmedStringSchema = z
   .string()
@@ -32,6 +32,17 @@ function readFormValue(formData: FormData, key: string) {
 
 export async function getSettingsAction() {
   return getSettings()
+}
+
+export async function exportStoreAction() {
+  return exportStoreJson()
+}
+
+export async function importStoreAction(jsonText: string) {
+  await importStoreJson(jsonText)
+  revalidatePath('/library')
+  revalidatePath('/collections')
+  revalidatePath('/profile')
 }
 
 export async function updateSettingsAction(formData: FormData) {
