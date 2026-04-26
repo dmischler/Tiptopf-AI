@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { MasonryGrid, MasonryItem } from '@/components/library/masonry-grid'
+import { buildCollectionMarkdown, collectionMarkdownFilename } from '@/lib/export'
 import type { Collection, Recipe } from '@/types'
 
 interface CollectionDetailViewProps {
@@ -107,6 +108,26 @@ export function CollectionDetailView({ collection, allRecipes }: CollectionDetai
     }
   }
 
+  function handleExportMarkdown() {
+    if (collectionRecipes.length === 0) {
+      toast.error('Keine Rezepte zum Exportieren vorhanden.')
+      return
+    }
+
+    const markdown = buildCollectionMarkdown(currentCollection, collectionRecipes)
+    const fileName = collectionMarkdownFilename(currentCollection.name)
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = fileName
+    document.body.append(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
+    toast.success('Sammlung exportiert.')
+  }
+
   const selectedRecipe = allRecipes.find((r) => r.id === selectedRecipeId) ?? null
 
   return (
@@ -155,10 +176,15 @@ export function CollectionDetailView({ collection, allRecipes }: CollectionDetai
         <p className="text-sm text-muted-foreground">
           {collectionRecipes.length} Rezept{collectionRecipes.length === 1 ? '' : 'e'}
         </p>
-        <Button onClick={() => setIsAddModalOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Rezept hinzufügen
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={handleExportMarkdown}>
+            Exportieren
+          </Button>
+          <Button onClick={() => setIsAddModalOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Rezept hinzufügen
+          </Button>
+        </div>
       </div>
 
       {collectionRecipes.length === 0 ? (

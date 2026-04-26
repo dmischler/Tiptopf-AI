@@ -53,6 +53,7 @@ type RecipeDetailProps = {
   onRecipeUpdated?: (recipe: Recipe) => void
   onRecipeDeleteRequested?: (recipe: Recipe) => void
   collections?: Collection[]
+  allTags?: string[]
 }
 
 type EditMode = 'view' | 'edit'
@@ -184,6 +185,7 @@ export function RecipeDetail({
   onRecipeUpdated,
   onRecipeDeleteRequested,
   collections = [],
+  allTags = [],
 }: RecipeDetailProps) {
   const [mode, setMode] = useState<EditMode>('view')
   const [draft, setDraft] = useState<RecipeDraft | null>(null)
@@ -239,6 +241,14 @@ export function RecipeDetail({
   const instructionSteps = toInstructionSteps(currentRecipe.instructions)
   const totalTime = currentRecipe.prep_time + currentRecipe.cook_time
   const currentImageUrl = replacementImagePreviewUrl ?? draft.imageUrl
+  const normalizedTagInput = draft.tagInput.trim().toLowerCase()
+  const tagSuggestions =
+    normalizedTagInput.length === 0
+      ? []
+      : allTags
+          .filter((tag) => tag.startsWith(normalizedTagInput))
+          .filter((tag) => !draft.tags.includes(tag))
+          .slice(0, 6)
 
   function resetDraftFromRecipe() {
     setDraft(toDraft(currentRecipe))
@@ -907,20 +917,37 @@ export function RecipeDetail({
                       </span>
                     ))}
                   </div>
-                  <div className="flex gap-2">
-                    <Input
-                      value={draft.tagInput}
-                      disabled={isSaving}
-                      placeholder="Tag eingeben..."
-                      className="bg-background/70"
-                      onChange={(event) =>
-                        setDraft((current) =>
-                          current ? { ...current, tagInput: event.target.value } : current
-                        )
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ',') {
-                          event.preventDefault()
+                  <div className="relative">
+                    <div className="flex gap-2">
+                      <Input
+                        value={draft.tagInput}
+                        disabled={isSaving}
+                        placeholder="Tag eingeben..."
+                        className="bg-background/70"
+                        onChange={(event) =>
+                          setDraft((current) =>
+                            current ? { ...current, tagInput: event.target.value } : current
+                          )
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ',') {
+                            event.preventDefault()
+                            const raw = draft.tagInput.trim().toLowerCase()
+                            if (raw && !draft.tags.includes(raw)) {
+                              setDraft((current) =>
+                                current
+                                  ? { ...current, tags: [...current.tags, raw], tagInput: '' }
+                                  : current
+                              )
+                            }
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={isSaving || !draft.tagInput.trim()}
+                        onClick={() => {
                           const raw = draft.tagInput.trim().toLowerCase()
                           if (raw && !draft.tags.includes(raw)) {
                             setDraft((current) =>
@@ -929,26 +956,31 @@ export function RecipeDetail({
                                 : current
                             )
                           }
-                        }
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={isSaving || !draft.tagInput.trim()}
-                      onClick={() => {
-                        const raw = draft.tagInput.trim().toLowerCase()
-                        if (raw && !draft.tags.includes(raw)) {
-                          setDraft((current) =>
-                            current
-                              ? { ...current, tags: [...current.tags, raw], tagInput: '' }
-                              : current
-                          )
-                        }
-                      }}
-                    >
-                      Hinzufügen
-                    </Button>
+                        }}
+                      >
+                        Hinzufügen
+                      </Button>
+                    </div>
+                    {tagSuggestions.length > 0 ? (
+                      <div className="absolute top-[calc(100%+0.4rem)] left-0 z-20 w-full rounded-lg border border-border/70 bg-popover p-1 shadow-lg">
+                        {tagSuggestions.map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            className="block w-full rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
+                            onClick={() =>
+                              setDraft((current) =>
+                                current
+                                  ? { ...current, tags: [...current.tags, tag], tagInput: '' }
+                                  : current
+                              )
+                            }
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 

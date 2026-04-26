@@ -21,6 +21,7 @@ const recipeSchema = z.object({
   servings: z.number().int().nullable(),
   category: z.enum(['starter', 'main', 'dessert', 'side', 'breakfast', 'snack']),
   difficulty: z.enum(['easy', 'medium', 'hard']),
+  tags: z.array(z.string()).optional(),
   confidence: z.number().min(0).max(1),
 })
 
@@ -110,6 +111,7 @@ export async function extractRecipeFromImage(
     category: parsed.category,
     difficulty: parsed.difficulty,
     confidence: parsed.confidence,
+    tags: parsed.tags,
     image_url: null,
     source_type: 'image',
   }

@@ -327,6 +327,7 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl }
         imageUrl: replacementImageFile ? null : previewState.imageUrl,
         sourceUrl: previewState.sourceUrl,
         sourceType: previewState.sourceType,
+        tags: extractedRecipe.tags,
       })
 
       let persistedImageUrl = saved.image_url as string | null

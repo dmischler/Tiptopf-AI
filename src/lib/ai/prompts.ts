@@ -10,6 +10,7 @@ Return ONLY valid JSON (no markdown, no explanations) with this exact shape:
   "servings": number | null,
   "category": "starter" | "main" | "dessert" | "side" | "breakfast" | "snack",
   "difficulty": "easy" | "medium" | "hard",
+  "tags": ["string"],
   "confidence": number
 }
 
@@ -25,6 +26,7 @@ Rules:
 - If unknown, use null for times/servings.
 - Category must be one allowed value.
 - Difficulty defaults to "medium" when unclear.
+- tags should contain up to 5 short German tags (lowercase, no duplicates), e.g. "vegetarisch", "schnell", "glutenfrei".
 - confidence must be between 0 and 1.`
 
 export const IMAGE_EXTRACTION_PROMPT = `${RECIPE_SYSTEM_PROMPT}

@@ -1,10 +1,12 @@
-# Frontend Implementation Addendum – Phase 1 (Tiptopf-AI)
+# Frontend Implementation Addendum – Phase 1 & 2 (Tiptopf-AI)
 
 > **Status: COMPLETED** ✅ (2026-04-26)
 
 > **Phase 2 Addendum (2026-04-26): COMPLETED** ✅
 
-## Phase 2 Addendum: Desktop Navigation + Profile-Based API Configuration
+---
+
+## Phase 2 Addendum: Desktop Navigation + Profile-Based API Configuration + Feature Polish
 
 This follow-up addendum documents the architecture updates requested after Phase 1.
 
@@ -61,6 +63,13 @@ This follow-up addendum documents the architecture updates requested after Phase
   - `AGENTS.md`
 - API key env vars are no longer required; only `DATA_DIR` remains required.
 
+### F) Additional Phase 2 Feature Polish
+
+- **Time slider filter** in `FilterBar` — replaced the simple quick-filter toggle with a `Slider` component (shadcn/ui) allowing dynamic max-time filtering.
+- **Tag autocomplete** in `RecipeDetail` edit mode — shows a dropdown with existing tag suggestions while typing.
+- **Collection markdown export** — added `Exportieren` button on collection detail pages that generates a `.md` file with all recipes.
+- **AI-generated tags** — extraction prompts now request up to 5 German tags; tags are persisted on save and shown in cards/detail.
+
 ---
 
 This addendum provides **detailed frontend specifications** to complement the main plan. All text, labels, and UI elements are in **German** as per project design.
@@ -77,18 +86,20 @@ Unified filter bar that combines:
 - Category chips (vorspeise, hauptgericht, dessert, etc.)
 - Computed "Schnell (<30min)" chip
 - Dynamic German tag chips (only shown if at least one recipe has that tag)
+- **Time slider** for dynamic max-time filtering
 
 **Props**
 ```ts
 interface FilterBarProps {
   search: string;
   onSearchChange: (value: string) => void;
-  activeCategory: string | null;
-  onCategoryChange: (category: string | null) => void;
+  activeCategory: RecipeCategory | null;
+  onCategoryChange: (category: RecipeCategory | null) => void;
   activeTags: string[];
   onTagToggle: (tag: string) => void;
-  showQuickFilter: boolean;
-  onQuickFilterToggle: () => void;
+  maxTime: number | null;
+  maxTimeLimit: number;
+  onMaxTimeChange: (value: number | null) => void;
   availableTags: string[]; // dynamically computed from recipes
 }
 ```
@@ -98,9 +109,10 @@ interface FilterBarProps {
 - Horizontal scrollable chip row:
   - "Alle"
   - Category chips (colored differently)
-  - "Schnell (<30min)" (special blue chip, only active when filter is on)
+  - "Schnell (<30min)" (special blue chip, toggles `maxTime = 30`)
   - Dynamic tag chips (e.g. vegetarisch, vegan, glutenfrei) — green/purple/etc.
 - Active filters are highlighted with primary color + check icon
+- **Time slider** (shadcn/ui `Slider`) with reset button; range is `0 … maxTimeLimit` in 5-minute steps
 
 **Integration**
 - Used in `src/app/library/page.tsx` (or wherever LibraryView lives)
@@ -135,14 +147,15 @@ interface FilterBarProps {
 
 ---
 
-## 3. RecipeDetail – Tag Editing
+## 3. RecipeDetail – Tag Editing + Autocomplete
 
-**File:** `src/components/recipe/recipe-detail.tsx` (update existing modal/page)
+**File:** `src/components/library/recipe-detail.tsx` (update existing modal/page)
 
 **Changes in Edit Mode**
 - Add a new section: **"Tags"**
 - Input field + "Hinzufügen" button (comma or Enter to add)
 - Display current tags as removable chips
+- **Tag autocomplete dropdown** — while typing, up to 6 matching existing tags are shown in a popover below the input
 - On save, call the existing `updateRecipe` action with normalized tags
 
 **UI Pattern**
@@ -202,6 +215,7 @@ interface CollectionCardProps {
 - Header with collection name + "Bearbeiten" / "Löschen" buttons
 - Masonry grid showing only recipes in this collection
 - "Rezept hinzufügen" button that opens a modal with all recipes (searchable)
+- **"Exportieren" button** — generates a Markdown file (`{slug}.md`) containing all recipes in the collection
 - Back button to collections list
 
 ### 5.4 "Add to Collection" in Recipe Detail
@@ -240,24 +254,35 @@ interface CollectionCardProps {
 | `src/components/library/recipe-card.tsx`  | Modify     | High     | ✅ Done |
 | `src/components/library/recipe-detail.tsx`| Modify     | High     | ✅ Done |
 | `src/components/layout/bottom-nav.tsx`    | New        | Medium   | ✅ Done |
+| `src/components/layout/top-nav.tsx`       | New        | Medium   | ✅ Done |
+| `src/components/layout/nav-items.ts`      | New        | Medium   | ✅ Done |
 | `src/app/collections/page.tsx`            | New        | Medium   | ✅ Done |
 | `src/app/collections/[id]/page.tsx`       | New        | Medium   | ✅ Done |
 | `src/components/collections/*`            | New        | Medium   | ✅ Done |
-| `src/types/index.ts`                      | Modify     | High     | ✅ Added `tags` to Recipe, `Collection` type |
-| `src/lib/local/store.ts`                  | Modify     | High     | ✅ Tags + collections CRUD |
+| `src/components/profile/settings-form.tsx`| New        | Low      | ✅ Done |
+| `src/app/profile/page.tsx`                | New        | Low      | ✅ Done |
+| `src/app/actions/settings.ts`             | New        | Medium   | ✅ Done |
+| `src/types/index.ts`                      | Modify     | High     | ✅ Added `tags` to Recipe, `Collection`, `AppSettings` types |
+| `src/lib/local/store.ts`                  | Modify     | High     | ✅ Tags + collections + settings CRUD |
 | `src/lib/utils.ts`                        | Modify     | High     | ✅ Added `normalizeTags` helper |
+| `src/lib/ai/client.ts`                    | Modify     | High     | ✅ Settings-driven config |
+| `src/lib/ai/extractor.ts`                 | Modify     | High     | ✅ Tags support |
+| `src/lib/ai/image-handler.ts`             | Modify     | High     | ✅ Tags support |
+| `src/lib/ai/prompts.ts`                   | Modify     | High     | ✅ German tags in extraction prompt |
+| `src/lib/export.ts`                       | New        | Low      | ✅ Markdown export utilities |
 | `src/app/actions/recipe.ts`               | Modify     | High     | ✅ Tags support in edit/restore |
 | `src/app/actions/add-recipe.ts`           | Modify     | High     | ✅ Tags support in save |
 | `src/app/actions/collections.ts`          | New        | Medium   | ✅ Server actions for collections |
-| `src/components/library/library-view.tsx` | Modify     | High     | ✅ Integrated FilterBar |
-| `src/app/layout.tsx`                      | Modify     | Medium   | ✅ Added BottomNav |
-| `src/app/profile/page.tsx`                | New        | Low      | ✅ Basic profile page |
+| `src/app/actions/extract-recipe.ts`       | Modify     | High     | ✅ Settings-driven extraction |
+| `src/components/library/library-view.tsx` | Modify     | High     | ✅ Integrated FilterBar + time slider |
+| `src/app/layout.tsx`                      | Modify     | Medium   | ✅ Added TopNav + BottomNav |
+| `src/components/ui/slider.tsx`            | New        | High     | ✅ shadcn/ui slider component |
 
 ---
 
 **Next Step Recommendation**  
-Phase 1 is fully implemented. Future enhancements could include:
-- AI-generated tags during recipe extraction
-- Collection sharing or export
-- Advanced filtering (prep time range, ingredient search)
-- Recipe tags autocomplete based on existing tags
+Phase 1 & 2 are fully implemented. Future enhancements could include:
+- Recipe import from Markdown or JSON
+- Full-text search across ingredients and instructions
+- Image optimization pipeline (WebP conversion, responsive srcset)
+- Encrypted storage for API keys

@@ -12,9 +12,8 @@ import { MasonryGrid, MasonryItem } from '@/components/library/masonry-grid'
 import { RecipeCard } from '@/components/library/recipe-card'
 import { RecipeDetail } from '@/components/library/recipe-detail'
 import { SortDropdown } from '@/components/library/sort-dropdown'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import type { Collection, Recipe, SortOption } from '@/types'
+import type { Collection, Recipe, RecipeCategory, SortOption } from '@/types'
 
 type LibraryViewProps = {
   initialRecipes: Recipe[]
@@ -75,11 +74,20 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
   const [collections, setCollections] = useState(initialCollections)
   const [searchTerm, setSearchTerm] = useState('')
   const [sortOption, setSortOption] = useState<SortOption>('newest')
-  const [activeCategory, setActiveCategory] = useState<string | null>(null)
+  const [activeCategory, setActiveCategory] = useState<RecipeCategory | null>(null)
   const [activeTags, setActiveTags] = useState<string[]>([])
-  const [showQuickFilter, setShowQuickFilter] = useState(false)
+  const [maxTime, setMaxTime] = useState<number | null>(null)
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null)
   const pendingDeletionRef = useRef<PendingDeletion | null>(null)
+
+  const maxTimeLimit = useMemo(() => {
+    const maxTotal = recipes.reduce((currentMax, recipe) => {
+      const total = recipe.prep_time + recipe.cook_time
+      return total > currentMax ? total : currentMax
+    }, 0)
+
+    return Math.max(180, maxTotal)
+  }, [recipes])
 
   useEffect(() => {
     return () => {
@@ -108,7 +116,7 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
         return false
       }
 
-      if (showQuickFilter && recipe.prep_time + recipe.cook_time >= 30) {
+      if (maxTime !== null && recipe.prep_time + recipe.cook_time > maxTime) {
         return false
       }
 
@@ -131,7 +139,7 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
         tagsText.includes(query)
       )
     })
-  }, [activeCategory, activeTags, recipes, searchTerm, showQuickFilter])
+  }, [activeCategory, activeTags, maxTime, recipes, searchTerm])
 
   const visibleRecipes = useMemo(
     () => sortRecipes(filteredRecipes, sortOption),
@@ -275,10 +283,10 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
           onCategoryChange={setActiveCategory}
           activeTags={activeTags}
           onTagToggle={handleTagToggle}
-          showQuickFilter={showQuickFilter}
-          onQuickFilterToggle={() => setShowQuickFilter((current) => !current)}
+          maxTime={maxTime}
+          maxTimeLimit={maxTimeLimit}
+          onMaxTimeChange={setMaxTime}
           availableTags={availableTags}
-          recipes={recipes}
         />
         <div className="flex justify-end">
           <SortDropdown value={sortOption} onChange={setSortOption} />
@@ -340,6 +348,7 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
         }}
         onRecipeDeleteRequested={handleDeleteRequested}
         collections={collections}
+        allTags={availableTags}
       />
 
       <AddRecipeLauncher

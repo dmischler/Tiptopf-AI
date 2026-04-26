@@ -17,6 +17,7 @@ const recipeSchema = z.object({
   servings: z.number().int().nullable(),
   category: z.enum(['starter', 'main', 'dessert', 'side', 'breakfast', 'snack']),
   difficulty: z.enum(['easy', 'medium', 'hard']),
+  tags: z.array(z.string()).optional(),
   confidence: z.number().min(0).max(1),
 })
 
@@ -33,6 +34,7 @@ function normalizeParsedRecipe(recipe: RecipeSchema, sourceType: 'image' | 'url'
     category: recipe.category,
     difficulty: recipe.difficulty,
     confidence: recipe.confidence,
+    tags: recipe.tags,
     source_type: sourceType,
   }
 }

@@ -3,7 +3,8 @@
 import { Check, Search, Zap } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
-import type { Recipe, RecipeCategory } from '@/types'
+import { Slider } from '@/components/ui/slider'
+import type { RecipeCategory } from '@/types'
 
 const CATEGORY_ITEMS: Array<{ value: RecipeCategory; label: string; color: string }> = [
   { value: 'starter', label: 'Vorspeise', color: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30' },
@@ -29,14 +30,14 @@ function getTagColor(index: number) {
 interface FilterBarProps {
   search: string
   onSearchChange: (value: string) => void
-  activeCategory: string | null
-  onCategoryChange: (category: string | null) => void
+  activeCategory: RecipeCategory | null
+  onCategoryChange: (category: RecipeCategory | null) => void
   activeTags: string[]
   onTagToggle: (tag: string) => void
-  showQuickFilter: boolean
-  onQuickFilterToggle: () => void
+  maxTime: number | null
+  maxTimeLimit: number
+  onMaxTimeChange: (value: number | null) => void
   availableTags: string[]
-  recipes: Recipe[]
 }
 
 export function FilterBar({
@@ -46,11 +47,14 @@ export function FilterBar({
   onCategoryChange,
   activeTags,
   onTagToggle,
-  showQuickFilter,
-  onQuickFilterToggle,
+  maxTime,
+  maxTimeLimit,
+  onMaxTimeChange,
   availableTags,
 }: FilterBarProps) {
-  const isCategoryActive = (category: string | null) => activeCategory === category
+  const isCategoryActive = (category: RecipeCategory | null) => activeCategory === category
+  const quickFilterActive = maxTime === 30
+  const sliderValue = Math.min(maxTime ?? maxTimeLimit, maxTimeLimit)
 
   return (
     <div className="space-y-3">
@@ -87,7 +91,9 @@ export function FilterBar({
               key={item.value}
               onClick={() => onCategoryChange(active ? null : item.value)}
               className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium border transition-colors ${
-                active ? `${item.color} ring-1 ring-inset ring-white/20` : 'bg-zinc-800/50 text-zinc-300 border-zinc-700 hover:bg-zinc-800'
+                active
+                  ? `${item.color} ring-1 ring-inset ring-white/20`
+                  : 'bg-zinc-800/50 text-zinc-300 border-zinc-700 hover:bg-zinc-800'
               }`}
             >
               <span className="flex items-center gap-1.5">
@@ -99,15 +105,15 @@ export function FilterBar({
         })}
 
         <button
-          onClick={onQuickFilterToggle}
+          onClick={() => onMaxTimeChange(quickFilterActive ? null : 30)}
           className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium border transition-colors ${
-            showQuickFilter
+            quickFilterActive
               ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
               : 'bg-zinc-800/50 text-zinc-300 border-zinc-700 hover:bg-zinc-800'
           }`}
         >
           <span className="flex items-center gap-1.5">
-            {showQuickFilter ? <Check className="h-3.5 w-3.5" /> : <Zap className="h-3.5 w-3.5" />}
+            {quickFilterActive ? <Check className="h-3.5 w-3.5" /> : <Zap className="h-3.5 w-3.5" />}
             Schnell (&lt;30min)
           </span>
         </button>
@@ -119,7 +125,9 @@ export function FilterBar({
               key={tag}
               onClick={() => onTagToggle(tag)}
               className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium border transition-colors ${
-                active ? `${getTagColor(index)} ring-1 ring-inset ring-white/20` : 'bg-zinc-800/50 text-zinc-300 border-zinc-700 hover:bg-zinc-800'
+                active
+                  ? `${getTagColor(index)} ring-1 ring-inset ring-white/20`
+                  : 'bg-zinc-800/50 text-zinc-300 border-zinc-700 hover:bg-zinc-800'
               }`}
             >
               <span className="flex items-center gap-1.5">
@@ -129,6 +137,36 @@ export function FilterBar({
             </button>
           )
         })}
+      </div>
+
+      <div className="rounded-lg border border-zinc-800/80 bg-zinc-900/40 px-3 py-2">
+        <div className="mb-2 flex items-center justify-between text-xs text-zinc-400">
+          <span>Zeit bis</span>
+          <div className="flex items-center gap-2">
+            <span>{maxTime === null ? `Beliebig (bis ${maxTimeLimit} min)` : `${maxTime} min`}</span>
+            {maxTime !== null ? (
+              <button
+                type="button"
+                onClick={() => onMaxTimeChange(null)}
+                className="rounded px-1.5 py-0.5 text-[11px] text-zinc-300 transition-colors hover:bg-zinc-700/70"
+              >
+                Zurücksetzen
+              </button>
+            ) : null}
+          </div>
+        </div>
+        <Slider
+          min={0}
+          max={maxTimeLimit}
+          step={5}
+          value={[sliderValue]}
+          onValueChange={(value) => {
+            const arr = Array.isArray(value) ? value : [value]
+            const next = arr[0] ?? maxTimeLimit
+            onMaxTimeChange(next >= maxTimeLimit ? null : next)
+          }}
+          className="py-2"
+        />
       </div>
     </div>
   )
