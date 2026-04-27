@@ -13,9 +13,9 @@ import { IMAGE_EXTRACTION_PROMPT } from '@/lib/ai/prompts'
 import type { ParsedRecipe } from '@/types'
 
 const recipeSchema = z.object({
-  title: z.string().min(1),
-  ingredients: z.array(z.string()),
-  instructions: z.string().min(1),
+  title: z.string().min(1, 'Titel fehlt im extrahierten Rezept.'),
+  ingredients: z.array(z.string()).min(1, 'Zutatenliste fehlt im extrahierten Rezept.'),
+  instructions: z.string().min(1, 'Zubereitung fehlt im extrahierten Rezept.'),
   prepTime: z.number().int().nullable(),
   cookTime: z.number().int().nullable(),
   servings: z.number().int().nullable(),
@@ -99,7 +99,16 @@ export async function extractRecipeFromImage(
 
   console.log('AI image extraction - succeeded with Gemini model:', usedModel)
 
-  const parsed = recipeSchema.parse(JSON.parse(cleanJsonResponse(raw)))
+  let parsed
+  try {
+    parsed = recipeSchema.parse(JSON.parse(cleanJsonResponse(raw)))
+  } catch (parseError) {
+    if (parseError instanceof z.ZodError) {
+      const issues = parseError.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join('; ')
+      throw new Error(`Rezept konnte nicht vollständig erkannt werden (${issues}). Bitte versuche es mit einem anderen Foto.`)
+    }
+    throw parseError
+  }
 
   return {
     title: parsed.title,

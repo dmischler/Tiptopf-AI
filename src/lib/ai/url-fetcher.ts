@@ -355,16 +355,31 @@ function extractOgImage(html: string) {
   return match ? match[1] : null
 }
 
-export async function fetchRecipeUrl(url: string): Promise<FetchResult> {
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; Tiptopf-AI/1.0)',
-    },
-    cache: 'no-store',
-  })
+export async function fetchRecipeUrl(url: string, timeoutMs = 15000): Promise<FetchResult> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+  let response: Response
+  try {
+    response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; Tiptopf-AI/1.0)',
+      },
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+  } catch (err) {
+    clearTimeout(timeoutId)
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error(`Timeout fetching URL after ${timeoutMs}ms`)
+    }
+    throw new Error(`Failed to fetch URL: ${err instanceof Error ? err.message : 'Network error'}`)
+  }
+
+  clearTimeout(timeoutId)
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch URL: ${response.status}`)
+    throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`)
   }
 
   const html = await response.text()

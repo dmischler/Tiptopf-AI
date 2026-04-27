@@ -61,7 +61,7 @@ export function resolveAiModelId(modelId?: string) {
 export function resolveGeminiBaseUrl(baseUrl?: string): string | undefined {
   const resolved = baseUrl?.trim()
   if (!resolved) {
-    return undefined
+    return 'https://generativelanguage.googleapis.com/v1beta'
   }
   return resolved
 }
