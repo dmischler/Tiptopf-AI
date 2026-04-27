@@ -26,6 +26,7 @@ Rules:
   - NEVER combine multiple steps into a single line.
   - NEVER use bullet points or dashes for steps.
   - Each line must contain exactly one numbered cooking step.
+  - Use actual line breaks (\\n) between every step so steps are visually separated.
 - If unknown, use null for times/servings.
 - Category must be one allowed value.
 - Difficulty defaults to "medium" when unclear.

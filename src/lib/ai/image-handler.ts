@@ -1,6 +1,6 @@
 'use server'
 
-import { streamText } from 'ai'
+import { generateText } from 'ai'
 import { z } from 'zod'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 
@@ -30,7 +30,7 @@ function cleanJsonResponse(raw: string) {
 }
 
 async function runImageExtraction(imageDataUrl: string, model: any): Promise<string> {
-  const result = await streamText({
+  const result = await generateText({
     model,
     system: IMAGE_EXTRACTION_PROMPT,
     messages: [
@@ -50,12 +50,7 @@ async function runImageExtraction(imageDataUrl: string, model: any): Promise<str
     ],
   })
 
-  let raw = ''
-  for await (const chunk of result.textStream) {
-    raw += chunk
-  }
-
-  return raw
+  return result.text
 }
 
 export async function extractRecipeFromImage(
