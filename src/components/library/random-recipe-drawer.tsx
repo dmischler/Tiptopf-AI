@@ -84,18 +84,18 @@ export function RandomRecipeDrawer({
 
       void controls.start({
         x: finalX,
-        transition: { duration: 2.8, ease: [0.15, 0.9, 0.34, 1] },
+        transition: { duration: 3.5, ease: [0.1, 0.95, 0.2, 1] },
       })
 
       const popTimer = setTimeout(() => {
         setPhase('popping')
-      }, 2800)
+      }, 3500)
 
       const doneTimer = setTimeout(() => {
         setPhase('done')
         onRecipeSelectedRef.current(recipe)
         onCloseRef.current()
-      }, 3600)
+      }, 4300)
 
       timersRef.current = [popTimer, doneTimer]
     }, 50)
