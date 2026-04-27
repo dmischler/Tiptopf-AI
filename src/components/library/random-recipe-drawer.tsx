@@ -39,6 +39,13 @@ export function RandomRecipeDrawer({
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  const onRecipeSelectedRef = useRef(onRecipeSelected)
+  const onCloseRef = useRef(onClose)
+
+  useEffect(() => {
+    onRecipeSelectedRef.current = onRecipeSelected
+    onCloseRef.current = onClose
+  })
 
   const items = useMemo(() => {
     if (recipes.length === 0) return []
@@ -75,8 +82,8 @@ export function RandomRecipeDrawer({
 
     const doneTimer = setTimeout(() => {
       setPhase('done')
-      onRecipeSelected(recipe)
-      onClose()
+      onRecipeSelectedRef.current(recipe)
+      onCloseRef.current()
     }, 3600)
 
     timersRef.current = [popTimer, doneTimer]
@@ -85,9 +92,14 @@ export function RandomRecipeDrawer({
       timersRef.current.forEach(clearTimeout)
       timersRef.current = []
     }
-  }, [isOpen, recipes, containerWidth, drawKey, onRecipeSelected, onClose])
+  }, [isOpen, recipes, containerWidth, drawKey])
 
   useEffect(() => {
+    if (!isOpen) {
+      setContainerWidth(0)
+      return
+    }
+
     const el = containerRef.current
     if (!el) return
 
@@ -98,7 +110,7 @@ export function RandomRecipeDrawer({
     })
     ro.observe(el)
     return () => ro.disconnect()
-  }, [])
+  }, [isOpen])
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
