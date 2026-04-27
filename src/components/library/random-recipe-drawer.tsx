@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
-import { motion } from 'framer-motion'
+import { motion, useAnimationControls } from 'framer-motion'
 
 import {
   Dialog,
@@ -34,13 +34,13 @@ export function RandomRecipeDrawer({
   drawKey,
 }: RandomRecipeDrawerProps) {
   const [phase, setPhase] = useState<'idle' | 'scrolling' | 'popping' | 'done'>('idle')
-  const [containerWidth, setContainerWidth] = useState(0)
-  const [targetX, setTargetX] = useState(0)
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const stripRef = useRef<HTMLDivElement>(null)
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const onRecipeSelectedRef = useRef(onRecipeSelected)
   const onCloseRef = useRef(onClose)
+  const controls = useAnimationControls()
 
   useEffect(() => {
     onRecipeSelectedRef.current = onRecipeSelected
@@ -56,61 +56,57 @@ export function RandomRecipeDrawer({
     if (!isOpen) {
       setPhase('idle')
       setSelectedRecipe(null)
-      setTargetX(0)
       timersRef.current.forEach(clearTimeout)
       timersRef.current = []
+      controls.set({ x: 0 })
       return
     }
 
     if (recipes.length === 0) return
-    if (containerWidth === 0) return
 
     const targetRecipeIndex = Math.floor(Math.random() * recipes.length)
     const recipe = recipes[targetRecipeIndex]
     setSelectedRecipe(recipe)
 
-    const middleRepetition = Math.floor(REPETITIONS / 2)
-    const physicalIndex = middleRepetition * recipes.length + targetRecipeIndex
-    const finalX = -(physicalIndex * ITEM_STRIDE) + (containerWidth - ITEM_WIDTH) / 2
+    // Wait a tick so the dialog DOM is fully laid out, then measure and animate
+    const startTimer = setTimeout(() => {
+      const container = containerRef.current
+      if (!container) return
 
-    setTargetX(finalX)
-    setPhase('scrolling')
+      const containerWidth = container.getBoundingClientRect().width
+      if (containerWidth === 0) return
 
-    const popTimer = setTimeout(() => {
-      setPhase('popping')
-    }, 2800)
+      const middleRepetition = Math.floor(REPETITIONS / 2)
+      const physicalIndex = middleRepetition * recipes.length + targetRecipeIndex
+      const finalX = -(physicalIndex * ITEM_STRIDE) + (containerWidth - ITEM_WIDTH) / 2
 
-    const doneTimer = setTimeout(() => {
-      setPhase('done')
-      onRecipeSelectedRef.current(recipe)
-      onCloseRef.current()
-    }, 3600)
+      setPhase('scrolling')
 
-    timersRef.current = [popTimer, doneTimer]
+      void controls.start({
+        x: finalX,
+        transition: { duration: 2.8, ease: [0.15, 0.9, 0.34, 1] },
+      })
+
+      const popTimer = setTimeout(() => {
+        setPhase('popping')
+      }, 2800)
+
+      const doneTimer = setTimeout(() => {
+        setPhase('done')
+        onRecipeSelectedRef.current(recipe)
+        onCloseRef.current()
+      }, 3600)
+
+      timersRef.current = [popTimer, doneTimer]
+    }, 50)
+
+    timersRef.current.push(startTimer)
 
     return () => {
       timersRef.current.forEach(clearTimeout)
       timersRef.current = []
     }
-  }, [isOpen, recipes, containerWidth, drawKey])
-
-  useEffect(() => {
-    if (!isOpen) {
-      setContainerWidth(0)
-      return
-    }
-
-    const el = containerRef.current
-    if (!el) return
-
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width)
-      }
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [isOpen])
+  }, [isOpen, recipes, drawKey, controls])
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -150,15 +146,14 @@ export function RandomRecipeDrawer({
             <p className="text-sm text-muted-foreground">
               Noch keine Rezepte vorhanden.
             </p>
-          ) : containerWidth === 0 ? null : (
+          ) : (
             <>
               <div className="pointer-events-none absolute inset-y-0 left-1/2 z-10 w-0.5 -translate-x-1/2 bg-primary/40" />
               <motion.div
-                key={drawKey}
+                ref={stripRef}
                 className="flex items-center gap-4 will-change-transform"
                 initial={{ x: 0 }}
-                animate={{ x: targetX }}
-                transition={{ duration: 2.8, ease: [0.15, 0.9, 0.34, 1] }}
+                animate={controls}
               >
                 {items.map((recipe, index) => {
                   const isExactTarget = index === exactTargetIndex
