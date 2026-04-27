@@ -299,7 +299,6 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
 
   function handleRecipeSelected(recipe: Recipe) {
     setSelectedRecipeId(recipe.id)
-    toast.success('Dein Zufallsrezept ist da!')
   }
 
   return (
