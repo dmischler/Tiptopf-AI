@@ -1,6 +1,6 @@
 'use client'
 
-import { SearchX } from 'lucide-react'
+import { Dices, SearchX } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -8,10 +8,13 @@ import { deleteRecipeAction, restoreRecipe } from '@/app/actions/recipe'
 
 import { AddRecipeLauncher } from '@/components/add-recipe/launcher'
 import { FilterBar } from '@/components/library/filter-bar'
+import { RandomRecipeDrawer } from '@/components/library/random-recipe-drawer'
+import { RandomRecipeFab } from '@/components/library/random-recipe-fab'
 import { MasonryGrid, MasonryItem } from '@/components/library/masonry-grid'
 import { RecipeCard } from '@/components/library/recipe-card'
 import { RecipeDetail } from '@/components/library/recipe-detail'
 import { SortDropdown } from '@/components/library/sort-dropdown'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { Collection, Difficulty, Recipe, RecipeCategory, SortOption } from '@/types'
 
@@ -80,6 +83,9 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
   const [activeDifficulty, setActiveDifficulty] = useState<Difficulty | null>(null)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null)
+  const [isDrawOpen, setIsDrawOpen] = useState(false)
+  const [drawKey, setDrawKey] = useState(0)
+  const [drawPool, setDrawPool] = useState<Recipe[]>([])
   const pendingDeletionRef = useRef<PendingDeletion | null>(null)
 
   const maxTimeLimit = useMemo(() => {
@@ -274,6 +280,28 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
     )
   }
 
+  function handleOpenRandomDraw() {
+    if (recipes.length === 0) {
+      toast.error('Noch keine Rezepte vorhanden.')
+      return
+    }
+
+    const pool = filteredRecipes.length > 0 ? filteredRecipes : recipes
+
+    if (filteredRecipes.length === 0 && recipes.length > 0) {
+      toast.info('Keine Rezepte passen zu den Filtern – zeige ein zufälliges Rezept')
+    }
+
+    setDrawPool(pool)
+    setDrawKey((k) => k + 1)
+    setIsDrawOpen(true)
+  }
+
+  function handleRecipeSelected(recipe: Recipe) {
+    setSelectedRecipeId(recipe.id)
+    toast.success('Dein Zufallsrezept ist da!')
+  }
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-8 pb-[max(6rem,env(safe-area-inset-bottom))] md:pb-8 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -283,6 +311,15 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
             {recipes.length} Rezept{recipes.length === 1 ? '' : 'e'} in deiner persönlichen Sammlung.
           </p>
         </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleOpenRandomDraw}
+          className="hidden gap-2 md:inline-flex"
+        >
+          <Dices className="h-4 w-4" />
+          Zufallsrezept ziehen
+        </Button>
       </div>
 
       <div className="space-y-3">
@@ -364,6 +401,16 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
         collections={collections}
         allTags={availableTags}
       />
+
+      <RandomRecipeDrawer
+        isOpen={isDrawOpen}
+        onClose={() => setIsDrawOpen(false)}
+        recipes={drawPool}
+        onRecipeSelected={handleRecipeSelected}
+        drawKey={drawKey}
+      />
+
+      <RandomRecipeFab onClick={handleOpenRandomDraw} />
 
       <AddRecipeLauncher
         onRecipeSaved={(recipe) => {
