@@ -30,9 +30,10 @@ function cleanJsonResponse(raw: string) {
 }
 
 function parseDataUrl(dataUrl: string): { mimeType: string; base64: string } | null {
-  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
+  const match = dataUrl.match(/^data:([^;]*);base64,(.+)$/)
   if (!match) return null
-  return { mimeType: match[1], base64: match[2] }
+  const mimeType = match[1]?.trim() || 'image/jpeg'
+  return { mimeType, base64: match[2] }
 }
 
 function getFinishReasonString(finishReason: unknown): string {
@@ -63,8 +64,8 @@ async function runImageExtraction(imageDataUrl: string, model: any): Promise<Ext
         role: 'user',
         content: [
           {
-            type: 'file',
-            data: parsedImage.base64,
+            type: 'image',
+            image: parsedImage.base64,
             mimeType: parsedImage.mimeType,
           },
           {
