@@ -79,20 +79,16 @@ export async function extractRecipeFromImage(
   let usedModel = primaryModel
 
   try {
-    console.log('AI image extraction - trying Gemini model:', primaryModel)
     raw = await runImageExtraction(imageDataUrl, google(primaryModel))
   } catch (primaryError) {
     console.error('AI image extraction - Gemini model failed:', primaryError)
     if (fallbackModel !== primaryModel) {
-      console.log('AI image extraction - trying Gemini fallback:', fallbackModel)
       raw = await runImageExtraction(imageDataUrl, google(fallbackModel))
       usedModel = fallbackModel
     } else {
       throw primaryError
     }
   }
-
-  console.log('AI image extraction - succeeded with Gemini model:', usedModel)
 
   let parsed
   try {

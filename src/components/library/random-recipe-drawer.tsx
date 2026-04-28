@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
-import { motion, useAnimationControls } from 'framer-motion'
 
 import {
   Dialog,
@@ -40,7 +39,10 @@ export function RandomRecipeDrawer({
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const onRecipeSelectedRef = useRef(onRecipeSelected)
   const onCloseRef = useRef(onClose)
-  const controls = useAnimationControls()
+  const [stripStyle, setStripStyle] = useState<{ transform: string, transition: string }>({
+    transform: 'translateX(0px)',
+    transition: 'none'
+  })
 
   useEffect(() => {
     onRecipeSelectedRef.current = onRecipeSelected
@@ -58,7 +60,7 @@ export function RandomRecipeDrawer({
       setSelectedRecipe(null)
       timersRef.current.forEach(clearTimeout)
       timersRef.current = []
-      controls.set({ x: 0 })
+      setStripStyle({ transform: 'translateX(0px)', transition: 'none' })
       return
     }
 
@@ -82,9 +84,9 @@ export function RandomRecipeDrawer({
 
       setPhase('scrolling')
 
-      void controls.start({
-        x: finalX,
-        transition: { duration: 5, ease: [0.1, 0.6, 0.2, 1] },
+      setStripStyle({
+        transform: `translateX(${finalX}px)`,
+        transition: 'transform 5s cubic-bezier(0.1, 0.6, 0.2, 1)'
       })
 
       const popTimer = setTimeout(() => {
@@ -106,7 +108,7 @@ export function RandomRecipeDrawer({
       timersRef.current.forEach(clearTimeout)
       timersRef.current = []
     }
-  }, [isOpen, recipes, drawKey, controls])
+  }, [isOpen, recipes, drawKey])
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -149,11 +151,10 @@ export function RandomRecipeDrawer({
           ) : (
             <>
               <div className="pointer-events-none absolute inset-y-0 left-1/2 z-10 w-0.5 -translate-x-1/2 bg-primary/40" />
-              <motion.div
+              <div
                 ref={stripRef}
                 className="flex items-center gap-4 will-change-transform"
-                initial={{ x: 0 }}
-                animate={controls}
+                style={stripStyle}
               >
                 {items.map((recipe, index) => {
                   const isExactTarget = index === exactTargetIndex
@@ -188,7 +189,7 @@ export function RandomRecipeDrawer({
                     </div>
                   )
                 })}
-              </motion.div>
+              </div>
             </>
           )}
         </div>

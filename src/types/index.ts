@@ -66,7 +66,6 @@ export interface ParsedRecipe {
 }
 
 export type SortOption = 'newest' | 'oldest' | 'prep_time' | 'rating';
-export type LibraryCategoryFilter = 'all' | RecipeCategory;
 
 export interface Collection {
   id: string;
