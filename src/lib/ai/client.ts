@@ -1,7 +1,7 @@
 const LEGACY_BASE_URLS = new Set(['https://api.opencode.ai', 'https://api.opencode.ai/v1'])
 export const DEFAULT_BASE_URL = 'https://opencode.ai/zen/v1'
 export const DEFAULT_MODEL_ID = 'minimax-m2.5'
-export const DEFAULT_GEMINI_IMAGE_MODEL_ID = 'gemini-2.0-flash'
+export const DEFAULT_GEMINI_IMAGE_MODEL_ID = 'gemini-2.5-flash-lite'
 export const DEFAULT_GEMINI_IMAGE_FALLBACK_MODEL_ID = 'gemini-1.5-flash'
 
 const LEGACY_MODEL_IDS: Record<string, string> = {

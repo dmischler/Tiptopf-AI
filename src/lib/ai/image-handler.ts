@@ -1,6 +1,6 @@
 'use server'
 
-import { generateText } from 'ai'
+import { generateObject } from 'ai'
 import { z } from 'zod'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 
@@ -9,7 +9,7 @@ import {
   resolveGeminiImageFallbackModelId,
   resolveGeminiImageModelId,
 } from '@/lib/ai/client'
-import { IMAGE_EXTRACTION_PROMPT } from '@/lib/ai/prompts'
+import { SIMPLIFIED_IMAGE_PROMPT } from '@/lib/ai/prompts'
 import type { ParsedRecipe } from '@/types'
 
 const recipeSchema = z.object({
@@ -56,20 +56,22 @@ async function runImageExtraction(imageDataUrl: string, model: any): Promise<Ext
     throw new Error('Invalid image data URL format')
   }
 
-  const result = await generateText({
+  const imageDataUrlFull = `data:${parsedImage.mimeType};base64,${parsedImage.base64}`
+
+  const result = await generateObject({
     model,
+    schema: recipeSchema,
     messages: [
       {
         role: 'user',
         content: [
           {
             type: 'text',
-            text: IMAGE_EXTRACTION_PROMPT,
+            text: SIMPLIFIED_IMAGE_PROMPT,
           },
           {
             type: 'image',
-            image: Buffer.from(parsedImage.base64, 'base64'),
-            mimeType: parsedImage.mimeType,
+            image: imageDataUrlFull,
           },
         ],
       },
@@ -84,11 +86,13 @@ async function runImageExtraction(imageDataUrl: string, model: any): Promise<Ext
         ],
       },
     },
+    maxTokens: 2000,
+    temperature: 0.2,
   } as any)
 
   return {
-    text: result.text,
-    finishReason: getFinishReasonString((result as any).finishReason),
+    text: JSON.stringify(result.object),
+    finishReason: 'stop',
   }
 }
 
@@ -113,6 +117,17 @@ export async function extractRecipeFromImage(
   const google = createGoogleGenerativeAI(googleOptions)
   const primaryModel = resolveGeminiImageModelId(geminiImageModelId)
   const fallbackModel = resolveGeminiImageFallbackModelId(geminiImageFallbackModelId)
+
+  const hardcodedFallbacks = [
+    'gemini-2.5-flash',
+    'gemini-3.1-flash-lite-preview',
+  ]
+
+  const modelsToTry = [
+    primaryModel,
+    ...(fallbackModel !== primaryModel ? [fallbackModel] : []),
+    ...hardcodedFallbacks.filter((m) => m !== primaryModel && m !== fallbackModel),
+  ]
 
   let raw = ''
   let usedModel = primaryModel
@@ -139,12 +154,12 @@ export async function extractRecipeFromImage(
     }
   }
 
-  let success = await tryExtract(primaryModel)
-
-  if (!success && fallbackModel !== primaryModel) {
-    success = await tryExtract(fallbackModel)
+  let success = false
+  for (const modelName of modelsToTry) {
+    success = await tryExtract(modelName)
     if (success) {
-      usedModel = fallbackModel
+      usedModel = modelName
+      break
     }
   }
 
