@@ -29,12 +29,32 @@ function cleanJsonResponse(raw: string) {
   return raw.replace(/^```json\s*/i, '').replace(/```$/i, '').trim()
 }
 
+function parseDataUrl(dataUrl: string): { mimeType: string; base64: string } | null {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
+  if (!match) return null
+  return { mimeType: match[1], base64: match[2] }
+}
+
+function getFinishReasonString(finishReason: unknown): string {
+  if (typeof finishReason === 'string') return finishReason
+  if (finishReason && typeof finishReason === 'object') {
+    const fr = finishReason as { unified?: string; raw?: string }
+    return fr.unified || fr.raw || String(finishReason)
+  }
+  return String(finishReason || '')
+}
+
 type ExtractionResult = {
   text: string
-  finishReason?: string
+  finishReason: string
 }
 
 async function runImageExtraction(imageDataUrl: string, model: any): Promise<ExtractionResult> {
+  const parsedImage = parseDataUrl(imageDataUrl)
+  if (!parsedImage) {
+    throw new Error('Invalid image data URL format')
+  }
+
   const result = await generateText({
     model,
     system: IMAGE_EXTRACTION_PROMPT,
@@ -43,8 +63,9 @@ async function runImageExtraction(imageDataUrl: string, model: any): Promise<Ext
         role: 'user',
         content: [
           {
-            type: 'image',
-            image: imageDataUrl,
+            type: 'file',
+            data: parsedImage.base64,
+            mimeType: parsedImage.mimeType,
           },
           {
             type: 'text',
@@ -67,7 +88,7 @@ async function runImageExtraction(imageDataUrl: string, model: any): Promise<Ext
 
   return {
     text: result.text,
-    finishReason: (result as any).finishReason,
+    finishReason: getFinishReasonString((result as any).finishReason),
   }
 }
 
@@ -102,7 +123,7 @@ export async function extractRecipeFromImage(
     try {
       const result = await runImageExtraction(imageDataUrl, google(modelName))
       raw = result.text
-      finishReason = result.finishReason || ''
+      finishReason = result.finishReason
       console.log(
         'AI image extraction - model:',
         modelName,
