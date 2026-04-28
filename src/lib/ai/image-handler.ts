@@ -58,19 +58,18 @@ async function runImageExtraction(imageDataUrl: string, model: any): Promise<Ext
 
   const result = await generateText({
     model,
-    system: IMAGE_EXTRACTION_PROMPT,
     messages: [
       {
         role: 'user',
         content: [
           {
-            type: 'image',
-            image: parsedImage.base64,
-            mimeType: parsedImage.mimeType,
+            type: 'text',
+            text: IMAGE_EXTRACTION_PROMPT,
           },
           {
-            type: 'text',
-            text: 'Extract recipe content and return valid JSON only.',
+            type: 'image',
+            image: Buffer.from(parsedImage.base64, 'base64'),
+            mimeType: parsedImage.mimeType,
           },
         ],
       },
