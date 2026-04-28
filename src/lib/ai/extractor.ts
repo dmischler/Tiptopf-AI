@@ -54,10 +54,6 @@ async function runExtraction(
   const resolvedBaseUrl = resolveAiBaseUrl(baseUrl)
   const resolvedModelId = resolveAiModelId(modelId)
 
-  console.log('AI extraction - baseUrl:', resolvedBaseUrl)
-  console.log('AI extraction - model:', resolvedModelId)
-  console.log('AI extraction - apiKey prefix:', apiKey.slice(0, 8))
-
   const ai = createOpenAI({
     apiKey,
     baseURL: resolvedBaseUrl,
@@ -75,9 +71,6 @@ async function runExtraction(
     console.error('generateText error:', err)
     throw err
   }
-
-  console.log('AI extraction - content length:', content.length)
-  console.log('AI extraction - raw response length:', raw.length)
 
   const cleaned = cleanJsonResponse(raw)
   if (!cleaned) {
