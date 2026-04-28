@@ -93,10 +93,17 @@ export async function extractRecipeFromImage(
   }
 
   console.log('AI image extraction - succeeded with Gemini model:', usedModel)
+  console.log('AI image extraction - raw response length:', raw.length)
+
+  const cleaned = cleanJsonResponse(raw)
+  if (!cleaned) {
+    console.error('AI image extraction failed - empty response. Full raw:', raw)
+    throw new Error('Empty response from Gemini. Check API key and model.')
+  }
 
   let parsed
   try {
-    parsed = recipeSchema.parse(JSON.parse(cleanJsonResponse(raw)))
+    parsed = recipeSchema.parse(JSON.parse(cleaned))
   } catch (parseError) {
     if (parseError instanceof z.ZodError) {
       const issues = parseError.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join('; ')
