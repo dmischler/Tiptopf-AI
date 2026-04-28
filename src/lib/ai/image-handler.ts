@@ -29,7 +29,12 @@ function cleanJsonResponse(raw: string) {
   return raw.replace(/^```json\s*/i, '').replace(/```$/i, '').trim()
 }
 
-async function runImageExtraction(imageDataUrl: string, model: any): Promise<string> {
+type ExtractionResult = {
+  text: string
+  finishReason?: string
+}
+
+async function runImageExtraction(imageDataUrl: string, model: any): Promise<ExtractionResult> {
   const result = await generateText({
     model,
     system: IMAGE_EXTRACTION_PROMPT,
@@ -48,9 +53,22 @@ async function runImageExtraction(imageDataUrl: string, model: any): Promise<str
         ],
       },
     ],
-  })
+    providerOptions: {
+      google: {
+        safetySettings: [
+          { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+          { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+          { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+          { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+        ],
+      },
+    },
+  } as any)
 
-  return result.text
+  return {
+    text: result.text,
+    finishReason: (result as any).finishReason,
+  }
 }
 
 export async function extractRecipeFromImage(
@@ -77,35 +95,62 @@ export async function extractRecipeFromImage(
 
   let raw = ''
   let usedModel = primaryModel
+  let finishReason = ''
 
-  try {
-    raw = await runImageExtraction(imageDataUrl, google(primaryModel))
-  } catch (primaryError) {
-    console.error('AI image extraction - Gemini model failed:', primaryError)
-    if (fallbackModel !== primaryModel) {
-      raw = await runImageExtraction(imageDataUrl, google(fallbackModel))
-      usedModel = fallbackModel
-    } else {
-      throw primaryError
+  async function tryExtract(modelName: string): Promise<boolean> {
+    console.log('AI image extraction - trying Gemini model:', modelName)
+    try {
+      const result = await runImageExtraction(imageDataUrl, google(modelName))
+      raw = result.text
+      finishReason = result.finishReason || ''
+      console.log(
+        'AI image extraction - model:',
+        modelName,
+        'finishReason:',
+        finishReason,
+        'textLength:',
+        raw.length
+      )
+      return raw.trim().length > 0
+    } catch (err) {
+      console.error('AI image extraction - Gemini model failed:', modelName, err)
+      return false
     }
   }
 
-  console.log('AI image extraction - succeeded with Gemini model:', usedModel)
-  console.log('AI image extraction - raw response length:', raw.length)
+  let success = await tryExtract(primaryModel)
 
-  const cleaned = cleanJsonResponse(raw)
-  if (!cleaned) {
-    console.error('AI image extraction failed - empty response. Full raw:', raw)
-    throw new Error('Empty response from Gemini. Check API key and model.')
+  if (!success && fallbackModel !== primaryModel) {
+    success = await tryExtract(fallbackModel)
+    if (success) {
+      usedModel = fallbackModel
+    }
   }
+
+  if (!success) {
+    console.error(
+      'AI image extraction failed - all models returned empty. Last finishReason:',
+      finishReason
+    )
+    const isSafetyBlock = finishReason?.toLowerCase().includes('safety') || finishReason?.toLowerCase().includes('block')
+    throw new Error(
+      isSafetyBlock
+        ? 'Das Bild wurde von der Google-Sicherheitsfilterung blockiert. Bitte versuche ein anderes Foto.'
+        : 'Keine Antwort von Gemini erhalten. Überprüfe API-Key und Modell-Einstellungen (z. B. gemini-2.0-flash).'
+    )
+  }
+
+  console.log('AI image extraction - succeeded with Gemini model:', usedModel)
 
   let parsed
   try {
-    parsed = recipeSchema.parse(JSON.parse(cleaned))
+    parsed = recipeSchema.parse(JSON.parse(cleanJsonResponse(raw)))
   } catch (parseError) {
     if (parseError instanceof z.ZodError) {
       const issues = parseError.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join('; ')
-      throw new Error(`Rezept konnte nicht vollständig erkannt werden (${issues}). Bitte versuche es mit einem anderen Foto.`)
+      throw new Error(
+        `Rezept konnte nicht vollständig erkannt werden (${issues}). Bitte versuche es mit einem anderen Foto.`
+      )
     }
     throw parseError
   }
