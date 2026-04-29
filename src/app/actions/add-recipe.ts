@@ -20,7 +20,7 @@ const saveRecipeSchema = z.object({
   difficulty: difficultySchema,
   imageUrl: z.string().nullable(),
   sourceUrl: z.string().nullable(),
-  sourceType: z.enum(['image', 'url']),
+  sourceType: z.enum(['image', 'url', 'manual']),
   tags: z.array(z.string()).optional(),
 })
 

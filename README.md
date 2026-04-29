@@ -11,6 +11,7 @@ This version runs without Supabase. It stores recipes and profile settings on lo
 - Local image storage at `DATA_DIR/recipe-images`
 - Image serving route: `/api/images/[imageName]`
 - API keys and AI model settings are managed in `/profile`
+- Expandable FAB in the library provides quick access to: random recipe, manual entry, URL extraction, and image extraction
 
 ## Getting started
 

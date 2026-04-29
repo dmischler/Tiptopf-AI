@@ -2,33 +2,29 @@
 
 import { useState } from 'react'
 
-import { FloatingAddButton } from '@/components/add-recipe/fab'
 import { AddRecipeModal } from '@/components/add-recipe/modal'
 import type { Recipe } from '@/types'
 
 type AddRecipeLauncherProps = {
   onRecipeSaved?: (recipe: Recipe) => void
+  initialMode?: 'image' | 'url' | 'manual'
+  allTags?: string[]
 }
 
-export function AddRecipeLauncher({ onRecipeSaved }: AddRecipeLauncherProps) {
+export function AddRecipeLauncher({ onRecipeSaved, initialMode, allTags }: AddRecipeLauncherProps) {
   const [open, setOpen] = useState(false)
-
-  const handleOpen = () => {
-    setOpen(true)
-  }
 
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen)
   }
 
   return (
-    <>
-      <FloatingAddButton onClick={handleOpen} />
-      <AddRecipeModal
-        open={open}
-        onOpenChange={handleOpenChange}
-        onRecipeSaved={onRecipeSaved}
-      />
-    </>
+    <AddRecipeModal
+      open={open}
+      onOpenChange={handleOpenChange}
+      onRecipeSaved={onRecipeSaved}
+      initialMode={initialMode}
+      allTags={allTags}
+    />
   )
 }

@@ -14,6 +14,7 @@ import {
 import { saveRecipe, uploadRecipeImage } from '@/app/actions/add-recipe'
 import { ImageSelectionModal } from '@/components/add-recipe/image-selection-modal'
 import { ImageUpload } from '@/components/add-recipe/image-upload'
+import { ManualForm } from '@/components/add-recipe/manual-form'
 import { RecipePreview, type EditableRecipePreview } from '@/components/add-recipe/preview'
 import { StreamingProgress, type Stage } from '@/components/add-recipe/streaming-progress'
 import { UrlInput } from '@/components/add-recipe/url-input'
@@ -36,6 +37,8 @@ type AddRecipeModalProps = {
   onOpenChange: (open: boolean) => void
   onRecipeSaved?: (recipe: Recipe) => void
   initialUrl?: string
+  initialMode?: 'image' | 'url' | 'manual'
+  allTags?: string[]
 }
 
 type ExtractedRecipePayload = ParsedRecipe & {
@@ -62,8 +65,8 @@ function buildEditableState(recipe: ExtractedRecipePayload): EditableRecipePrevi
   }
 }
 
-export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl }: AddRecipeModalProps) {
-  const [activeTab, setActiveTab] = useState<'image' | 'url'>('image')
+export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, initialMode = 'image', allTags = [] }: AddRecipeModalProps) {
+  const [activeTab, setActiveTab] = useState<'image' | 'url' | 'manual'>(initialMode)
   const [phase, setPhase] = useState<ModalPhase>('input')
   const [progressStage, setProgressStage] = useState<Stage>('fetching')
   const [streamText, setStreamText] = useState('')
@@ -77,7 +80,7 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl }
   const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false)
   const [imageCandidates, setImageCandidates] = useState<RecipeImageCandidate[]>([])
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false)
-
+  const [isManualSaving, setIsManualSaving] = useState(false)
 
   useEffect(() => {
     if (!replacementImagePreviewUrl) return
@@ -87,12 +90,14 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl }
   }, [replacementImagePreviewUrl])
 
   useEffect(() => {
-    if (open && initialUrl) {
-      setActiveTab('url')
-      setUrlInput(initialUrl)
-      toast.success('URL from clipboard detected', { duration: 2000 })
+    if (open) {
+      setActiveTab(initialMode)
+      if (initialUrl) {
+        setUrlInput(initialUrl)
+        toast.success('URL from clipboard detected', { duration: 2000 })
+      }
     }
-  }, [open, initialUrl])
+  }, [open, initialUrl, initialMode])
 
   function resetState() {
     setPhase('input')
@@ -107,6 +112,7 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl }
     setIsSelectionModalOpen(false)
     setImageCandidates([])
     setIsLoadingCandidates(false)
+    setIsManualSaving(false)
     if (replacementImagePreviewUrl) {
       URL.revokeObjectURL(replacementImagePreviewUrl)
     }
@@ -359,6 +365,54 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl }
     }
   }
 
+  async function handleSaveManual(recipe: import('@/components/add-recipe/manual-form').ManualRecipeInput, imageFile: File | null) {
+    setIsManualSaving(true)
+
+    try {
+      const saved = await saveRecipe({
+        title: recipe.title,
+        ingredients: recipe.ingredients,
+        instructions: recipe.instructions,
+        prepTime: recipe.prepTime,
+        cookTime: recipe.cookTime,
+        servings: recipe.servings,
+        category: recipe.category,
+        difficulty: recipe.difficulty,
+        imageUrl: recipe.imageUrl,
+        sourceUrl: null,
+        sourceType: 'manual',
+        tags: recipe.tags,
+      })
+
+      let persistedImageUrl = saved.image_url as string | null
+
+      if (imageFile) {
+        try {
+          const imageFormData = new FormData()
+          imageFormData.append('recipeId', saved.id)
+          imageFormData.append('image', imageFile)
+          persistedImageUrl = await uploadRecipeImage(imageFormData)
+        } catch {
+          toast.error('Rezept gespeichert, aber das Bild konnte nicht hochgeladen werden.')
+        }
+      }
+
+      onRecipeSaved?.({
+        ...(saved as Recipe),
+        image_url: persistedImageUrl,
+      })
+
+      toast.success('Rezept gespeichert.')
+      onOpenChange(false)
+      resetState()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save recipe.'
+      toast.error(message)
+    } finally {
+      setIsManualSaving(false)
+    }
+  }
+
   const previewImageUrl = useMemo(
     () => replacementImagePreviewUrl ?? previewState?.imageUrl ?? extractedRecipe?.image_url ?? null,
     [replacementImagePreviewUrl, previewState?.imageUrl, extractedRecipe?.image_url]
@@ -384,10 +438,11 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl }
 
         <div className="max-h-[calc(90vh-7.5rem)] space-y-4 overflow-y-auto px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
           {phase === 'input' && (
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'image' | 'url')}>
-              <TabsList className="grid w-full grid-cols-2 rounded-xl bg-muted/60 p-1">
-                <TabsTrigger value="image">Upload image</TabsTrigger>
-                <TabsTrigger value="url">Paste URL</TabsTrigger>
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'image' | 'url' | 'manual')}>
+              <TabsList className="grid w-full grid-cols-3 rounded-xl bg-muted/60 p-1">
+                <TabsTrigger value="image">Bild</TabsTrigger>
+                <TabsTrigger value="url">URL</TabsTrigger>
+                <TabsTrigger value="manual">Manuell</TabsTrigger>
               </TabsList>
 
               <TabsContent value="image" className="pt-4">
@@ -402,6 +457,18 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl }
                   value={urlInput}
                   onValueChange={setUrlInput}
                   onExtract={handleExtractFromUrl}
+                />
+              </TabsContent>
+
+              <TabsContent value="manual" className="pt-4">
+                <ManualForm
+                  onSave={handleSaveManual}
+                  onCancel={() => {
+                    onOpenChange(false)
+                    resetState()
+                  }}
+                  isSaving={isManualSaving}
+                  allTags={allTags}
                 />
               </TabsContent>
             </Tabs>
@@ -437,7 +504,7 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl }
             </div>
           )}
 
-          {phase !== 'saving' && phase !== 'preview' && (
+          {phase !== 'saving' && phase !== 'preview' && activeTab !== 'manual' && (
             <div className="flex justify-end">
               <Button
                 type="button"

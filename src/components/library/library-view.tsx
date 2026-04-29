@@ -6,10 +6,10 @@ import { toast } from 'sonner'
 
 import { deleteRecipeAction, restoreRecipe } from '@/app/actions/recipe'
 
-import { AddRecipeLauncher } from '@/components/add-recipe/launcher'
+import { AddRecipeModal } from '@/components/add-recipe/modal'
+import { ExpandableFab } from '@/components/add-recipe/expandable-fab'
 import { FilterBar } from '@/components/library/filter-bar'
 import { RandomRecipeDrawer } from '@/components/library/random-recipe-drawer'
-import { RandomRecipeFab } from '@/components/library/random-recipe-fab'
 import { MasonryGrid, MasonryItem } from '@/components/library/masonry-grid'
 import { RecipeCard } from '@/components/library/recipe-card'
 import { RecipeDetail } from '@/components/library/recipe-detail'
@@ -86,6 +86,8 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
   const [isDrawOpen, setIsDrawOpen] = useState(false)
   const [drawKey, setDrawKey] = useState(0)
   const [drawPool, setDrawPool] = useState<Recipe[]>([])
+  const [addOpen, setAddOpen] = useState(false)
+  const [addMode, setAddMode] = useState<'image' | 'url' | 'manual'>('image')
   const pendingDeletionRef = useRef<PendingDeletion | null>(null)
 
   const maxTimeLimit = useMemo(() => {
@@ -409,9 +411,27 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
         drawKey={drawKey}
       />
 
-      <RandomRecipeFab onClick={handleOpenRandomDraw} />
+      <ExpandableFab
+        onRandom={handleOpenRandomDraw}
+        onManual={() => {
+          setAddMode('manual')
+          setAddOpen(true)
+        }}
+        onUrl={() => {
+          setAddMode('url')
+          setAddOpen(true)
+        }}
+        onImage={() => {
+          setAddMode('image')
+          setAddOpen(true)
+        }}
+      />
 
-      <AddRecipeLauncher
+      <AddRecipeModal
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        initialMode={addMode}
+        allTags={availableTags}
         onRecipeSaved={(recipe) => {
           setRecipes((current) => [
             recipe,

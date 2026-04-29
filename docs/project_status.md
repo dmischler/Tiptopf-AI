@@ -1,5 +1,18 @@
 # Project Status
 
+## v0.8.0 - Expandable FAB & Manual Recipe Entry
+- Replaced separate add/random FABs with a single expandable speed-dial FAB (`src/components/add-recipe/expandable-fab.tsx`):
+  - Options: Zufallsrezept, Manuell, URL, Bild
+  - Mobile-only random recipe option (desktop has header button)
+  - Pure CSS transitions, no new dependencies
+- Added manual recipe form (`src/components/add-recipe/manual-form.tsx`):
+  - Full form: title, ingredients (textarea), instructions (textarea), prep/cook time, servings, category, difficulty
+  - Chip-style tag input with autocomplete from existing tags
+  - Image upload or Pexels search (disabled until title + category filled)
+- Extended `AddRecipeModal` with a third "Manuell" tab and `initialMode` prop
+- Updated `saveRecipe` action to accept `source_type: 'manual'`
+- Deleted obsolete components: `src/components/add-recipe/fab.tsx`, `src/components/library/random-recipe-fab.tsx`
+
 ## v0.7.0 - Local Pi Mode (Option A)
 - Migrated runtime architecture from Supabase to local filesystem persistence.
 - Added local storage modules:
