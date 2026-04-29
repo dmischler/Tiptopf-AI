@@ -1,6 +1,6 @@
 'use server'
 
-import { generateText } from 'ai'
+import { generateObject } from 'ai'
 import { z } from 'zod'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 
@@ -9,7 +9,7 @@ import {
   resolveGeminiImageFallbackModelId,
   resolveGeminiImageModelId,
 } from '@/lib/ai/client'
-import { IMAGE_EXTRACTION_PROMPT } from '@/lib/ai/prompts'
+import { SIMPLIFIED_IMAGE_PROMPT } from '@/lib/ai/prompts'
 import type { ParsedRecipe } from '@/types'
 
 const recipeSchema = z.object({
@@ -29,28 +29,71 @@ function cleanJsonResponse(raw: string) {
   return raw.replace(/^```json\s*/i, '').replace(/```$/i, '').trim()
 }
 
-async function runImageExtraction(imageDataUrl: string, model: any): Promise<string> {
-  const result = await generateText({
+function parseDataUrl(dataUrl: string): { mimeType: string; base64: string } | null {
+  const match = dataUrl.match(/^data:([^;]*);base64,(.+)$/)
+  if (!match) return null
+  const mimeType = match[1]?.trim() || 'image/jpeg'
+  return { mimeType, base64: match[2] }
+}
+
+function getFinishReasonString(finishReason: unknown): string {
+  if (typeof finishReason === 'string') return finishReason
+  if (finishReason && typeof finishReason === 'object') {
+    const fr = finishReason as { unified?: string; raw?: string }
+    return fr.unified || fr.raw || String(finishReason)
+  }
+  return String(finishReason || '')
+}
+
+type ExtractionResult = {
+  text: string
+  finishReason: string
+}
+
+async function runImageExtraction(imageDataUrl: string, model: any): Promise<ExtractionResult> {
+  const parsedImage = parseDataUrl(imageDataUrl)
+  if (!parsedImage) {
+    throw new Error('Invalid image data URL format')
+  }
+
+  const imageDataUrlFull = `data:${parsedImage.mimeType};base64,${parsedImage.base64}`
+
+  const result = await generateObject({
     model,
-    system: IMAGE_EXTRACTION_PROMPT,
+    schema: recipeSchema,
     messages: [
       {
         role: 'user',
         content: [
           {
-            type: 'image',
-            image: imageDataUrl,
+            type: 'text',
+            text: SIMPLIFIED_IMAGE_PROMPT,
           },
           {
-            type: 'text',
-            text: 'Extract recipe content and return valid JSON only.',
+            type: 'image',
+            image: imageDataUrlFull,
           },
         ],
       },
     ],
-  })
+    providerOptions: {
+      google: {
+        safetySettings: [
+          { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+          { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+          { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+          { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+        ],
+      },
+    },
+    maxTokens: 2000,
+    temperature: 0.2,
+  } as any)
 
-  return result.text
+  return {
+    text: JSON.stringify(result.object),
+    finishReason: 'stop',
+  }
 }
 
 export async function extractRecipeFromImage(
@@ -75,20 +118,65 @@ export async function extractRecipeFromImage(
   const primaryModel = resolveGeminiImageModelId(geminiImageModelId)
   const fallbackModel = resolveGeminiImageFallbackModelId(geminiImageFallbackModelId)
 
+  const hardcodedFallbacks = [
+    'gemini-2.5-flash',
+    'gemini-3.1-flash-lite-preview',
+  ]
+
+  const modelsToTry = [
+    primaryModel,
+    ...(fallbackModel !== primaryModel ? [fallbackModel] : []),
+    ...hardcodedFallbacks.filter((m) => m !== primaryModel && m !== fallbackModel),
+  ]
+
   let raw = ''
   let usedModel = primaryModel
+  let finishReason = ''
 
-  try {
-    raw = await runImageExtraction(imageDataUrl, google(primaryModel))
-  } catch (primaryError) {
-    console.error('AI image extraction - Gemini model failed:', primaryError)
-    if (fallbackModel !== primaryModel) {
-      raw = await runImageExtraction(imageDataUrl, google(fallbackModel))
-      usedModel = fallbackModel
-    } else {
-      throw primaryError
+  async function tryExtract(modelName: string): Promise<boolean> {
+    console.log('AI image extraction - trying Gemini model:', modelName)
+    try {
+      const result = await runImageExtraction(imageDataUrl, google(modelName))
+      raw = result.text
+      finishReason = result.finishReason
+      console.log(
+        'AI image extraction - model:',
+        modelName,
+        'finishReason:',
+        finishReason,
+        'textLength:',
+        raw.length
+      )
+      return raw.trim().length > 0
+    } catch (err) {
+      console.error('AI image extraction - Gemini model failed:', modelName, err)
+      return false
     }
   }
+
+  let success = false
+  for (const modelName of modelsToTry) {
+    success = await tryExtract(modelName)
+    if (success) {
+      usedModel = modelName
+      break
+    }
+  }
+
+  if (!success) {
+    console.error(
+      'AI image extraction failed - all models returned empty. Last finishReason:',
+      finishReason
+    )
+    const isSafetyBlock = finishReason?.toLowerCase().includes('safety') || finishReason?.toLowerCase().includes('block')
+    throw new Error(
+      isSafetyBlock
+        ? 'Das Bild wurde von der Google-Sicherheitsfilterung blockiert. Bitte versuche ein anderes Foto.'
+        : 'Keine Antwort von Gemini erhalten. Überprüfe API-Key und Modell-Einstellungen (z. B. gemini-2.0-flash).'
+    )
+  }
+
+  console.log('AI image extraction - succeeded with Gemini model:', usedModel)
 
   let parsed
   try {
@@ -96,7 +184,9 @@ export async function extractRecipeFromImage(
   } catch (parseError) {
     if (parseError instanceof z.ZodError) {
       const issues = parseError.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join('; ')
-      throw new Error(`Rezept konnte nicht vollständig erkannt werden (${issues}). Bitte versuche es mit einem anderen Foto.`)
+      throw new Error(
+        `Rezept konnte nicht vollständig erkannt werden (${issues}). Bitte versuche es mit einem anderen Foto.`
+      )
     }
     throw parseError
   }
