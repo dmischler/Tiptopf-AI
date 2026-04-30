@@ -60,7 +60,7 @@ export function ExpandableFab({ onRandom, onManual, onUrl, onImage }: Expandable
           onClick={() => setOpen(false)}
         />
       )}
-      <div ref={containerRef} className="fixed bottom-20 right-6 z-[60] flex flex-col items-end gap-3 md:bottom-6">
+      <div ref={containerRef} className="fixed right-6 z-[60] flex flex-col items-end gap-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] md:bottom-6">
         {ACTIONS.map((action, index) => {
           const Icon = action.icon
           const isVisible = open
