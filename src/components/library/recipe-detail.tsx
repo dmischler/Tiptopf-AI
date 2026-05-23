@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   Clock,
   ExternalLink,
@@ -254,6 +254,12 @@ export function RecipeDetail({
   const [newCollectionName, setNewCollectionName] = useState('')
   const [adjustedServings, setAdjustedServings] = useState(0)
   const [isAddingToShoppingList, setIsAddingToShoppingList] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+
+  const sheetRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const dragRef = useRef<{ startY: number; startTime: number; lastY: number; lastTime: number; startScrollTop?: number; committed?: boolean } | null>(null)
+  const onOpenChangeRef = useRef(onOpenChange)
 
   useEffect(() => {
     if (!replacementImagePreviewUrl) {
@@ -286,6 +292,106 @@ export function RecipeDetail({
     setConfirmDeleteOpen(false)
     setAdjustedServings(recipe.servings > 0 ? recipe.servings : 1)
   }, [open, recipe])
+
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 639px)')
+    const update = () => setIsMobile(mql.matches)
+    update()
+    mql.addEventListener('change', update)
+    return () => mql.removeEventListener('change', update)
+  }, [])
+
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange
+  }, [onOpenChange])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el || !isMobile || mode !== 'view') return
+
+    const handleStart = (e: TouchEvent) => {
+      const sc = scrollRef.current
+      if (!sc) return
+      const t = e.touches[0]
+      dragRef.current = {
+        startY: t.clientY,
+        startTime: Date.now(),
+        lastY: t.clientY,
+        lastTime: Date.now(),
+        startScrollTop: sc.scrollTop,
+        committed: false,
+      }
+    }
+
+    const handleMove = (e: TouchEvent) => {
+      const d = dragRef.current
+      const sc = scrollRef.current
+      const sheet = sheetRef.current
+      if (!d || !sc || !sheet) return
+
+      const t = e.touches[0]
+      const dy = t.clientY - d.startY
+
+      if (!d.committed) {
+        const wasAtTop = (d.startScrollTop ?? 0) <= 2
+        if (wasAtTop && dy > 28) {
+          d.committed = true
+          sheet.style.transition = 'none'
+        } else {
+          return
+        }
+      }
+
+      const visual = Math.max(0, dy)
+      sheet.style.transform = `translateY(${visual}px)`
+
+      const now = Date.now()
+      d.lastY = t.clientY
+      d.lastTime = now
+
+      e.preventDefault()
+    }
+
+    const handleEnd = () => {
+      const d = dragRef.current
+      const sheet = sheetRef.current
+      if (!d || !sheet) {
+        dragRef.current = null
+        return
+      }
+      if (d.committed) {
+        const dy = Math.max(0, d.lastY - d.startY)
+        const dt = Math.max(1, d.lastTime - d.startTime)
+        const velocity = dy / dt
+        const shouldClose = dy > 120 || velocity > 0.75
+        if (shouldClose) {
+          onOpenChangeRef.current(false)
+        } else {
+          sheet.style.transition = 'transform 180ms cubic-bezier(0.32, 0.72, 0, 1)'
+          sheet.style.transform = 'translateY(0)'
+          window.setTimeout(() => {
+            if (sheetRef.current) {
+              sheetRef.current.style.transition = ''
+              sheetRef.current.style.transform = ''
+            }
+          }, 200)
+        }
+      }
+      dragRef.current = null
+    }
+
+    el.addEventListener('touchstart', handleStart, { passive: true })
+    el.addEventListener('touchmove', handleMove, { passive: false })
+    el.addEventListener('touchend', handleEnd, { passive: true })
+    el.addEventListener('touchcancel', handleEnd, { passive: true })
+
+    return () => {
+      el.removeEventListener('touchstart', handleStart)
+      el.removeEventListener('touchmove', handleMove)
+      el.removeEventListener('touchend', handleEnd)
+      el.removeEventListener('touchcancel', handleEnd)
+    }
+  }, [isMobile, mode])
 
   if (!recipe || !draft) {
     return null
@@ -578,6 +684,57 @@ export function RecipeDetail({
     }
   }
 
+  function beginDrag(clientY: number) {
+    if (!isMobile || mode !== 'view') return
+    dragRef.current = { startY: clientY, startTime: Date.now(), lastY: clientY, lastTime: Date.now() }
+    if (sheetRef.current) sheetRef.current.style.transition = 'none'
+  }
+
+  function updateDrag(clientY: number, target: EventTarget | null) {
+    const d = dragRef.current
+    if (!d || !sheetRef.current) return
+    const dy = Math.max(0, clientY - d.startY)
+    sheetRef.current.style.transform = `translateY(${dy}px)`
+    const now = Date.now()
+    d.lastY = clientY
+    d.lastTime = now
+  }
+
+  function endDrag() {
+    const d = dragRef.current
+    if (!d || !sheetRef.current) {
+      dragRef.current = null
+      return
+    }
+    const dy = Math.max(0, d.lastY - d.startY)
+    const dt = Math.max(1, d.lastTime - d.startTime)
+    const velocity = dy / dt
+    const shouldClose = dy > 120 || velocity > 0.75
+    if (shouldClose) {
+      onOpenChange(false)
+    } else {
+      sheetRef.current.style.transition = 'transform 180ms cubic-bezier(0.32, 0.72, 0, 1)'
+      sheetRef.current.style.transform = 'translateY(0)'
+      window.setTimeout(() => {
+        if (sheetRef.current) {
+          sheetRef.current.style.transition = ''
+          sheetRef.current.style.transform = ''
+        }
+      }, 200)
+    }
+    dragRef.current = null
+  }
+
+  function onHandleTouchStart(e: React.TouchEvent) {
+    beginDrag(e.touches[0].clientY)
+  }
+  function onHandleTouchMove(e: React.TouchEvent) {
+    updateDrag(e.touches[0].clientY, e.currentTarget)
+  }
+  function onHandleTouchEnd() {
+    endDrag()
+  }
+
   return (
     <>
       <Dialog
@@ -585,15 +742,30 @@ export function RecipeDetail({
         onOpenChange={(nextOpen) => {
           onOpenChange(nextOpen)
           if (!nextOpen) {
+            dragRef.current = null
+            if (sheetRef.current) {
+              sheetRef.current.style.transition = ''
+              sheetRef.current.style.transform = ''
+            }
             setMode('view')
             setConfirmDeleteOpen(false)
             resetDraftFromRecipe()
           }
         }}
       >
-        <DialogContent className="w-full max-w-2xl gap-0 p-0 sm:max-w-2xl" showCloseButton>
+        <DialogContent ref={sheetRef} presentation={isMobile ? 'sheet' : 'modal'} className="w-full max-w-2xl gap-0 p-0 sm:max-w-2xl" showCloseButton>
           {mode === 'view' ? (
-            <div className="flex h-[calc(100vh-2rem)] min-h-0 flex-col">
+            <div className={"flex min-h-0 flex-col " + (isMobile ? "h-[min(92svh,1000px)]" : "h-[calc(100vh-2rem)]") }>
+              {isMobile && (
+                <div
+                  className="flex h-6 w-full shrink-0 items-center justify-center touch-none select-none"
+                  onTouchStart={onHandleTouchStart}
+                  onTouchMove={onHandleTouchMove}
+                  onTouchEnd={onHandleTouchEnd}
+                >
+                  <div className="h-1.5 w-9 rounded-full bg-muted-foreground/40" />
+                </div>
+              )}
               {currentRecipe.image_url ? (
                 <div className="relative h-40 w-full shrink-0 sm:h-48">
                   <Image
@@ -638,19 +810,23 @@ export function RecipeDetail({
                       size="md"
                       onOptimisticChange={onFavoriteChange}
                     />
-                    <Button type="button" variant="ghost" size="icon" className="min-h-[44px] min-w-[44px] touch-manipulation" onClick={() => setMode('edit')}>
+                    <Button type="button" variant="ghost" size="icon" className="min-h-[44px] min-w-[44px] touch-manipulation" onClick={() => {
+                        dragRef.current = null
+                        if (sheetRef.current) {
+                          sheetRef.current.style.transition = ''
+                          sheetRef.current.style.transform = ''
+                        }
+                        setMode('edit')
+                      }}>
                       <Pencil className="h-4 w-4" />
                       <span className="sr-only">Edit recipe</span>
                     </Button>
                   </div>
                 </div>
 
-                <DialogDescription>
-                  Details, Bewertung und Quelleninformationen für dieses Rezept anzeigen.
-                </DialogDescription>
-              </DialogHeader>
+                </DialogHeader>
 
-              <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 pb-6 pt-4">
+              <div ref={scrollRef} className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 pb-6 pt-4 touch-pan-y">
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <InfoItem
                     label="Vorbereitung"
