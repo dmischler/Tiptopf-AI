@@ -726,6 +726,7 @@ export function RecipeDetail({
   }
 
   function onHandleTouchStart(e: React.TouchEvent) {
+    if ((e.target as HTMLElement).closest('button, [role="button"], a, input, select, textarea')) return
     beginDrag(e.touches[0].clientY)
   }
   function onHandleTouchMove(e: React.TouchEvent) {
@@ -733,6 +734,12 @@ export function RecipeDetail({
   }
   function onHandleTouchEnd() {
     endDrag()
+  }
+
+  const dragHandlers = {
+    onTouchStart: onHandleTouchStart,
+    onTouchMove: onHandleTouchMove,
+    onTouchEnd: onHandleTouchEnd,
   }
 
   return (
@@ -759,30 +766,28 @@ export function RecipeDetail({
               {isMobile && (
                 <div
                   className="flex h-6 w-full shrink-0 items-center justify-center touch-none select-none"
-                  onTouchStart={onHandleTouchStart}
-                  onTouchMove={onHandleTouchMove}
-                  onTouchEnd={onHandleTouchEnd}
+                  {...dragHandlers}
                 >
                   <div className="h-1.5 w-9 rounded-full bg-muted-foreground/40" />
                 </div>
               )}
               {currentRecipe.image_url ? (
-                <div className="relative h-40 w-full shrink-0 sm:h-48">
+                <div className="relative h-40 w-full shrink-0 sm:h-48 touch-none select-none" {...dragHandlers}>
                   <Image
                     src={currentRecipe.image_url}
                     alt={currentRecipe.title}
                     fill
-                    className="object-cover"
+                    className="object-cover pointer-events-none"
                     sizes="(max-width: 640px) 100vw, 768px"
                   />
                 </div>
               ) : (
-                <div className="flex h-40 w-full shrink-0 items-center justify-center bg-muted/40 text-sm text-muted-foreground sm:h-48">
+                <div className="flex h-40 w-full shrink-0 items-center justify-center bg-muted/40 text-sm text-muted-foreground sm:h-48 touch-none select-none" {...dragHandlers}>
                   No image available
                 </div>
               )}
 
-              <DialogHeader className="gap-2 border-b border-border/70 px-5 pb-2 pt-4 pr-12">
+              <DialogHeader className="gap-2 border-b border-border/70 px-5 pb-2 pt-4 pr-12 touch-none select-none" {...dragHandlers}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-2">
                     <DialogTitle className="text-lg leading-tight">{currentRecipe.title}</DialogTitle>
