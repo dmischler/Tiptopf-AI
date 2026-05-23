@@ -9,14 +9,17 @@ import {
   FolderPlus,
   ImageIcon,
   Loader2,
+  Minus,
   Pencil,
   Plus,
   Printer,
+  RotateCcw,
   Timer,
   Trash2,
   Upload,
   UtensilsCrossed,
 } from 'lucide-react'
+import { scaleIngredient } from '@/lib/ingredient-scaling'
 import { toast } from 'sonner'
 
 import { uploadRecipeImage } from '@/app/actions/add-recipe'
@@ -202,6 +205,7 @@ export function RecipeDetail({
   const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false)
   const [isCreatingCollection, setIsCreatingCollection] = useState(false)
   const [newCollectionName, setNewCollectionName] = useState('')
+  const [adjustedServings, setAdjustedServings] = useState(0)
 
   useEffect(() => {
     if (!replacementImagePreviewUrl) {
@@ -232,6 +236,7 @@ export function RecipeDetail({
     setIsSelectionModalOpen(false)
     setImageCandidates([])
     setConfirmDeleteOpen(false)
+    setAdjustedServings(recipe.servings > 0 ? recipe.servings : 1)
   }, [open, recipe])
 
   if (!recipe || !draft) {
@@ -241,6 +246,11 @@ export function RecipeDetail({
   const currentRecipe = recipe
   const instructionSteps = toInstructionSteps(currentRecipe.instructions)
   const totalTime = currentRecipe.prep_time + currentRecipe.cook_time
+
+  const baseServings = currentRecipe.servings > 0 ? currentRecipe.servings : 1
+  const effectiveServings = adjustedServings > 0 ? adjustedServings : baseServings
+  const scaleRatio = effectiveServings !== baseServings && baseServings > 0 ? effectiveServings / baseServings : 1
+
   const currentImageUrl = replacementImagePreviewUrl ?? draft.imageUrl
   const normalizedTagInput = draft.tagInput.trim().toLowerCase()
   const tagSuggestions =
@@ -580,11 +590,50 @@ export function RecipeDetail({
                     value={totalTime > 0 ? `${totalTime} min` : '—'}
                     icon={<Clock className="h-4 w-4 text-muted-foreground" />}
                   />
-                  <InfoItem
-                    label="Portionen"
-                    value={currentRecipe.servings > 0 ? String(currentRecipe.servings) : '—'}
-                    icon={<UtensilsCrossed className="h-4 w-4 text-muted-foreground" />}
-                  />
+                   <div className="rounded-lg border border-border/70 bg-background/40 p-3">
+                     <div className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Portionen</div>
+                     <div className="flex items-center gap-1 text-sm font-medium">
+                       <UtensilsCrossed className="h-4 w-4 text-muted-foreground shrink-0" />
+                       <Button
+                         type="button"
+                         variant="ghost"
+                         size="icon"
+                         className="h-7 w-7"
+                         disabled={effectiveServings <= 1}
+                         onClick={() => setAdjustedServings(Math.max(1, effectiveServings - 1))}
+                         aria-label="Eine Portion weniger"
+                       >
+                         <Minus className="h-3.5 w-3.5" />
+                       </Button>
+
+                       <span className="tabular-nums min-w-[1.5rem] text-center">{effectiveServings}</span>
+
+                       <Button
+                         type="button"
+                         variant="ghost"
+                         size="icon"
+                         className="h-7 w-7"
+                         disabled={effectiveServings >= 99}
+                         onClick={() => setAdjustedServings(Math.min(99, effectiveServings + 1))}
+                         aria-label="Eine Portion mehr"
+                       >
+                         <Plus className="h-3.5 w-3.5" />
+                       </Button>
+
+                       {scaleRatio !== 1 && (
+                         <Button
+                           type="button"
+                           variant="ghost"
+                           size="icon"
+                           className="h-7 w-7 ml-1"
+                           onClick={() => setAdjustedServings(baseServings)}
+                           aria-label="Auf Original zurücksetzen"
+                         >
+                           <RotateCcw className="h-3.5 w-3.5" />
+                         </Button>
+                       )}
+                     </div>
+                   </div>
                 </div>
 
                 <div className="space-y-2">
@@ -601,11 +650,12 @@ export function RecipeDetail({
                   <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                     Zutaten
                   </h4>
-                  <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed">
-                    {currentRecipe.ingredients.map((ingredient, index) => (
-                      <li key={`${ingredient}-${index}`}>{ingredient}</li>
-                    ))}
-                  </ul>
+                   <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed">
+                     {currentRecipe.ingredients.map((ingredient, index) => {
+                       const display = scaleRatio !== 1 ? scaleIngredient(ingredient, scaleRatio) : ingredient
+                       return <li key={index}>{display}</li>
+                     })}
+                   </ul>
                 </section>
 
                 <section className="space-y-3">
