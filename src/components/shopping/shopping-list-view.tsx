@@ -10,6 +10,7 @@ import {
   removeShoppingListItemAction,
   toggleShoppingListItemAction,
 } from '@/app/actions/shopping-list'
+import { reorderShoppingList } from '@/lib/shopping'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
@@ -67,19 +68,20 @@ export function ShoppingListView({ initialItems }: ShoppingListViewProps) {
 
   async function handleToggle(item: ShoppingListItem) {
     const newChecked = !item.checked
+    const previous = items
 
-    // Optimistic
-    setItems((current) =>
-      current.map((i) => (i.id === item.id ? { ...i, checked: newChecked } : i)),
-    )
+    // Optimistic update with the same reorder rule the server uses
+    setItems((current) => {
+      const flipped = current.map((i) =>
+        i.id === item.id ? { ...i, checked: newChecked } : i
+      )
+      return reorderShoppingList(flipped)
+    })
 
     try {
       await toggleShoppingListItemAction(item.id, newChecked)
     } catch (error) {
-      // Revert
-      setItems((current) =>
-        current.map((i) => (i.id === item.id ? { ...i, checked: item.checked } : i)),
-      )
+      setItems(previous)
       const message = error instanceof Error ? error.message : 'Aktion fehlgeschlagen.'
       toast.error(message)
     }

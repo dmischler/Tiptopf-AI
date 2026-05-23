@@ -14,6 +14,7 @@ import type {
 
 import { getDataDir, getStoreFilePath } from '@/lib/local/paths'
 import { normalizeTags } from '@/lib/utils'
+import { reorderShoppingList } from '@/lib/shopping'
 
 export const LOCAL_PROFILE_ID = 'local-device'
 const LOCAL_PROFILE_EMAIL = 'local@tiptopf.local'
@@ -670,12 +671,6 @@ export async function removeRecipeFromCollection(collectionId: string, recipeId:
 }
 
 // Shopping List
-
-function reorderShoppingList(list: ShoppingListItem[]): ShoppingListItem[] {
-  const unchecked = list.filter((item) => !item.checked)
-  const checked = list.filter((item) => item.checked)
-  return [...unchecked, ...checked]
-}
 
 export async function getShoppingList() {
   const store = await readStore()
