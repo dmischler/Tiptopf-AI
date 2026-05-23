@@ -62,6 +62,8 @@ function buildEditableState(recipe: ExtractedRecipePayload): EditableRecipePrevi
     sourceUrl: recipe.source_url ?? null,
     sourceType: recipe.source_type,
     tags: recipe.tags ?? [],
+    ingredientsText: recipe.ingredients.join('\n'),
+    instructionsText: recipe.instructions,
   }
 }
 
@@ -322,10 +324,31 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
     setPhase('saving')
 
     try {
+      const ingredients = (previewState.ingredientsText || '')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+      const instructions = (previewState.instructionsText || '')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .join('\n')
+
+      if (ingredients.length === 0) {
+        toast.error('At least one ingredient is required.')
+        setPhase('preview')
+        return
+      }
+      if (!instructions) {
+        toast.error('Instructions are required.')
+        setPhase('preview')
+        return
+      }
+
       const saved = await saveRecipe({
         title: previewState.title,
-        ingredients: extractedRecipe.ingredients,
-        instructions: extractedRecipe.instructions,
+        ingredients,
+        instructions,
         prepTime: extractedRecipe.prep_time,
         cookTime: extractedRecipe.cook_time,
         servings: previewState.servings,

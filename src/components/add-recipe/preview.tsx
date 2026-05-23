@@ -42,6 +42,8 @@ export type EditableRecipePreview = {
   sourceUrl: string | null
   sourceType: 'image' | 'url'
   tags: string[]
+  ingredientsText: string
+  instructionsText: string
 }
 
 type RecipePreviewProps = {
@@ -262,21 +264,25 @@ export function RecipePreview({
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2 rounded-xl border border-border/70 bg-muted/25 p-4">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">Zutaten (schreibgeschützt)</Label>
-          <div className="max-h-56 overflow-y-auto rounded-lg border border-border/70 bg-background/60 p-3 text-sm">
-            <ul className="space-y-1">
-              {parsedRecipe.ingredients.map((ingredient, index) => (
-                <li key={`${ingredient}-${index}`}>• {ingredient}</li>
-              ))}
-            </ul>
-          </div>
+          <Label>Zutaten (eine pro Zeile)</Label>
+          <textarea
+            value={value.ingredientsText}
+            disabled={disabled}
+            rows={6}
+            className="w-full rounded-lg border border-input bg-input/30 px-2.5 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 resize-y min-h-[100px] max-h-48"
+            onChange={(event) => update({ ingredientsText: event.target.value })}
+          />
         </div>
 
         <div className="space-y-2 rounded-xl border border-border/70 bg-muted/25 p-4">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">Anleitung (schreibgeschützt)</Label>
-          <div className="max-h-56 overflow-y-auto rounded-lg border border-border/70 bg-background/60 p-3 text-sm whitespace-pre-wrap">
-            {parsedRecipe.instructions}
-          </div>
+          <Label>Anleitung (ein Schritt pro Zeile)</Label>
+          <textarea
+            value={value.instructionsText}
+            disabled={disabled}
+            rows={8}
+            className="w-full rounded-lg border border-input bg-input/30 px-2.5 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 resize-y min-h-[120px] max-h-56"
+            onChange={(event) => update({ instructionsText: event.target.value })}
+          />
         </div>
       </div>
 
