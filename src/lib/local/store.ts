@@ -9,6 +9,7 @@ import type {
   Recipe,
   RecipeCategory,
   RecipeSourceType,
+  ShoppingListItem,
 } from '@/types'
 
 import { getDataDir, getStoreFilePath } from '@/lib/local/paths'
@@ -20,6 +21,7 @@ const LOCAL_PROFILE_EMAIL = 'local@tiptopf.local'
 type LocalStore = {
   recipes: Recipe[]
   collections: Collection[]
+  shoppingList: ShoppingListItem[]
   profile: Profile
   settings: AppSettings
 }
@@ -80,6 +82,7 @@ function createDefaultStore(): LocalStore {
   return {
     recipes: [],
     collections: [],
+    shoppingList: [],
     profile: createDefaultProfile(),
     settings: createDefaultSettings(),
   }
@@ -256,6 +259,32 @@ function normalizeCollection(value: unknown): Collection | null {
   }
 }
 
+function normalizeShoppingListItem(value: unknown): ShoppingListItem | null {
+  if (!isObject(value)) {
+    return null
+  }
+
+  const id = typeof value.id === 'string' && value.id.trim() ? value.id : randomUUID()
+  const addedAt = toIsoOrNow(value.addedAt ?? value.added_at)
+
+  const text = typeof value.text === 'string' ? value.text.trim() : ''
+  if (!text) return null
+
+  return {
+    id,
+    text,
+    checked: Boolean(value.checked),
+    sourceRecipeTitle: normalizeOptionalString(value.sourceRecipeTitle ?? value.source_recipe_title) ?? undefined,
+    sourceServings:
+      typeof value.sourceServings === 'number' && Number.isFinite(value.sourceServings) && value.sourceServings > 0
+        ? Math.trunc(value.sourceServings)
+        : typeof value.source_servings === 'number' && Number.isFinite(value.source_servings) && value.source_servings > 0
+          ? Math.trunc(value.source_servings)
+          : undefined,
+    addedAt,
+  }
+}
+
 function normalizeStore(value: unknown): LocalStore {
   if (!isObject(value)) {
     return createDefaultStore()
@@ -269,9 +298,14 @@ function normalizeStore(value: unknown): LocalStore {
     ? value.collections.map((item) => normalizeCollection(item)).filter((item): item is Collection => Boolean(item))
     : []
 
+  const shoppingList = Array.isArray(value.shoppingList)
+    ? value.shoppingList.map((item) => normalizeShoppingListItem(item)).filter((item): item is ShoppingListItem => Boolean(item))
+    : []
+
   return {
     recipes,
     collections,
+    shoppingList,
     profile: normalizeProfile(value.profile),
     settings: normalizeSettings(value.settings),
   }
@@ -629,5 +663,98 @@ export async function removeRecipeFromCollection(collectionId: string, recipeId:
 
     store.collections[index] = updated
     return updated
+  })
+}
+
+// Shopping List
+
+function reorderShoppingList(list: ShoppingListItem[]): ShoppingListItem[] {
+  const unchecked = list.filter((item) => !item.checked)
+  const checked = list.filter((item) => item.checked)
+  return [...unchecked, ...checked]
+}
+
+export async function getShoppingList() {
+  const store = await readStore()
+  return [...store.shoppingList]
+}
+
+export async function addToShoppingList(
+  items: Array<{
+    text: string
+    sourceRecipeTitle?: string
+    sourceServings?: number
+  }>,
+) {
+  if (items.length === 0) {
+    return getShoppingList()
+  }
+
+  return runMutatingStoreOperation((store) => {
+    const now = nowIso()
+    const newItems: ShoppingListItem[] = items.map((item) => ({
+      id: randomUUID(),
+      text: item.text.trim(),
+      checked: false,
+      sourceRecipeTitle: item.sourceRecipeTitle?.trim() || undefined,
+      sourceServings: item.sourceServings,
+      addedAt: now,
+    }))
+
+    store.shoppingList = reorderShoppingList([...store.shoppingList, ...newItems])
+    return [...store.shoppingList]
+  })
+}
+
+export async function toggleShoppingListItem(itemId: string, checked: boolean) {
+  return runMutatingStoreOperation((store) => {
+    const index = store.shoppingList.findIndex((item) => item.id === itemId)
+    if (index < 0) {
+      return [...store.shoppingList]
+    }
+
+    const updatedItem: ShoppingListItem = {
+      ...store.shoppingList[index],
+      checked,
+    }
+
+    const nextList = [...store.shoppingList]
+    nextList[index] = updatedItem
+
+    store.shoppingList = reorderShoppingList(nextList)
+    return [...store.shoppingList]
+  })
+}
+
+export async function addManualShoppingItem(text: string) {
+  const trimmed = text.trim()
+  if (!trimmed) {
+    return getShoppingList()
+  }
+
+  return runMutatingStoreOperation((store) => {
+    const now = nowIso()
+    const newItem: ShoppingListItem = {
+      id: randomUUID(),
+      text: trimmed,
+      checked: false,
+      addedAt: now,
+    }
+
+    store.shoppingList = reorderShoppingList([...store.shoppingList, newItem])
+    return [...store.shoppingList]
+  })
+}
+
+export async function clearShoppingList() {
+  return runMutatingStoreOperation((store) => {
+    store.shoppingList = []
+  })
+}
+
+export async function removeShoppingListItem(itemId: string) {
+  return runMutatingStoreOperation((store) => {
+    store.shoppingList = store.shoppingList.filter((item) => item.id !== itemId)
+    return [...store.shoppingList]
   })
 }

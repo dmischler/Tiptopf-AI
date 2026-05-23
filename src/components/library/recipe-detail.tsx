@@ -14,6 +14,7 @@ import {
   Plus,
   Printer,
   RotateCcw,
+  ShoppingCart,
   Timer,
   Trash2,
   Upload,
@@ -25,6 +26,7 @@ import { toast } from 'sonner'
 import { uploadRecipeImage } from '@/app/actions/add-recipe'
 import { buildRecipeMarkdown, recipeMarkdownFilename } from '@/lib/export'
 import { addRecipeToCollectionAction, createCollectionAction } from '@/app/actions/collections'
+import { addRecipeIngredientsToShoppingList } from '@/app/actions/shopping-list'
 import {
   applyRecipeImageCandidateAction,
   searchRecipeImageCandidatesAction,
@@ -206,6 +208,7 @@ export function RecipeDetail({
   const [isCreatingCollection, setIsCreatingCollection] = useState(false)
   const [newCollectionName, setNewCollectionName] = useState('')
   const [adjustedServings, setAdjustedServings] = useState(0)
+  const [isAddingToShoppingList, setIsAddingToShoppingList] = useState(false)
 
   useEffect(() => {
     if (!replacementImagePreviewUrl) {
@@ -501,6 +504,34 @@ export function RecipeDetail({
     }
   }
 
+  async function handleAddToShoppingList() {
+    if (!currentRecipe) return
+
+    const displayed = currentRecipe.ingredients.map((ingredient) =>
+      scaleRatio !== 1 ? scaleIngredient(ingredient, scaleRatio) : ingredient,
+    )
+
+    if (displayed.length === 0) {
+      toast.error('Keine Zutaten vorhanden.')
+      return
+    }
+
+    setIsAddingToShoppingList(true)
+    try {
+      await addRecipeIngredientsToShoppingList({
+        items: displayed,
+        sourceRecipeTitle: currentRecipe.title,
+        sourceServings: effectiveServings,
+      })
+      toast.success('Zutaten zur Einkaufsliste hinzugefügt.')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Hinzufügen fehlgeschlagen.'
+      toast.error(message)
+    } finally {
+      setIsAddingToShoppingList(false)
+    }
+  }
+
   return (
     <>
       <Dialog
@@ -724,6 +755,16 @@ export function RecipeDetail({
                       Zur Sammlung
                     </Button>
                   )}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void handleAddToShoppingList()}
+                    disabled={isAddingToShoppingList}
+                  >
+                    <ShoppingCart className="mr-2 h-4 w-4" />
+                    {isAddingToShoppingList ? 'Wird hinzugefügt...' : 'Zur Einkaufsliste'}
+                  </Button>
                 </div>
               </div>
             </div>

@@ -74,3 +74,12 @@ export interface Collection {
   created_at: string;
   updated_at: string;
 }
+
+export interface ShoppingListItem {
+  id: string;
+  text: string;
+  checked: boolean;
+  sourceRecipeTitle?: string;
+  sourceServings?: number;
+  addedAt: string;
+}
