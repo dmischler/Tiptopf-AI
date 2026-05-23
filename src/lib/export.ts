@@ -80,6 +80,13 @@ export function buildCollectionMarkdown(collection: Collection, recipes: Recipe[
     for (const instruction of formatInstructions(recipe.instructions)) {
       sections.push(instruction)
     }
+
+    if (recipe.notes && recipe.notes.trim()) {
+      sections.push('')
+      sections.push('### Notizen')
+      sections.push('')
+      sections.push(recipe.notes.trim())
+    }
   }
 
   sections.push('')
@@ -119,6 +126,13 @@ export function buildRecipeMarkdown(recipe: Recipe) {
   sections.push('')
   for (const instruction of formatInstructions(recipe.instructions)) {
     sections.push(instruction)
+  }
+
+  if (recipe.notes && recipe.notes.trim()) {
+    sections.push('')
+    sections.push('## Notizen')
+    sections.push('')
+    sections.push(recipe.notes.trim())
   }
 
   sections.push('')

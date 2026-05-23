@@ -15,6 +15,7 @@ export interface Recipe {
   source_url: string | null;
   source_type: RecipeSourceType;
   tags: string[];
+  notes?: string;
   created_at: string;
   updated_at: string;
 }

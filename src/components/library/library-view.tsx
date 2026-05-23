@@ -37,6 +37,7 @@ type RecipePatch = Partial<
     | 'category'
     | 'difficulty'
     | 'tags'
+    | 'notes'
   >
 >
 
@@ -151,10 +152,12 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
 
       const ingredientsText = recipe.ingredients.join(' ').toLowerCase()
       const tagsText = recipe.tags.join(' ').toLowerCase()
+      const notesText = (recipe.notes ?? '').toLowerCase()
       return (
         recipe.title.toLowerCase().includes(query) ||
         ingredientsText.includes(query) ||
-        tagsText.includes(query)
+        tagsText.includes(query) ||
+        notesText.includes(query)
       )
     })
   }, [activeCategory, activeDifficulty, activeTags, favoritesOnly, maxTime, recipes, searchTerm])

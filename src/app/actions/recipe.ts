@@ -28,6 +28,7 @@ const editRecipeSchema = z.object({
   category: categorySchema.optional(),
   difficulty: difficultySchema.optional(),
   tags: z.array(z.string()).optional(),
+  notes: z.string().max(2000).optional(),
 })
 
 const restoreRecipeSchema = z.object({
@@ -46,6 +47,7 @@ const restoreRecipeSchema = z.object({
   source_url: z.string().nullable(),
   source_type: z.enum(['image', 'url', 'manual']),
   tags: z.array(z.string()).optional(),
+  notes: z.string().optional(),
 })
 
 export async function toggleFavorite(recipeId: string, isFavorite: boolean) {
@@ -132,6 +134,10 @@ export async function editRecipe(recipeId: string, input: z.infer<typeof editRec
       .filter((tag, index, arr) => arr.indexOf(tag) === index)
   }
 
+  if (parsedInput.notes !== undefined) {
+    normalizedInput.notes = parsedInput.notes.trim()
+  }
+
   const data = await updateRecipe(parsedRecipeId, normalizedInput)
 
   revalidatePath('/library')
@@ -175,6 +181,7 @@ export async function restoreRecipe(input: z.infer<typeof restoreRecipeSchema>) 
       source_url: parsedInput.source_url,
       source_type: parsedInput.source_type,
       tags: parsedInput.tags,
+      notes: parsedInput.notes ?? '',
     })
   } catch (error) {
     if (!(error instanceof Error) || error.message !== 'Recipe not found') {
@@ -194,6 +201,7 @@ export async function restoreRecipe(input: z.infer<typeof restoreRecipeSchema>) 
       source_url: parsedInput.source_url,
       source_type: parsedInput.source_type,
       tags: parsedInput.tags,
+      notes: parsedInput.notes ?? '',
     })
   }
 

@@ -73,6 +73,7 @@ type RecipeDraft = {
   servings: string
   ingredientsText: string
   instructionsText: string
+  notes: string
   imageUrl: string | null
   tags: string[]
   tagInput: string
@@ -140,6 +141,49 @@ function toNonEmptyLines(value: string) {
     .filter((line) => line.length > 0)
 }
 
+function renderNotesToHtml(notes: string): string {
+  let html = notes
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+
+  // bold **text** or __text__
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+  html = html.replace(/__([^_]+)__/g, '<strong>$1</strong>')
+
+  const lines = html.split('\n')
+  const out: string[] = []
+  let inUl = false
+  let inOl = false
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
+    if (/^[-*+]\s+/.test(line)) {
+      if (!inUl) {
+        if (inOl) { out.push('</ol>'); inOl = false }
+        out.push('<ul class="list-disc pl-5 space-y-1">')
+        inUl = true
+      }
+      out.push('<li>' + line.replace(/^[-*+]\s+/, '') + '</li>')
+    } else if (/^\d+\.\s+/.test(line)) {
+      if (!inOl) {
+        if (inUl) { out.push('</ul>'); inUl = false }
+        out.push('<ol class="list-decimal pl-5 space-y-1">')
+        inOl = true
+      }
+      out.push('<li>' + line.replace(/^\d+\.\s+/, '') + '</li>')
+    } else {
+      if (inUl) { out.push('</ul>'); inUl = false }
+      if (inOl) { out.push('</ol>'); inOl = false }
+      if (line) out.push('<p class="mb-2 last:mb-0">' + line + '</p>')
+    }
+  }
+  if (inUl) out.push('</ul>')
+  if (inOl) out.push('</ol>')
+
+  return out.join('')
+}
+
 function toDraft(recipe: Recipe): RecipeDraft {
   return {
     title: recipe.title,
@@ -150,6 +194,7 @@ function toDraft(recipe: Recipe): RecipeDraft {
     servings: recipe.servings > 0 ? String(recipe.servings) : '',
     ingredientsText: recipe.ingredients.join('\n'),
     instructionsText: toInstructionSteps(recipe.instructions).join('\n'),
+    notes: recipe.notes ?? '',
     imageUrl: recipe.image_url,
     tags: [...recipe.tags],
     tagInput: '',
@@ -434,6 +479,7 @@ export function RecipeDetail({
         category: currentDraft.category,
         difficulty: currentDraft.difficulty,
         tags: currentDraft.tags,
+        notes: currentDraft.notes,
       })
 
       if (replacementImageFile) {
@@ -701,11 +747,23 @@ export function RecipeDetail({
                         </span>
                         <span>{step}</span>
                       </li>
-                    ))}
-                  </ol>
-                </section>
+                     ))}
+                   </ol>
+                 </section>
 
-                <div className="flex flex-wrap gap-2 pt-2">
+                 {currentRecipe.notes && currentRecipe.notes.trim() ? (
+                   <section className="space-y-3">
+                     <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                       Anmerkungen
+                     </h4>
+                     <div
+                       className="text-sm leading-relaxed text-foreground/90"
+                       dangerouslySetInnerHTML={{ __html: renderNotesToHtml(currentRecipe.notes) }}
+                     />
+                   </section>
+                 ) : null}
+
+                 <div className="flex flex-wrap gap-2 pt-2">
                   <Button type="button" variant="outline" onClick={() => window.print()}>
                     <Printer className="mr-2 h-4 w-4" />
                     Drucken
@@ -1139,10 +1197,43 @@ export function RecipeDetail({
                           : current
                       )
                     }
-                  />
-                </div>
+                   />
+                 </div>
 
-                <div className="sticky bottom-0 z-10 -mx-5 bg-background/95 px-5 py-3 backdrop-blur-sm sm:static sm:bg-transparent sm:px-0 sm:py-0">
+                 <div className="space-y-2 rounded-xl border border-border/70 bg-muted/25 p-4">
+                   <div className="flex items-center justify-between">
+                     <Label htmlFor="recipe-edit-notes">Anmerkungen (optional)</Label>
+                     <span
+                       className={`text-xs tabular-nums ${draft.notes.length > 1800 ? 'text-amber-500 font-medium' : 'text-muted-foreground'}`}
+                     >
+                       {draft.notes.length} / 2000
+                     </span>
+                   </div>
+                   <textarea
+                     id="recipe-edit-notes"
+                     value={draft.notes}
+                     disabled={isSaving}
+                     rows={6}
+                     maxLength={2000}
+                     placeholder="Persönliche Notizen, Variationen, Tipps…"
+                     className="min-h-28 w-full rounded-lg border border-input bg-input/30 px-2.5 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                     onChange={(event) =>
+                       setDraft((current) =>
+                         current
+                           ? {
+                               ...current,
+                               notes: event.target.value,
+                             }
+                           : current
+                       )
+                     }
+                   />
+                   <p className="text-xs text-muted-foreground">
+                     Unterstützt **fett**, - Listen und 1. nummerierte Listen.
+                   </p>
+                 </div>
+
+                 <div className="sticky bottom-0 z-10 -mx-5 bg-background/95 px-5 py-3 backdrop-blur-sm sm:static sm:bg-transparent sm:px-0 sm:py-0">
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-2 sm:border-t-0 sm:pt-0">
                     <Button
                       type="button"

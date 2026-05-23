@@ -39,6 +39,7 @@ type CreateRecipeInput = {
   source_url: string | null
   source_type: RecipeSourceType
   tags?: string[]
+  notes?: string
 }
 
 type UpdateRecipeInput = Partial<
@@ -198,6 +199,7 @@ function normalizeRecipe(value: unknown): Recipe | null {
     source_url: toStringOrNull(value.source_url),
     source_type: normalizeSourceType(value.source_type),
     tags,
+    notes: typeof value.notes === 'string' ? value.notes : '',
     created_at: createdAt,
     updated_at: updatedAt,
   }
@@ -393,6 +395,7 @@ export async function createRecipe(input: CreateRecipeInput) {
       source_url: input.source_url,
       source_type: input.source_type,
       tags: normalizeTags(input.tags),
+      notes: input.notes ?? '',
       created_at: now,
       updated_at: now,
     }
