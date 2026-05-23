@@ -720,8 +720,9 @@ export function RecipeDetail({
                             : current
                         )
                       }
+                      disabled={isSaving}
                     >
-                      <SelectTrigger className="w-full bg-background/70" disabled={isSaving}>
+                      <SelectTrigger className="w-full bg-background/70">
                         <SelectValue>
                           {(val) => (val ? CATEGORY_LABELS[val as RecipeCategory] : 'Kategorie')}
                         </SelectValue>
@@ -750,8 +751,9 @@ export function RecipeDetail({
                             : current
                         )
                       }
+                      disabled={isSaving}
                     >
-                      <SelectTrigger className="w-full bg-background/70" disabled={isSaving}>
+                      <SelectTrigger className="w-full bg-background/70">
                         <SelectValue>
                           {(val) => (val ? DIFFICULTY_LABELS[val as Difficulty] : 'Schwierigkeit')}
                         </SelectValue>

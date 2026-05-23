@@ -1,8 +1,18 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  serverActions: {
-    bodySizeLimit: '20mb',
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '20mb',
+    },
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/manifest.webmanifest',
+        destination: '/manifest.json',
+      },
+    ]
   },
 }
 
