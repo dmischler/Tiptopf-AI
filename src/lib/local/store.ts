@@ -74,8 +74,8 @@ function createDefaultSettings(): AppSettings {
     opencode_model_id: null,
     gemini_api_key: null,
     gemini_base_url: null,
-    gemini_image_model_id: null,
-    gemini_image_fallback_model_id: null,
+    gemini_model_id: null,
+    gemini_fallback_model_id: null,
     pexels_api_key: null,
   }
 }
@@ -234,8 +234,12 @@ function normalizeSettings(value: unknown): AppSettings {
     opencode_model_id: normalizeOptionalString(value.opencode_model_id),
     gemini_api_key: normalizeOptionalString(value.gemini_api_key),
     gemini_base_url: normalizeOptionalString(value.gemini_base_url),
-    gemini_image_model_id: normalizeOptionalString(value.gemini_image_model_id),
-    gemini_image_fallback_model_id: normalizeOptionalString(value.gemini_image_fallback_model_id),
+    gemini_model_id:
+      normalizeOptionalString(value.gemini_model_id) ||
+      normalizeOptionalString(value.gemini_image_model_id),
+    gemini_fallback_model_id:
+      normalizeOptionalString(value.gemini_fallback_model_id) ||
+      normalizeOptionalString(value.gemini_image_fallback_model_id),
     pexels_api_key: normalizeOptionalString(value.pexels_api_key),
   }
 }
@@ -504,7 +508,7 @@ export async function getSettings() {
   return { ...store.settings }
 }
 
-export async function updateSettings(input: Partial<AppSettings>) {
+export async function updateSettings(input: Partial<AppSettings> & Record<string, unknown>) {
   return runMutatingStoreOperation((store) => {
     const next = { ...store.settings }
 
@@ -528,12 +532,15 @@ export async function updateSettings(input: Partial<AppSettings>) {
       next.gemini_base_url = normalizeOptionalString(input.gemini_base_url)
     }
 
-    if ('gemini_image_model_id' in input) {
-      next.gemini_image_model_id = normalizeOptionalString(input.gemini_image_model_id)
+    // Support both old (gemini_image_*) and new unified field names during transition
+    if ('gemini_model_id' in input || 'gemini_image_model_id' in input) {
+      const newVal = ('gemini_model_id' in input ? input.gemini_model_id : (input as any).gemini_image_model_id) as string | null | undefined
+      next.gemini_model_id = normalizeOptionalString(newVal)
     }
 
-    if ('gemini_image_fallback_model_id' in input) {
-      next.gemini_image_fallback_model_id = normalizeOptionalString(input.gemini_image_fallback_model_id)
+    if ('gemini_fallback_model_id' in input || 'gemini_image_fallback_model_id' in input) {
+      const newVal = ('gemini_fallback_model_id' in input ? input.gemini_fallback_model_id : (input as any).gemini_image_fallback_model_id) as string | null | undefined
+      next.gemini_fallback_model_id = normalizeOptionalString(newVal)
     }
 
     if ('pexels_api_key' in input) {

@@ -54,7 +54,7 @@ async function runExtraction(
   const resolvedBaseUrl = resolveAiBaseUrl(baseUrl)
   const resolvedModelId = resolveAiModelId(modelId)
 
-  const ai = createOpenAI({
+  const openai = createOpenAI({
     apiKey,
     baseURL: resolvedBaseUrl,
   })
@@ -62,7 +62,7 @@ async function runExtraction(
   let raw = ''
   try {
     const result = await generateText({
-      model: ai(resolvedModelId) as any,
+      model: openai(resolvedModelId) as any,
       system: systemPrompt,
       prompt: content,
     })

@@ -1,8 +1,8 @@
 const LEGACY_BASE_URLS = new Set(['https://api.opencode.ai', 'https://api.opencode.ai/v1'])
 export const DEFAULT_BASE_URL = 'https://opencode.ai/zen/v1'
 export const DEFAULT_MODEL_ID = 'minimax-m2.5'
-export const DEFAULT_GEMINI_IMAGE_MODEL_ID = 'gemini-2.5-flash-lite'
-export const DEFAULT_GEMINI_IMAGE_FALLBACK_MODEL_ID = 'gemini-1.5-flash'
+export const DEFAULT_GEMINI_MODEL_ID = 'gemini-2.5-flash'
+export const DEFAULT_GEMINI_FALLBACK_MODEL_ID = 'gemini-2.0-flash'
 
 const LEGACY_MODEL_IDS: Record<string, string> = {
   'minimax-m2.5': 'minimax-m2.5',
@@ -61,15 +61,15 @@ export function resolveAiModelId(modelId?: string) {
 export function resolveGeminiBaseUrl(baseUrl?: string): string | undefined {
   const resolved = baseUrl?.trim()
   if (!resolved) {
-    return 'https://generativelanguage.googleapis.com/v1beta'
+    return undefined
   }
   return resolved
 }
 
-export function resolveGeminiImageModelId(modelId?: string): string {
-  return modelId?.trim() || DEFAULT_GEMINI_IMAGE_MODEL_ID
+export function resolveGeminiModelId(modelId?: string): string {
+  return modelId?.trim() || DEFAULT_GEMINI_MODEL_ID
 }
 
-export function resolveGeminiImageFallbackModelId(modelId?: string): string {
-  return modelId?.trim() || DEFAULT_GEMINI_IMAGE_FALLBACK_MODEL_ID
+export function resolveGeminiFallbackModelId(modelId?: string): string {
+  return modelId?.trim() || DEFAULT_GEMINI_FALLBACK_MODEL_ID
 }

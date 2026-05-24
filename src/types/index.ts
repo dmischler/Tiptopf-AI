@@ -45,8 +45,8 @@ export interface AppSettings {
   opencode_model_id: string | null;
   gemini_api_key: string | null;
   gemini_base_url: string | null;
-  gemini_image_model_id: string | null;
-  gemini_image_fallback_model_id: string | null;
+  gemini_model_id: string | null;
+  gemini_fallback_model_id: string | null;
   pexels_api_key: string | null;
 }
 

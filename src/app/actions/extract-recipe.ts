@@ -165,8 +165,8 @@ export async function extractFromImageAction(imageDataUrl: string) {
     imageDataUrl,
     settings.gemini_api_key,
     settings.gemini_base_url ?? undefined,
-    settings.gemini_image_model_id ?? undefined,
-    settings.gemini_image_fallback_model_id ?? undefined
+    settings.gemini_model_id ?? undefined,
+    settings.gemini_fallback_model_id ?? undefined
   )
 
   return {

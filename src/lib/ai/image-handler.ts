@@ -6,8 +6,8 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google'
 
 import {
   resolveGeminiBaseUrl,
-  resolveGeminiImageFallbackModelId,
-  resolveGeminiImageModelId,
+  resolveGeminiFallbackModelId,
+  resolveGeminiModelId,
 } from '@/lib/ai/client'
 import { IMAGE_EXTRACTION_PROMPT } from '@/lib/ai/prompts'
 import type { ParsedRecipe } from '@/types'
@@ -100,8 +100,8 @@ export async function extractRecipeFromImage(
   imageDataUrl: string,
   geminiApiKey: string,
   geminiBaseUrl?: string,
-  geminiImageModelId?: string,
-  geminiImageFallbackModelId?: string
+  geminiModelId?: string,
+  geminiFallbackModelId?: string
 ): Promise<ParsedRecipe> {
   const sanitizedKey = geminiApiKey.trim()
   if (!sanitizedKey) {
@@ -109,18 +109,22 @@ export async function extractRecipeFromImage(
   }
 
   const googleOptions: { apiKey: string; baseURL?: string } = { apiKey: sanitizedKey }
-  const resolvedBaseUrl = resolveGeminiBaseUrl(geminiBaseUrl)
-  if (resolvedBaseUrl) {
-    googleOptions.baseURL = resolvedBaseUrl
+
+  // Only set custom baseURL if user explicitly configured one (to use the exact same
+  // API access point as inflabasket-web when no custom endpoint is desired)
+  if (geminiBaseUrl && geminiBaseUrl.trim()) {
+    const resolvedBaseUrl = resolveGeminiBaseUrl(geminiBaseUrl)
+    if (resolvedBaseUrl) {
+      googleOptions.baseURL = resolvedBaseUrl
+    }
   }
 
   const google = createGoogleGenerativeAI(googleOptions)
-  const primaryModel = resolveGeminiImageModelId(geminiImageModelId)
-  const fallbackModel = resolveGeminiImageFallbackModelId(geminiImageFallbackModelId)
+  const primaryModel = resolveGeminiModelId(geminiModelId)
+  const fallbackModel = resolveGeminiFallbackModelId(geminiFallbackModelId)
 
   const hardcodedFallbacks = [
-    'gemini-2.5-flash',
-    'gemini-3.1-flash-lite-preview',
+    'gemini-2.0-flash',
   ]
 
   const modelsToTry = [
@@ -131,6 +135,7 @@ export async function extractRecipeFromImage(
 
   let raw = ''
   let usedModel = primaryModel
+  let lastAttemptedModel = primaryModel
   let finishReason = ''
 
   async function tryExtract(modelName: string): Promise<boolean> {
@@ -156,6 +161,7 @@ export async function extractRecipeFromImage(
 
   let success = false
   for (const modelName of modelsToTry) {
+    lastAttemptedModel = modelName
     success = await tryExtract(modelName)
     if (success) {
       usedModel = modelName
@@ -169,10 +175,11 @@ export async function extractRecipeFromImage(
       finishReason
     )
     const isSafetyBlock = finishReason?.toLowerCase().includes('safety') || finishReason?.toLowerCase().includes('block')
+    const modelHint = lastAttemptedModel ? ` (letzter Versuch: ${lastAttemptedModel})` : ''
     throw new Error(
       isSafetyBlock
         ? 'Das Bild wurde von der Google-Sicherheitsfilterung blockiert. Bitte versuche ein anderes Foto.'
-        : 'Keine Antwort von Gemini erhalten. Überprüfe API-Key und Modell-Einstellungen (z. B. gemini-2.0-flash).'
+        : `Keine Antwort von Gemini erhalten${modelHint}. Überprüfe API-Key und Modell-Einstellungen im Profil (z. B. gemini-2.0-flash oder gemini-2.5-flash).`
     )
   }
 

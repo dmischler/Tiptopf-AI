@@ -10,8 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   DEFAULT_BASE_URL,
-  DEFAULT_GEMINI_IMAGE_FALLBACK_MODEL_ID,
-  DEFAULT_GEMINI_IMAGE_MODEL_ID,
+  DEFAULT_GEMINI_FALLBACK_MODEL_ID,
+  DEFAULT_GEMINI_MODEL_ID,
   DEFAULT_MODEL_ID,
 } from '@/lib/ai/client'
 import type { AppSettings } from '@/types'
@@ -133,22 +133,22 @@ export function SettingsForm({ settings }: SettingsFormProps) {
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="gemini_image_model_id">Gemini Bildmodell</Label>
+            <Label htmlFor="gemini_model_id">Gemini Modell</Label>
             <Input
-              id="gemini_image_model_id"
-              name="gemini_image_model_id"
-              defaultValue={settings.gemini_image_model_id ?? ''}
-              placeholder={DEFAULT_GEMINI_IMAGE_MODEL_ID}
+              id="gemini_model_id"
+              name="gemini_model_id"
+              defaultValue={settings.gemini_model_id ?? ''}
+              placeholder={DEFAULT_GEMINI_MODEL_ID}
               className="bg-background/70"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="gemini_image_fallback_model_id">Gemini Fallback-Modell</Label>
+            <Label htmlFor="gemini_fallback_model_id">Gemini Fallback-Modell</Label>
             <Input
-              id="gemini_image_fallback_model_id"
-              name="gemini_image_fallback_model_id"
-              defaultValue={settings.gemini_image_fallback_model_id ?? ''}
-              placeholder={DEFAULT_GEMINI_IMAGE_FALLBACK_MODEL_ID}
+              id="gemini_fallback_model_id"
+              name="gemini_fallback_model_id"
+              defaultValue={settings.gemini_fallback_model_id ?? ''}
+              placeholder={DEFAULT_GEMINI_FALLBACK_MODEL_ID}
               className="bg-background/70"
             />
           </div>

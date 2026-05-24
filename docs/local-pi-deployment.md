@@ -95,7 +95,7 @@ With `DATA_DIR=/home/pi/tiptopf-data`:
 - `profile` with:
   - `id` (`local-device`)
   - `email` (`local@tiptopf.local`)
-- `settings` with API keys and model/base URL configuration for OpenCode, Gemini, and Pexels
+- `settings` with API keys and model/base URL configuration for OpenCode, Gemini (unified `gemini_*` fields since 2026-05), and Pexels. Old `gemini_image_*` fields are auto-migrated on load.
 
 ## Image handling
 
