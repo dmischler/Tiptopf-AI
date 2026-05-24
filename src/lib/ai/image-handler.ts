@@ -9,7 +9,7 @@ import {
   resolveGeminiImageFallbackModelId,
   resolveGeminiImageModelId,
 } from '@/lib/ai/client'
-import { SIMPLIFIED_IMAGE_PROMPT } from '@/lib/ai/prompts'
+import { IMAGE_EXTRACTION_PROMPT } from '@/lib/ai/prompts'
 import type { ParsedRecipe } from '@/types'
 
 const recipeSchema = z.object({
@@ -67,7 +67,7 @@ async function runImageExtraction(imageDataUrl: string, model: any): Promise<Ext
         content: [
           {
             type: 'text',
-            text: SIMPLIFIED_IMAGE_PROMPT,
+            text: IMAGE_EXTRACTION_PROMPT,
           },
           {
             type: 'image',

@@ -5,8 +5,9 @@ import { Camera, UploadCloud } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 
-const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const MAX_BYTES = 10 * 1024 * 1024
+const MAX_DIMENSION = 2048
+const JPEG_QUALITY = 0.8
 
 type ImageUploadProps = {
   disabled?: boolean
@@ -14,12 +15,40 @@ type ImageUploadProps = {
   onError: (message: string) => void
 }
 
-function readFileAsDataUrl(file: File): Promise<string> {
+function resizeImageToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result || ''))
-    reader.onerror = () => reject(new Error('Failed to read image file'))
-    reader.readAsDataURL(file)
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+
+      let { width, height } = img
+
+      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+        const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height)
+        width = Math.round(width * ratio)
+        height = Math.round(height * ratio)
+      }
+
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        reject(new Error('Could not process image'))
+        return
+      }
+      ctx.drawImage(img, 0, 0, width, height)
+      resolve(canvas.toDataURL('image/jpeg', JPEG_QUALITY))
+    }
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Failed to load image. Try a different photo (JPG/PNG recommended).'))
+    }
+
+    img.src = url
   })
 }
 
@@ -30,8 +59,8 @@ export function ImageUpload({ disabled, onSelect, onError }: ImageUploadProps) {
   async function handleFile(file: File | null) {
     if (!file) return
 
-    if (!ALLOWED_TYPES.has(file.type)) {
-      onError('Only JPG, PNG, and WEBP are supported.')
+    if (!file.type.startsWith('image/')) {
+      onError('Please select an image file.')
       return
     }
 
@@ -41,9 +70,9 @@ export function ImageUpload({ disabled, onSelect, onError }: ImageUploadProps) {
     }
 
     try {
-      const dataUrl = await readFileAsDataUrl(file)
+      const dataUrl = await resizeImageToBase64(file)
       if (!dataUrl) {
-        onError('Could not parse image payload.')
+        onError('Could not process image payload.')
         return
       }
 
@@ -69,7 +98,7 @@ export function ImageUpload({ disabled, onSelect, onError }: ImageUploadProps) {
       >
         <UploadCloud className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
         <p className="text-sm font-medium text-foreground">Drag and drop a recipe photo</p>
-        <p className="mt-1 text-xs text-muted-foreground">JPG, PNG, WEBP up to 10MB</p>
+        <p className="mt-1 text-xs text-muted-foreground">Any photo up to 10MB (auto-optimized for AI)</p>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -97,7 +126,7 @@ export function ImageUpload({ disabled, onSelect, onError }: ImageUploadProps) {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept="image/*"
         className="hidden"
         onChange={(event) => {
           void handleFile(event.target.files?.[0] || null)
@@ -108,7 +137,7 @@ export function ImageUpload({ disabled, onSelect, onError }: ImageUploadProps) {
       <input
         ref={cameraInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept="image/*"
         capture="environment"
         className="hidden"
         onChange={(event) => {
