@@ -185,28 +185,8 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
     return next
   }
 
-  function queueDeletion(recipe: Recipe, index: number) {
-    const timeoutId = setTimeout(() => {
-      const pending = pendingDeletionRef.current
-      if (!pending || pending.recipe.id !== recipe.id) {
-        return
-      }
-
-      pendingDeletionRef.current = null
-      void deleteRecipeAction(recipe.id).catch((error) => {
-        const message = error instanceof Error ? error.message : 'Rezept konnte nicht wiederhergestellt werden.'
-        setRecipes((current) => insertRecipeAt(current, recipe, index))
-        toast.error(message)
-      })
-    }, 30_000)
-
-    pendingDeletionRef.current = {
-      recipe,
-      index,
-      timeoutId,
-    }
-  }
-
+  // Note: deletion is now immediate (durable across navigation/refresh).
+  // The 30s window only controls availability of the in-memory undo opportunity.
   function handleUndoDelete(recipeId: string) {
     const pending = pendingDeletionRef.current
     if (!pending || pending.recipe.id !== recipeId) {
@@ -248,35 +228,54 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
   }
 
   function handleDeleteRequested(recipe: Recipe) {
+    // Force-commit any still-pending previous deletion (harmless now that deletes are immediate).
     const previousPending = pendingDeletionRef.current
     if (previousPending) {
       clearTimeout(previousPending.timeoutId)
       pendingDeletionRef.current = null
-
-      void deleteRecipeAction(previousPending.recipe.id).catch((error) => {
-        const message = error instanceof Error ? error.message : 'Löschen fehlgeschlagen.'
-        toast.error(message)
+      void deleteRecipeAction(previousPending.recipe.id).catch(() => {
+        /* already gone or race — ignore */
       })
     }
 
     const removedIndex = recipes.findIndex((item) => item.id === recipe.id)
-
     if (removedIndex < 0) {
       return
     }
 
+    // Optimistic removal from UI (same as before).
     setRecipes((current) => current.filter((item) => item.id !== recipe.id))
-
     setSelectedRecipeId((currentSelected) => (currentSelected === recipe.id ? null : currentSelected))
-    queueDeletion(recipe, removedIndex)
 
-    toast.success('Rezept gelöscht', {
-      duration: 30_000,
-      action: {
-        label: 'Rückgängig',
-        onClick: () => handleUndoDelete(recipe.id),
-      },
-    })
+    // Immediate persistent delete. Success toast + undo window only appear if the server action succeeds.
+    void deleteRecipeAction(recipe.id)
+      .then(() => {
+        const timeoutId = setTimeout(() => {
+          if (pendingDeletionRef.current?.recipe.id === recipe.id) {
+            pendingDeletionRef.current = null
+          }
+        }, 30_000)
+
+        pendingDeletionRef.current = {
+          recipe,
+          index: removedIndex,
+          timeoutId,
+        }
+
+        toast.success('Rezept gelöscht', {
+          duration: 30_000,
+          action: {
+            label: 'Rückgängig',
+            onClick: () => handleUndoDelete(recipe.id),
+          },
+        })
+      })
+      .catch((error) => {
+        // Delete failed — restore UI immediately, no success toast, no undo entry.
+        setRecipes((current) => insertRecipeAt(current, recipe, removedIndex))
+        const message = error instanceof Error ? error.message : 'Löschen fehlgeschlagen.'
+        toast.error(message)
+      })
   }
 
   function handleTagToggle(tag: string) {
