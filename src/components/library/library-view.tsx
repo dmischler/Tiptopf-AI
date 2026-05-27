@@ -4,7 +4,8 @@ import { Dices, SearchX } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
-import { deleteRecipeAction, restoreRecipe } from '@/app/actions/recipe'
+import { deleteRecipeAction, listRecipesAction, restoreRecipe } from '@/app/actions/recipe'
+import { listCollectionsAction } from '@/app/actions/collections'
 
 import { AddRecipeModal } from '@/components/add-recipe/modal'
 import { ExpandableFab } from '@/components/add-recipe/expandable-fab'
@@ -16,6 +17,7 @@ import { RecipeDetail } from '@/components/library/recipe-detail'
 import { SortDropdown } from '@/components/library/sort-dropdown'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { PullToRefresh } from '@/components/ui/pull-to-refresh'
 import type { Collection, Difficulty, Recipe, RecipeCategory, SortOption } from '@/types'
 
 type LibraryViewProps = {
@@ -305,79 +307,103 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
     setSelectedRecipeId(recipe.id)
   }
 
+  async function handleRefresh() {
+    try {
+      const [freshRecipes, freshCollections] = await Promise.all([
+        listRecipesAction(),
+        listCollectionsAction(),
+      ])
+
+      setRecipes(freshRecipes as Recipe[])
+      setCollections(freshCollections as Collection[])
+
+      // Close detail if the recipe no longer exists after refresh
+      if (selectedRecipeId && !freshRecipes.some((r) => r.id === selectedRecipeId)) {
+        setSelectedRecipeId(null)
+      }
+      // Keep search, filters, and sort — user expects their current view to survive
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Aktualisieren fehlgeschlagen.'
+      toast.error(message)
+      throw err
+    }
+  }
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-8 pb-[max(6rem,env(safe-area-inset-bottom))] md:pb-8 sm:px-6 lg:px-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Deine Bibliothek</h1>
-          <p className="text-sm text-muted-foreground">
-            {recipes.length} Rezept{recipes.length === 1 ? '' : 'e'} in deiner persönlichen Sammlung.
-          </p>
+      <PullToRefresh onRefresh={handleRefresh}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight">Deine Bibliothek</h1>
+            <p className="text-sm text-muted-foreground">
+              {recipes.length} Rezept{recipes.length === 1 ? '' : 'e'} in deiner persönlichen Sammlung.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleOpenRandomDraw}
+            className="hidden gap-2 md:inline-flex"
+          >
+            <Dices className="h-4 w-4" />
+            Zufallsrezept ziehen
+          </Button>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={handleOpenRandomDraw}
-          className="hidden gap-2 md:inline-flex"
-        >
-          <Dices className="h-4 w-4" />
-          Zufallsrezept ziehen
-        </Button>
-      </div>
 
-      <div className="space-y-3">
-        <FilterBar
-          search={searchTerm}
-          onSearchChange={setSearchTerm}
-          activeCategory={activeCategory}
-          onCategoryChange={setActiveCategory}
-          activeTags={activeTags}
-          onTagToggle={handleTagToggle}
-          maxTime={maxTime}
-          maxTimeLimit={maxTimeLimit}
-          onMaxTimeChange={setMaxTime}
-          availableTags={availableTags}
-          activeDifficulty={activeDifficulty}
-          onDifficultyChange={setActiveDifficulty}
-          favoritesOnly={favoritesOnly}
-          onFavoritesOnlyToggle={() => setFavoritesOnly((v) => !v)}
-        />
-        <div className="flex justify-end">
-          <SortDropdown value={sortOption} onChange={setSortOption} />
+        <div className="space-y-3">
+          <FilterBar
+            search={searchTerm}
+            onSearchChange={setSearchTerm}
+            activeCategory={activeCategory}
+            onCategoryChange={setActiveCategory}
+            activeTags={activeTags}
+            onTagToggle={handleTagToggle}
+            maxTime={maxTime}
+            maxTimeLimit={maxTimeLimit}
+            onMaxTimeChange={setMaxTime}
+            availableTags={availableTags}
+            activeDifficulty={activeDifficulty}
+            onDifficultyChange={setActiveDifficulty}
+            favoritesOnly={favoritesOnly}
+            onFavoritesOnlyToggle={() => setFavoritesOnly((v) => !v)}
+          />
+          <div className="flex justify-end">
+            <SortDropdown value={sortOption} onChange={setSortOption} />
+          </div>
         </div>
-      </div>
 
-      {recipes.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Noch keine Rezepte</CardTitle>
-            <CardDescription>
-              Füge dein erstes Rezept aus einem Bild oder einer URL hinzu.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      ) : visibleRecipes.length === 0 ? (
-        <Card>
-          <CardContent className="flex items-center gap-3 py-6 text-sm text-muted-foreground">
-            <SearchX className="h-5 w-5" />
-            Deine aktuellen Such- und Filtereinstellungen ergeben keine Rezepte.
-          </CardContent>
-        </Card>
-      ) : (
-        <MasonryGrid>
-          {visibleRecipes.map((recipe, index) => (
-            <MasonryItem key={recipe.id}>
-              <RecipeCard
-                recipe={recipe}
-                index={index}
-                onOpen={() => setSelectedRecipeId(recipe.id)}
-                onFavoriteChange={(value) => patchRecipe(recipe.id, { is_favorite: value })}
-                onRatingChange={(value) => patchRecipe(recipe.id, { rating: value })}
-              />
-            </MasonryItem>
-          ))}
-        </MasonryGrid>
-      )}
+        {recipes.length === 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Noch keine Rezepte</CardTitle>
+              <CardDescription>
+                Füge dein erstes Rezept aus einem Bild oder einer URL hinzu.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        ) : visibleRecipes.length === 0 ? (
+          <Card>
+            <CardContent className="flex items-center gap-3 py-6 text-sm text-muted-foreground">
+              <SearchX className="h-5 w-5" />
+              Deine aktuellen Such- und Filtereinstellungen ergeben keine Rezepte.
+            </CardContent>
+          </Card>
+        ) : (
+          <MasonryGrid>
+            {visibleRecipes.map((recipe, index) => (
+              <MasonryItem key={recipe.id}>
+                <RecipeCard
+                  recipe={recipe}
+                  index={index}
+                  onOpen={() => setSelectedRecipeId(recipe.id)}
+                  onFavoriteChange={(value) => patchRecipe(recipe.id, { is_favorite: value })}
+                  onRatingChange={(value) => patchRecipe(recipe.id, { rating: value })}
+                />
+              </MasonryItem>
+            ))}
+          </MasonryGrid>
+        )}
+      </PullToRefresh>
 
       <RecipeDetail
         recipe={selectedRecipe}

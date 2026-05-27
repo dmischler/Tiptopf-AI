@@ -6,6 +6,7 @@ import { z } from 'zod'
 import {
   createRecipe,
   deleteRecipe,
+  listRecipes,
   updateRecipe,
   updateRecipeFavorite,
   updateRecipeImage,
@@ -225,4 +226,9 @@ export async function restoreRecipe(input: z.infer<typeof restoreRecipeSchema>) 
 
   revalidatePath('/library')
   return restored
+}
+
+export async function listRecipesAction() {
+  const recipes = await listRecipes()
+  return recipes
 }
