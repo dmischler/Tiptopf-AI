@@ -1,6 +1,6 @@
 import { generateText } from 'ai'
 import { z } from 'zod'
-import { createOpenAI } from '@ai-sdk/openai'
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 
 import type { ParsedRecipe } from '@/types'
 import { resolveAiBaseUrl, resolveAiModelId } from '@/lib/ai/client'
@@ -54,7 +54,8 @@ async function runExtraction(
   const resolvedBaseUrl = resolveAiBaseUrl(baseUrl)
   const resolvedModelId = resolveAiModelId(modelId)
 
-  const openai = createOpenAI({
+  const provider = createOpenAICompatible({
+    name: 'opencode',
     apiKey,
     baseURL: resolvedBaseUrl,
   })
@@ -62,7 +63,7 @@ async function runExtraction(
   let raw = ''
   try {
     const result = await generateText({
-      model: openai(resolvedModelId) as any,
+      model: provider(resolvedModelId),
       system: systemPrompt,
       prompt: content,
     })
