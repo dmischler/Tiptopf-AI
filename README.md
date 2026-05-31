@@ -85,6 +85,7 @@ See `docs/local-pi-deployment.md` (Option A) for Raspberry Pi deployment without
 
 ## Notes
 
-- API keys are configured in `/profile` and persisted in local store (currently unencrypted).
+- API keys and AI models (OpenCode + Gemini) are configured in `/profile` and persisted in local store (currently unencrypted).
+- Default recipe extraction model: `big-pickle` (free OpenCode Zen). OpenCode Go subscription supported via custom base URL.
 - Image uploads from URL are downloaded and persisted locally.
 - UI language: German

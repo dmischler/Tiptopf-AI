@@ -97,6 +97,58 @@ With `DATA_DIR=/home/pi/tiptopf-data`:
   - `email` (`local@tiptopf.local`)
 - `settings` with API keys and model/base URL configuration for OpenCode, Gemini (unified `gemini_*` fields since 2026-05), and Pexels. Old `gemini_image_*` fields are auto-migrated on load.
 
+## AI Model Configuration (OpenCode)
+
+Tiptopf-AI uses **OpenCode Zen** (an OpenAI-compatible gateway at `opencode.ai`) for recipe extraction from text and URLs. Image extraction uses Gemini (configured separately).
+
+### Default Configuration
+
+- **Default model**: `big-pickle`
+- **Default base URL**: `https://opencode.ai/zen/v1`
+
+**Big Pickle** is a free (beta/limited) model on OpenCode Zen, widely understood to be Zhipu AI's GLM-4.6. It offers strong reasoning and excellent structured/JSON output — well suited to recipe extraction.
+
+**Known limitation**: Community reports indicate that GLM-4.6 can produce slightly less natural German than previous GLM versions or certain other models (occasional grammar issues or unnatural phrasing). Because the app requires all recipe output (title, ingredients, instructions, tags) to be in German, test extraction quality after changing models.
+
+### Where to Configure
+
+Go to **/profile** in the app. The relevant section is "OpenCode":
+
+- **OpenCode API-Key**: Your Zen API key (create at [opencode.ai](https://opencode.ai))
+- **OpenCode Base URL**: Leave empty for the default free Zen endpoint, or enter a custom one
+- **OpenCode Modell-ID**: Leave empty to use `big-pickle`, or enter any supported model ID
+
+Empty fields always fall back to the built-in defaults.
+
+### Using the OpenCode Go Subscription
+
+The free Zen tier has rate limits. For more generous usage and stronger models, subscribe to the **OpenCode Go** plan ($5 first month, then $10/month):
+
+1. Subscribe at [https://opencode.ai/go](https://opencode.ai/go) (uses the same Zen account).
+2. In **/profile**, set:
+   - **OpenCode Base URL**: `https://opencode.ai/zen/go/v1`
+   - **OpenCode Modell-ID**: One of the Go models (current strong options include):
+     - `qwen3.7-max` or `qwen3.6-plus` — generally best multilingual/German + structured output
+     - `kimi-k2.6` or `kimi-k2.5` — excellent reasoning and instruction following
+     - `glm-5.1` — very strong agentic/structured model (test German quality)
+     - `minimax-m2.7` — paid successor to the older minimax models
+3. Your existing Zen API key works for Go as well.
+
+You can list currently available Go models with:
+```bash
+curl https://opencode.ai/zen/go/v1/models \
+  -H "Authorization: Bearer YOUR_ZEN_API_KEY"
+```
+
+To switch back to the free tier, simply clear the Base URL field (or set it to `https://opencode.ai/zen/v1`) and use `big-pickle` (or another free model such as `mimo-v2-pro-free`).
+
+### Tips for Model Selection
+
+- Start with the default (`big-pickle`). It is fast and capable for most users.
+- If German output quality feels off, try a Go subscription model (especially Qwen variants) or stick with Gemini for images.
+- The extraction code is resilient: it cleans markdown code fences and validates output with Zod. Minor formatting issues are often auto-corrected.
+- Gemini (configured in the separate "Gemini" section on /profile) is used for photo-based recipe extraction and has its own model/fallback settings.
+
 ## Image handling
 
 - Uploaded replacement images are validated (JPG/PNG/WEBP, up to 5 MB)
@@ -180,7 +232,8 @@ This guide documents how to run Tiptopf-AI as a Docker container on any machine 
 cp .env.docker.example .env.docker
 ```
 
-No API keys are required in `.env.docker`; configure them in `/profile` after startup.
+No API keys are required in `.env.docker`; configure them (including OpenCode model settings) in `/profile` after startup.
+See the "AI Model Configuration (OpenCode)" section below for details on Big Pickle and the OpenCode Go subscription.
 
 ### 2) Build and start
 

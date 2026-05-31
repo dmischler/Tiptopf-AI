@@ -235,8 +235,18 @@ The app opens directly to `/library`. Since there's no authentication, you're re
 ### Profile Settings
 
 Click the profile icon to:
-- Configure OpenCode, Gemini, and Pexels API/model settings
+- Configure OpenCode (API key + model), Gemini (for images), and Pexels API/model settings
 - Export/import your recipe collection
+
+**OpenCode defaults** (as of 2026):
+- Model: `big-pickle` (GLM-4.6 via free OpenCode Zen tier) — strong at structured extraction
+- Base URL: `https://opencode.ai/zen/v1`
+
+To use the paid **OpenCode Go** plan (higher limits + stronger models such as Qwen3.7 Max or GLM-5.1):
+- Set Base URL to `https://opencode.ai/zen/go/v1`
+- Choose a Go model ID (e.g. `qwen3.7-max`)
+
+See `docs/local-pi-deployment.md` → "AI Model Configuration (OpenCode)" for full details and recommendations.
 
 ---
 

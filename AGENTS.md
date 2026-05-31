@@ -19,7 +19,7 @@
 ## Architecture
 - **Next.js App Router** — primary routes: `/`, `/library`, `/profile`
 - **Server Actions** in `src/app/actions/` — `add-recipe.ts`, `extract-recipe.ts`, `recipe.ts`, `collections.ts`, `settings.ts`
-- **AI Layer** in `src/lib/ai/` — extraction and model config
+- **AI Layer** in `src/lib/ai/` — extraction and model config (default: `big-pickle` on OpenCode Zen; Go subscription supported)
 - **Local persistence** in `src/lib/local/` — `paths.ts`, `store.ts`, `images.ts`
 - **Image API route** in `src/app/api/images/[imageName]/route.ts`
 - **UI components** in `src/components/`
@@ -34,7 +34,7 @@
 - Categories fixed: starter, main, dessert, side, breakfast, snack
 - Difficulty: easy, medium, hard
 - URL images are downloaded and persisted locally
-- API keys/config are managed in `/profile` and persisted in local store (currently unencrypted)
+- API keys + AI model config (OpenCode for text/URL extraction, Gemini for images) are managed in `/profile` and persisted in local store (currently unencrypted)
 - UI language: German
 
 ## Code Organization
