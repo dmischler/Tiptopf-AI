@@ -350,7 +350,7 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
           </Button>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-3 mb-3">
           <FilterBar
             search={searchTerm}
             onSearchChange={setSearchTerm}
