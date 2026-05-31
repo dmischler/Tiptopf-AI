@@ -139,6 +139,15 @@ tar -xzf tiptopf-backup.tar.gz -C /home/pi
 - Check Tailscale status on both devices.
 - Verify firewall allows chosen port.
 
+### View logs (direct install)
+
+When running via the systemd service (recommended for production, see `docs/SETUP.md`):
+```bash
+sudo journalctl -u tiptopf -f
+```
+
+When running `npm run start` directly in the foreground, logs print to the terminal.
+
 ## Verify after deployment
 
 1. Open `/library`
@@ -219,6 +228,36 @@ docker compose cp ./tiptopf-backup.tar.gz app:/tmp/backup.tar.gz && \
 git pull
 docker compose up -d --build
 ```
+
+### Viewing Logs
+
+```bash
+# Follow logs live (most common)
+docker compose logs -f
+
+# View the last 100 lines
+docker compose logs --tail 100
+
+# Follow with timestamps
+docker compose logs -f -t
+
+# View logs for the app service only
+docker compose logs -f app
+```
+
+Logs show application output (including AI extraction, errors, and startup messages). Use this as the first step when recipes fail to save or images don't load.
+
+### Troubleshooting
+
+- Check container status and health: `docker compose ps`
+- Restart the app after config or code changes: `docker compose restart`
+- View a large recent window after a problem: `docker compose logs --tail 200 --no-color`
+- The container includes a healthcheck hitting `/library` (defined in `docker-compose.yml`).
+
+Common issues:
+- App won't start → inspect logs for port conflicts or `DATA_DIR` problems.
+- AI features (extraction, image generation) broken → keys are configured inside the app at `/profile` (not in `.env.docker`).
+- Images not loading → confirm the volume mounted correctly and files exist in the persisted data.
 
 ### Security notes
 
