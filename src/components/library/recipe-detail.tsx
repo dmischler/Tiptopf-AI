@@ -1004,6 +1004,15 @@ export function RecipeDetail({
                     <ShoppingCart className="mr-2 h-4 w-4" />
                     {isAddingToShoppingList ? 'Wird hinzugefügt...' : 'Zur Einkaufsliste'}
                   </Button>
+
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => setConfirmDeleteOpen(true)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Rezept löschen
+                  </Button>
                 </div>
               </div>
             </div>
