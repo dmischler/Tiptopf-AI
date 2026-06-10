@@ -13,7 +13,6 @@ import {
   Pencil,
   Plus,
   Printer,
-  RotateCcw,
   ShoppingCart,
   Timer,
   Trash2,
@@ -864,7 +863,22 @@ export function RecipeDetail({
                          <Minus className="h-3.5 w-3.5" />
                        </Button>
 
-                       <span className="tabular-nums min-w-[1.5rem] text-center">{effectiveServings}</span>
+                       {scaleRatio !== 1 ? (
+                         <button
+                           type="button"
+                           className="inline-flex min-h-[44px] min-w-[2.75rem] items-center justify-center gap-0.5 rounded-lg tabular-nums text-sm font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 touch-manipulation"
+                           onClick={() => setAdjustedServings(baseServings)}
+                           aria-label={`Auf ${baseServings} Portionen zurücksetzen`}
+                           title={`Auf ${baseServings} Portionen zurücksetzen`}
+                         >
+                           {effectiveServings}
+                           <span aria-hidden="true" className="text-xs text-primary/80">
+                             *
+                           </span>
+                         </button>
+                       ) : (
+                         <span className="tabular-nums min-w-[1.5rem] text-center">{effectiveServings}</span>
+                       )}
 
                        <Button
                          type="button"
@@ -877,19 +891,6 @@ export function RecipeDetail({
                        >
                          <Plus className="h-3.5 w-3.5" />
                        </Button>
-
-                       {scaleRatio !== 1 && (
-                         <Button
-                           type="button"
-                           variant="ghost"
-                           size="icon"
-                           className="h-7 w-7 ml-1"
-                           onClick={() => setAdjustedServings(baseServings)}
-                           aria-label="Auf Original zurücksetzen"
-                         >
-                           <RotateCcw className="h-3.5 w-3.5" />
-                         </Button>
-                       )}
                      </div>
                    </div>
                 </div>
