@@ -14,8 +14,6 @@ import type { Recipe } from '@/types'
 
 const REPETITIONS = 5
 const ITEM_WIDTH = 160
-const ITEM_GAP = 16
-const ITEM_STRIDE = ITEM_WIDTH + ITEM_GAP
 
 interface RandomRecipeDrawerProps {
   isOpen: boolean
@@ -33,7 +31,7 @@ export function RandomRecipeDrawer({
   drawKey,
 }: RandomRecipeDrawerProps) {
   const [phase, setPhase] = useState<'idle' | 'scrolling' | 'popping' | 'done'>('idle')
-  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null)
+  const [targetPhysicalIndex, setTargetPhysicalIndex] = useState(-1)
   const containerRef = useRef<HTMLDivElement>(null)
   const stripRef = useRef<HTMLDivElement>(null)
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
@@ -57,7 +55,7 @@ export function RandomRecipeDrawer({
   useEffect(() => {
     if (!isOpen) {
       setPhase('idle')
-      setSelectedRecipe(null)
+      setTargetPhysicalIndex(-1)
       timersRef.current.forEach(clearTimeout)
       timersRef.current = []
       setStripStyle({ transform: 'translateX(0px)', transition: 'none' })
@@ -68,19 +66,29 @@ export function RandomRecipeDrawer({
 
     const targetRecipeIndex = Math.floor(Math.random() * recipes.length)
     const recipe = recipes[targetRecipeIndex]
-    setSelectedRecipe(recipe)
+    const middleRepetition = Math.floor(REPETITIONS / 2)
+    const physicalIndex = middleRepetition * recipes.length + targetRecipeIndex
+
+    setTargetPhysicalIndex(physicalIndex)
+    setStripStyle({ transform: 'translateX(0px)', transition: 'none' })
 
     // Wait a tick so the dialog DOM is fully laid out, then measure and animate
     const startTimer = setTimeout(() => {
       const container = containerRef.current
-      if (!container) return
+      const strip = stripRef.current
+      if (!container || !strip) return
 
       const containerWidth = container.getBoundingClientRect().width
       if (containerWidth === 0) return
 
-      const middleRepetition = Math.floor(REPETITIONS / 2)
-      const physicalIndex = middleRepetition * recipes.length + targetRecipeIndex
-      const finalX = -(physicalIndex * ITEM_STRIDE) + (containerWidth - ITEM_WIDTH) / 2
+      const targetEl = strip.children[physicalIndex] as HTMLElement | undefined
+      if (!targetEl) return
+
+      const containerRect = container.getBoundingClientRect()
+      const targetRect = targetEl.getBoundingClientRect()
+      const targetCenter = targetRect.left + targetRect.width / 2 - containerRect.left
+      const containerCenter = containerRect.width / 2
+      const finalX = containerCenter - targetCenter
 
       setPhase('scrolling')
 
@@ -118,13 +126,7 @@ export function RandomRecipeDrawer({
     }
   }
 
-  const targetRecipeIndexInPool =
-    selectedRecipe ? recipes.findIndex((r) => r.id === selectedRecipe.id) : -1
-  const middleRepetition = Math.floor(REPETITIONS / 2)
-  const exactTargetIndex =
-    targetRecipeIndexInPool >= 0
-      ? middleRepetition * recipes.length + targetRecipeIndexInPool
-      : -1
+  const exactTargetIndex = targetPhysicalIndex
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -141,7 +143,7 @@ export function RandomRecipeDrawer({
 
         <div
           ref={containerRef}
-          className="relative flex items-center justify-center overflow-hidden bg-muted/30 py-10"
+          className="relative flex items-center justify-start overflow-hidden bg-muted/30 py-10"
           style={{ height: 240 }}
         >
           {recipes.length === 0 ? (
