@@ -66,7 +66,7 @@ export function RecipeNotes({ notes }: RecipeNotesProps) {
     <section className="space-y-3">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Anmerkungen</h2>
       <div
-        className="text-sm leading-relaxed text-foreground/90"
+        className="text-base leading-relaxed text-foreground/90"
         dangerouslySetInnerHTML={{ __html: renderNotesToHtml(trimmed) }}
       />
     </section>

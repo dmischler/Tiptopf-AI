@@ -35,22 +35,23 @@ const DialogContent = React.forwardRef<
   HTMLDivElement,
   DialogPrimitive.Popup.Props & {
     showCloseButton?: boolean
-    presentation?: "modal" | "sheet"
   }
->(({ className, children, showCloseButton = true, presentation = "modal", ...props }, ref) => {
-  const isSheet = presentation === "sheet"
-  const baseClass = isSheet
-    ? "fixed bottom-0 left-0 right-0 z-[80] grid w-full max-h-[min(92svh,1000px)] translate-x-0 translate-y-0 gap-4 overflow-hidden rounded-t-2xl border border-white/10 bg-card text-sm text-card-foreground shadow-2xl shadow-black/35 duration-200 outline-none data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-bottom-4 data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-bottom-4"
-    : "fixed top-1/2 left-1/2 z-[80] grid w-full max-w-[calc(100%-2rem)] max-h-[calc(100vh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-hidden rounded-2xl border border-white/10 bg-card p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] text-sm text-card-foreground shadow-2xl shadow-black/35 duration-200 outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
-
+>(({ className, children, showCloseButton = true, ...props }, ref) => {
+  // Sheet on the phone / short landscape; centered modal only with `nav-top`
+  // (min-width 768px AND min-height 600px) — same rule as top vs bottom nav.
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Popup
         ref={ref}
         data-slot="dialog-content"
-        data-presentation={presentation}
-        className={cn(baseClass, className)}
+        className={cn(
+          "fixed inset-x-0 bottom-0 z-[80] grid w-full max-h-[min(92svh,1000px)] max-w-none translate-x-0 translate-y-0 gap-4 overflow-hidden rounded-t-2xl border border-white/10 bg-card pb-[env(safe-area-inset-bottom)] text-sm text-card-foreground shadow-2xl shadow-black/35 outline-none duration-200",
+          "data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-bottom-4 data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-bottom-4",
+          "nav-top:inset-auto nav-top:top-1/2 nav-top:left-1/2 nav-top:right-auto nav-top:bottom-auto nav-top:max-h-[calc(100vh-2rem)] nav-top:w-full nav-top:max-w-[calc(100%-2rem)] nav-top:-translate-x-1/2 nav-top:-translate-y-1/2 nav-top:rounded-2xl nav-top:p-4 nav-top:pb-4",
+          "nav-top:data-open:zoom-in-95 nav-top:data-closed:zoom-out-95",
+          className
+        )}
         {...props}
       >
         {children}
@@ -68,7 +69,7 @@ const DialogContent = React.forwardRef<
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-black/80 text-white shadow ring-1 ring-white/10 transition-all hover:bg-black/95 hover:ring-white/25">
               <XIcon className="h-4 w-4" />
             </span>
-            <span className="sr-only">Close</span>
+            <span className="sr-only">Schließen</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Popup>

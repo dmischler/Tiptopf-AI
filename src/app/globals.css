@@ -2,6 +2,11 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Top chrome only when the viewport is tablet+ AND tall enough.
+   Short landscape phones (e.g. 844×390) keep the bottom nav. */
+@custom-variant nav-top (@media (min-width: 768px) and (min-height: 600px));
+@custom-variant standalone (@media (display-mode: standalone));
+
 @theme inline {
   --color-background: #0f0f0f;
   --color-foreground: #ededed;
@@ -56,6 +61,26 @@
   html {
     @apply font-sans;
     -webkit-tap-highlight-color: transparent;
+  }
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+@media (display-mode: standalone) {
+  main {
+    padding-top: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .random-draw-strip {
+    transition: none !important;
   }
 }
 

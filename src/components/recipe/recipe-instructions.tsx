@@ -23,8 +23,8 @@ export function RecipeInstructions({ instructions }: RecipeInstructionsProps) {
       <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Anleitung</h2>
       <ol className="space-y-3">
         {steps.map((step, index) => (
-          <li key={`${step}-${index}`} className="flex gap-3 text-sm leading-relaxed">
-            <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
+          <li key={`${step}-${index}`} className="flex gap-3 text-lg leading-relaxed">
+            <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
               {index + 1}
             </span>
             <span>{step}</span>

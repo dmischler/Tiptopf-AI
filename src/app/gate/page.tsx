@@ -25,7 +25,7 @@ export default async function GatePage({ searchParams }: GatePageProps) {
   const showError = params.error === '1'
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-6 px-4 py-8 pb-[max(6rem,env(safe-area-inset-bottom))]">
+    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-6 px-4 pt-8 pb-[max(6rem,env(safe-area-inset-bottom))] standalone:pt-4">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">PIN eingeben</h1>
         <p className="mt-2 text-sm text-muted-foreground">

@@ -36,7 +36,7 @@ function resizeImageToBase64(file: File): Promise<string> {
       canvas.height = height
       const ctx = canvas.getContext('2d')
       if (!ctx) {
-        reject(new Error('Could not process image'))
+        reject(new Error('Bild konnte nicht verarbeitet werden.'))
         return
       }
       ctx.drawImage(img, 0, 0, width, height)
@@ -45,7 +45,7 @@ function resizeImageToBase64(file: File): Promise<string> {
 
     img.onerror = () => {
       URL.revokeObjectURL(url)
-      reject(new Error('Failed to load image. Try a different photo (JPG/PNG recommended).'))
+      reject(new Error('Bild konnte nicht geladen werden. Versuche ein anderes Foto (JPG/PNG).'))
     }
 
     img.src = url
@@ -60,25 +60,25 @@ export function ImageUpload({ disabled, onSelect, onError }: ImageUploadProps) {
     if (!file) return
 
     if (!file.type.startsWith('image/')) {
-      onError('Please select an image file.')
+      onError('Bitte wähle eine Bilddatei.')
       return
     }
 
     if (file.size > MAX_BYTES) {
-      onError('Image must be 10MB or smaller.')
+      onError('Das Bild darf höchstens 10 MB groß sein.')
       return
     }
 
     try {
       const dataUrl = await resizeImageToBase64(file)
       if (!dataUrl) {
-        onError('Could not process image payload.')
+        onError('Bild konnte nicht verarbeitet werden.')
         return
       }
 
       await onSelect(dataUrl)
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to process image.'
+      const message = error instanceof Error ? error.message : 'Bild konnte nicht verarbeitet werden.'
       onError(message)
     }
   }
@@ -86,7 +86,7 @@ export function ImageUpload({ disabled, onSelect, onError }: ImageUploadProps) {
   return (
     <div className="space-y-4">
       <div
-        className="rounded-xl border border-dashed border-border/80 bg-muted/35 p-8 text-center"
+        className="hidden rounded-xl border border-dashed border-border/80 bg-muted/35 p-8 text-center md:block"
         onDragOver={(event) => {
           event.preventDefault()
         }}
@@ -97,29 +97,30 @@ export function ImageUpload({ disabled, onSelect, onError }: ImageUploadProps) {
         }}
       >
         <UploadCloud className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
-        <p className="text-sm font-medium text-foreground">Drag and drop a recipe photo</p>
-        <p className="mt-1 text-xs text-muted-foreground">Any photo up to 10MB (auto-optimized for AI)</p>
+        <p className="text-sm font-medium text-foreground">Rezeptfoto hierher ziehen</p>
+        <p className="mt-1 text-sm text-muted-foreground">Beliebiges Foto bis 10 MB (wird für die KI verkleinert)</p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <Button
           type="button"
-          variant="outline"
           disabled={disabled}
-          onClick={() => fileInputRef.current?.click()}
+          className="h-11"
+          onClick={() => cameraInputRef.current?.click()}
         >
-          <UploadCloud className="mr-2 h-4 w-4" />
-          Choose image
+          <Camera className="mr-2 h-4 w-4" />
+          Foto aufnehmen
         </Button>
 
         <Button
           type="button"
           variant="outline"
           disabled={disabled}
-          onClick={() => cameraInputRef.current?.click()}
+          className="h-11"
+          onClick={() => fileInputRef.current?.click()}
         >
-          <Camera className="mr-2 h-4 w-4" />
-          Use camera
+          <UploadCloud className="mr-2 h-4 w-4" />
+          Bild wählen
         </Button>
       </div>
 

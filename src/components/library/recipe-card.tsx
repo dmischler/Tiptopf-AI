@@ -16,10 +16,9 @@ type RecipeCardProps = {
   recipe: Recipe
   index?: number
   onFavoriteChange?: (value: boolean) => void
-  onRatingChange?: (value: number | null) => void
 }
 
-export function RecipeCard({ recipe, index = 0, onFavoriteChange, onRatingChange }: RecipeCardProps) {
+export function RecipeCard({ recipe, index = 0, onFavoriteChange }: RecipeCardProps) {
   const imageSrc = toRecipeImageSrc(recipe)
 
   return (
@@ -27,9 +26,9 @@ export function RecipeCard({ recipe, index = 0, onFavoriteChange, onRatingChange
       href={`/library/${recipe.id}`}
       className="block rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
     >
-      <Card className="py-0 transition duration-150 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.985] active:shadow-md">
-        {imageSrc ? (
-          <div className="relative aspect-[16/10] w-full overflow-hidden sm:aspect-[4/3]">
+      <Card className="overflow-hidden py-0 transition duration-150 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.985] active:shadow-md">
+        <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted/40">
+          {imageSrc ? (
             <Image
               src={imageSrc}
               alt={recipe.title}
@@ -38,8 +37,12 @@ export function RecipeCard({ recipe, index = 0, onFavoriteChange, onRatingChange
               sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
               priority={index < 4}
             />
-          </div>
-        ) : null}
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
+              Kein Bild vorhanden
+            </div>
+          )}
+        </div>
 
         <CardContent className="space-y-3 p-4">
           <div className="flex items-start justify-between gap-2">
@@ -61,37 +64,32 @@ export function RecipeCard({ recipe, index = 0, onFavoriteChange, onRatingChange
           {recipe.tags.length > 0 ? (
             <div className="flex flex-wrap gap-1">
               {recipe.tags.slice(0, 3).map((tag) => (
-                <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300">
+                <span key={tag} className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">
                   {tag}
                 </span>
               ))}
               {recipe.tags.length > 3 && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">
+                <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
                   +{recipe.tags.length - 3}
                 </span>
               )}
             </div>
           ) : null}
 
-          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
             <span className="inline-flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <Clock className="h-4 w-4" />
               {formatTotalTime(recipe.prep_time, recipe.cook_time)}
             </span>
             {recipe.servings > 0 ? (
               <span className="inline-flex items-center gap-1">
-                <UtensilsCrossed className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <UtensilsCrossed className="h-4 w-4" />
                 {recipe.servings}
               </span>
             ) : null}
           </div>
 
-          <Rating
-            recipeId={recipe.id}
-            initialRating={recipe.rating}
-            size="sm"
-            onOptimisticChange={onRatingChange}
-          />
+          <Rating recipeId={recipe.id} initialRating={recipe.rating} size="sm" readOnly />
         </CardContent>
       </Card>
     </Link>

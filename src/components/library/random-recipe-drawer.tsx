@@ -73,6 +73,13 @@ export function RandomRecipeDrawer({
     setTargetPhysicalIndex(physicalIndex)
     setStripStyle({ transform: 'translateX(0px)', transition: 'none' })
 
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setPhase('done')
+      onRecipeSelectedRef.current(recipe)
+      onCloseRef.current()
+      return
+    }
+
     // Wait a tick so the dialog DOM is fully laid out, then measure and animate
     const startTimer = setTimeout(() => {
       const container = containerRef.current
@@ -132,7 +139,7 @@ export function RandomRecipeDrawer({
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="w-full max-w-3xl gap-0 overflow-hidden p-0 sm:max-w-3xl"
+        className="w-full gap-0 overflow-hidden p-0 nav-top:max-w-3xl"
         showCloseButton={phase !== 'scrolling' && phase !== 'popping'}
       >
         <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 pr-12">
@@ -156,7 +163,7 @@ export function RandomRecipeDrawer({
               <div className="pointer-events-none absolute inset-y-0 left-1/2 z-10 w-0.5 -translate-x-1/2 bg-primary/40" />
               <div
                 ref={stripRef}
-                className="flex items-center gap-4 will-change-transform"
+                className="random-draw-strip flex items-center gap-4 will-change-transform"
                 style={stripStyle}
               >
                 {items.map((recipe, index) => {

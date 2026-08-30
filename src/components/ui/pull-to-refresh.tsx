@@ -17,6 +17,12 @@ const DEFAULT_RESISTANCE = 2.2
 const INDICATOR_HEIGHT = 60
 const TOP_GAP = 4 // small visual breathing room
 
+function hasOpenDialog() {
+  return Boolean(
+    document.querySelector('[data-slot="dialog-overlay"][data-open], [data-slot="dialog-content"][data-open]')
+  )
+}
+
 export function PullToRefresh({
   onRefresh,
   children,
@@ -32,9 +38,9 @@ export function PullToRefresh({
   const isDraggingRef = useRef(false)
   const indicatorRef = useRef<HTMLDivElement>(null)
 
-  // Track mobile viewport (PTR only makes sense on touch / narrow screens)
+  // PTR follows the same chrome as bottom nav: coarse pointer, and not nav-top.
   useEffect(() => {
-    const mql = window.matchMedia('(max-width: 767px)')
+    const mql = window.matchMedia('(pointer: coarse) and ((max-width: 767px) or (max-height: 599px))')
     const update = () => setIsMobile(mql.matches)
     update()
     mql.addEventListener('change', update)
@@ -43,7 +49,7 @@ export function PullToRefresh({
 
   useEffect(() => {
     const handleTouchStart = (e: TouchEvent) => {
-      if (isRefreshing || !isMobile) return
+      if (isRefreshing || !isMobile || hasOpenDialog()) return
 
       const scrollTop = window.scrollY || document.documentElement.scrollTop
       if (scrollTop > 8) return
@@ -54,7 +60,7 @@ export function PullToRefresh({
     }
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (!isDraggingRef.current || isRefreshing || !isMobile) return
+      if (!isDraggingRef.current || isRefreshing || !isMobile || hasOpenDialog()) return
 
       const scrollTop = window.scrollY || document.documentElement.scrollTop
       if (scrollTop > 8) {

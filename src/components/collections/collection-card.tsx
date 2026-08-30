@@ -26,7 +26,7 @@ export function CollectionCard({ collection, recipeCount, coverImage, onClick }:
         }
       }}
     >
-      <div className="relative aspect-[16/10] w-full overflow-hidden">
+      <div className="relative aspect-[4/3] w-full overflow-hidden">
         {coverImage ? (
           <Image
             src={coverImage}

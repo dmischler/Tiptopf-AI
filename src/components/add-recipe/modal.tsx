@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -17,6 +17,7 @@ import { RecipePreview, type EditableRecipePreview } from '@/components/add-reci
 import { StreamingProgress, type Stage } from '@/components/add-recipe/streaming-progress'
 import { UrlInput } from '@/components/add-recipe/url-input'
 import { parseRecipeFieldsForSave } from '@/components/recipe/recipe-fields'
+import { ImageSelectionHost } from '@/components/recipe/image-picker'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -78,6 +79,7 @@ export function AddRecipeModal({
   allTags = [],
 }: AddRecipeModalProps) {
   const router = useRouter()
+  const extractGenRef = useRef(0)
   const [activeTab, setActiveTab] = useState<'image' | 'url' | 'manual'>(initialMode)
   const [phase, setPhase] = useState<ModalPhase>('input')
   const [progressStage, setProgressStage] = useState<Stage>('fetching')
@@ -102,6 +104,7 @@ export function AddRecipeModal({
   }, [open, initialUrl, initialMode])
 
   function resetState() {
+    extractGenRef.current += 1
     setPhase('input')
     setProgressStage('fetching')
     setStreamText('')
@@ -125,22 +128,27 @@ export function AddRecipeModal({
       return
     }
 
+    const gen = ++extractGenRef.current
     setPhase('parsing')
     setProgressStage('fetching')
     setStreamText('Seite wird geladen...')
 
     try {
       const recipe = await extractFromUrlAction(url)
+      if (gen !== extractGenRef.current) return
+
       setProgressStage('structuring')
       setStreamText('Felder werden strukturiert...')
 
-      const withImage = await runAutoImageFallback(recipe)
+      const withImage = await runAutoImageFallback(recipe, gen)
+      if (gen !== extractGenRef.current) return
 
       setExtractedRecipe(withImage)
       setPreviewState(buildEditableState(withImage))
       setProgressStage('complete')
       setPhase('preview')
     } catch (error) {
+      if (gen !== extractGenRef.current) return
       const message = error instanceof Error ? error.message : 'Extrahieren von der URL fehlgeschlagen.'
       setProgressStage('error')
       toast.error(message)
@@ -149,22 +157,27 @@ export function AddRecipeModal({
   }
 
   async function handleExtractFromImage(imageBase64: string) {
+    const gen = ++extractGenRef.current
     setPhase('parsing')
     setProgressStage('parsing')
     setStreamText('Rezeptbild wird analysiert...')
 
     try {
       const recipe = await extractFromImageAction(imageBase64)
+      if (gen !== extractGenRef.current) return
+
       setProgressStage('structuring')
       setStreamText('Zutaten und Anleitung werden strukturiert...')
 
-      const withImage = await runAutoImageFallback(recipe)
+      const withImage = await runAutoImageFallback(recipe, gen)
+      if (gen !== extractGenRef.current) return
 
       setExtractedRecipe(withImage)
       setPreviewState(buildEditableState(withImage))
       setProgressStage('complete')
       setPhase('preview')
     } catch (error) {
+      if (gen !== extractGenRef.current) return
       const message = error instanceof Error ? error.message : 'Extrahieren vom Bild fehlgeschlagen.'
       setProgressStage('error')
       toast.error(message)
@@ -172,8 +185,12 @@ export function AddRecipeModal({
     }
   }
 
-  async function runAutoImageFallback(recipe: ExtractedRecipePayload) {
+  async function runAutoImageFallback(recipe: ExtractedRecipePayload, gen: number) {
     if (recipe.image_url) {
+      return recipe
+    }
+
+    if (gen !== extractGenRef.current) {
       return recipe
     }
 
@@ -186,6 +203,10 @@ export function AddRecipeModal({
         category: recipe.category,
         ingredients: recipe.ingredients,
       })
+
+      if (gen !== extractGenRef.current) {
+        return recipe
+      }
 
       if (!resolved?.imageUrl) {
         return recipe
@@ -259,7 +280,7 @@ export function AddRecipeModal({
       resetState()
       router.push(`/library/${saved.id}`)
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Speichern fehlgeschlagen.'
+      const message = error instanceof Error ? error.message : 'Rezept konnte nicht gespeichert werden.'
       toast.error(message)
       setPhase('preview')
     }
@@ -306,7 +327,7 @@ export function AddRecipeModal({
       resetState()
       router.push(`/library/${saved.id}`)
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Speichern fehlgeschlagen.'
+      const message = error instanceof Error ? error.message : 'Rezept konnte nicht gespeichert werden.'
       toast.error(message)
     } finally {
       setIsManualSaving(false)
@@ -314,100 +335,102 @@ export function AddRecipeModal({
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        onOpenChange(nextOpen)
-        if (!nextOpen) {
-          resetState()
-        }
-      }}
-    >
-      <DialogContent className="w-full max-w-4xl p-0 sm:max-w-4xl">
-        <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 pr-12 sm:px-6 sm:pt-6">
-          <DialogTitle>Rezept hinzufügen</DialogTitle>
-          <DialogDescription>
-            Lade ein Foto hoch oder füge eine URL ein. Die KI extrahiert das Rezept automatisch.
-          </DialogDescription>
-        </DialogHeader>
+    <ImageSelectionHost>
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => {
+          onOpenChange(nextOpen)
+          if (!nextOpen) {
+            resetState()
+          }
+        }}
+      >
+        <DialogContent className="w-full p-0 nav-top:max-w-4xl">
+          <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 pr-12 sm:px-6 sm:pt-6">
+            <DialogTitle>Rezept hinzufügen</DialogTitle>
+            <DialogDescription>
+              Foto aufnehmen oder URL einfügen. Die KI strukturiert das Rezept.
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="max-h-[calc(90vh-7.5rem)] space-y-4 overflow-y-auto px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
-          {phase === 'input' && (
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'image' | 'url' | 'manual')}>
-              <TabsList className="grid w-full grid-cols-3 rounded-xl bg-muted/60 p-1">
-                <TabsTrigger value="image">Bild</TabsTrigger>
-                <TabsTrigger value="url">URL</TabsTrigger>
-                <TabsTrigger value="manual">Manuell</TabsTrigger>
-              </TabsList>
+          <div className="max-h-[min(calc(92svh-7.5rem),calc(1000px-7.5rem))] space-y-4 overflow-y-auto px-5 pb-5 pt-4 sm:px-6 sm:pb-6 nav-top:max-h-[calc(100vh-10rem)]">
+            {phase === 'input' && (
+              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'image' | 'url' | 'manual')}>
+                <TabsList className="grid w-full grid-cols-3 rounded-xl bg-muted/60 p-1">
+                  <TabsTrigger value="image">Bild</TabsTrigger>
+                  <TabsTrigger value="url">URL</TabsTrigger>
+                  <TabsTrigger value="manual">Manuell</TabsTrigger>
+                </TabsList>
 
-              <TabsContent value="image" className="pt-4">
-                <ImageUpload
-                  onSelect={handleExtractFromImage}
-                  onError={(message) => toast.error(message)}
-                />
-              </TabsContent>
+                <TabsContent value="image" className="pt-4">
+                  <ImageUpload
+                    onSelect={handleExtractFromImage}
+                    onError={(message) => toast.error(message)}
+                  />
+                </TabsContent>
 
-              <TabsContent value="url" className="pt-4">
-                <UrlInput value={urlInput} onValueChange={setUrlInput} onExtract={handleExtractFromUrl} />
-              </TabsContent>
+                <TabsContent value="url" className="pt-4">
+                  <UrlInput value={urlInput} onValueChange={setUrlInput} onExtract={handleExtractFromUrl} />
+                </TabsContent>
 
-              <TabsContent value="manual" className="pt-4">
-                <ManualForm
-                  onSave={handleSaveManual}
-                  onCancel={() => {
+                <TabsContent value="manual" className="pt-4">
+                  <ManualForm
+                    onSave={handleSaveManual}
+                    onCancel={() => {
+                      onOpenChange(false)
+                      resetState()
+                    }}
+                    isSaving={isManualSaving}
+                    allTags={allTags}
+                  />
+                </TabsContent>
+              </Tabs>
+            )}
+
+            {phase === 'parsing' && <StreamingProgress stage={progressStage} streamText={streamText} />}
+
+            {phase === 'preview' && extractedRecipe && previewState && (
+              <RecipePreview
+                parsedRecipe={extractedRecipe}
+                value={previewState}
+                disabled={false}
+                imageCreditName={imageMeta?.creditName ?? null}
+                imageCreditUrl={imageMeta?.creditUrl ?? null}
+                allTags={allTags}
+                onChange={setPreviewState}
+                onSave={handleSave}
+                onCancel={() => {
+                  resetState()
+                  onOpenChange(false)
+                }}
+                onImageFileChange={setReplacementImageFile}
+              />
+            )}
+
+            {phase === 'saving' && (
+              <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/40 p-8 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Rezept wird gespeichert...
+              </div>
+            )}
+
+            {phase !== 'saving' && phase !== 'preview' && activeTab !== 'manual' && (
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
                     onOpenChange(false)
                     resetState()
                   }}
-                  isSaving={isManualSaving}
-                  allTags={allTags}
-                />
-              </TabsContent>
-            </Tabs>
-          )}
-
-          {phase === 'parsing' && <StreamingProgress stage={progressStage} streamText={streamText} />}
-
-          {phase === 'preview' && extractedRecipe && previewState && (
-            <RecipePreview
-              parsedRecipe={extractedRecipe}
-              value={previewState}
-              disabled={false}
-              imageCreditName={imageMeta?.creditName ?? null}
-              imageCreditUrl={imageMeta?.creditUrl ?? null}
-              allTags={allTags}
-              onChange={setPreviewState}
-              onSave={handleSave}
-              onCancel={() => {
-                resetState()
-                onOpenChange(false)
-              }}
-              onImageFileChange={setReplacementImageFile}
-            />
-          )}
-
-          {phase === 'saving' && (
-            <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/40 p-8 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Rezept wird gespeichert...
-            </div>
-          )}
-
-          {phase !== 'saving' && phase !== 'preview' && activeTab !== 'manual' && (
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  onOpenChange(false)
-                  resetState()
-                }}
-              >
-                Abbrechen
-              </Button>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+                >
+                  Abbrechen
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </ImageSelectionHost>
   )
 }

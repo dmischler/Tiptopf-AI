@@ -1,8 +1,16 @@
 'use client'
 
 import Image from 'next/image'
-import { useEffect, useState } from 'react'
-import { ImageIcon, Loader2, Upload } from 'lucide-react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
+import { Camera, ImageIcon, Loader2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 
 import {
@@ -19,6 +27,42 @@ import {
   toRecipeImageSrc,
 } from '@/lib/recipe-image'
 import type { RecipeCategory } from '@/types'
+
+type ImageSelectionHostState = {
+  open: boolean
+  loading: boolean
+  title: string
+  candidates: RecipeImageCandidate[]
+  onOpenChange: (open: boolean) => void
+  onSelectCandidate: (candidate: RecipeImageCandidate) => void
+  onRefreshSearch: () => void
+}
+
+const ImageSelectionHostContext = createContext<{
+  setSelection: (state: ImageSelectionHostState | null) => void
+} | null>(null)
+
+export function ImageSelectionHost({ children }: { children: ReactNode }) {
+  const [selection, setSelection] = useState<ImageSelectionHostState | null>(null)
+  const api = useMemo(() => ({ setSelection }), [])
+
+  return (
+    <ImageSelectionHostContext.Provider value={api}>
+      {children}
+      {selection ? (
+        <ImageSelectionModal
+          open={selection.open}
+          loading={selection.loading}
+          title={selection.title}
+          candidates={selection.candidates}
+          onOpenChange={selection.onOpenChange}
+          onSelectCandidate={selection.onSelectCandidate}
+          onRefreshSearch={selection.onRefreshSearch}
+        />
+      ) : null}
+    </ImageSelectionHostContext.Provider>
+  )
+}
 
 type ImageMeta = {
   creditName?: string
@@ -151,6 +195,11 @@ export function ImagePicker({
   onFileChange,
 }: ImagePickerProps) {
   const picker = useRecipeImagePicker({ recipeId, title, category })
+  const pickerRef = useRef(picker)
+  pickerRef.current = picker
+  const host = useContext(ImageSelectionHostContext)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const cameraInputRef = useRef<HTMLInputElement | null>(null)
   const [selectionOpen, setSelectionOpen] = useState(false)
   const [isFinding, setIsFinding] = useState(false)
   const [pickedCredit, setPickedCredit] = useState<ImageMeta | null>(null)
@@ -193,6 +242,9 @@ export function ImagePicker({
     }
   }
 
+  const handleSelectCandidateRef = useRef(handleSelectCandidate)
+  handleSelectCandidateRef.current = handleSelectCandidate
+
   function handleReplaceImage(nextFile: File | null) {
     if (!nextFile) {
       return
@@ -207,6 +259,36 @@ export function ImagePicker({
     onFileChange?.(nextFile)
     toast.success('Bild ersetzt.')
   }
+
+  useEffect(() => {
+    if (!host) {
+      return
+    }
+
+    host.setSelection({
+      open: selectionOpen,
+      loading: picker.loading,
+      title: title || 'Rezept',
+      candidates: picker.candidates,
+      onOpenChange: setSelectionOpen,
+      onSelectCandidate: (candidate) => {
+        void handleSelectCandidateRef.current(candidate)
+      },
+      onRefreshSearch: () => {
+        void pickerRef.current.search()
+      },
+    })
+  }, [host, picker.candidates, picker.loading, selectionOpen, title])
+
+  useEffect(() => {
+    if (!host) {
+      return
+    }
+
+    return () => {
+      host.setSelection(null)
+    }
+  }, [host])
 
   return (
     <div className="space-y-3 rounded-xl border border-border/70 bg-muted/25 p-4">
@@ -252,22 +334,49 @@ export function ImagePicker({
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
-        <label className="inline-flex">
-          <input
-            type="file"
-            className="hidden"
-            accept="image/jpeg,image/png,image/webp"
-            disabled={disabled}
-            onChange={(event) => {
-              handleReplaceImage(event.target.files?.[0] || null)
-              event.currentTarget.value = ''
-            }}
-          />
-          <span className="inline-flex h-10 min-h-[44px] cursor-pointer items-center gap-2 rounded-md border border-border bg-background/70 px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/60">
-            <Upload className="h-4 w-4" />
-            Bild ersetzen
-          </span>
-        </label>
+        <Button
+          type="button"
+          disabled={disabled}
+          onClick={() => cameraInputRef.current?.click()}
+        >
+          <Camera className="h-4 w-4" />
+          Foto aufnehmen
+        </Button>
+
+        <Button
+          type="button"
+          variant="outline"
+          disabled={disabled}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Upload className="h-4 w-4" />
+          {displayUrl ? 'Bild ersetzen' : 'Bild wählen'}
+        </Button>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept="image/jpeg,image/png,image/webp"
+          disabled={disabled}
+          onChange={(event) => {
+            handleReplaceImage(event.target.files?.[0] || null)
+            event.currentTarget.value = ''
+          }}
+        />
+
+        <input
+          ref={cameraInputRef}
+          type="file"
+          className="hidden"
+          accept="image/*"
+          capture="environment"
+          disabled={disabled}
+          onChange={(event) => {
+            handleReplaceImage(event.target.files?.[0] || null)
+            event.currentTarget.value = ''
+          }}
+        />
 
         <Button
           type="button"
@@ -282,19 +391,21 @@ export function ImagePicker({
         </Button>
       </div>
 
-      <ImageSelectionModal
-        open={selectionOpen}
-        loading={picker.loading}
-        title={title || 'Rezept'}
-        candidates={picker.candidates}
-        onOpenChange={setSelectionOpen}
-        onSelectCandidate={(candidate) => {
-          void handleSelectCandidate(candidate)
-        }}
-        onRefreshSearch={() => {
-          void picker.search()
-        }}
-      />
+      {host ? null : (
+        <ImageSelectionModal
+          open={selectionOpen}
+          loading={picker.loading}
+          title={title || 'Rezept'}
+          candidates={picker.candidates}
+          onOpenChange={setSelectionOpen}
+          onSelectCandidate={(candidate) => {
+            void handleSelectCandidate(candidate)
+          }}
+          onRefreshSearch={() => {
+            void picker.search()
+          }}
+        />
+      )}
     </div>
   )
 }

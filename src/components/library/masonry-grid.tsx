@@ -11,9 +11,13 @@ type MasonryItemProps = {
 }
 
 export function MasonryGrid({ children }: MasonryGridProps) {
-  return <div className="columns-1 gap-3 space-y-3 sm:columns-2 sm:gap-4 sm:space-y-4 md:columns-3 lg:columns-4">{children}</div>
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
+      {children}
+    </div>
+  )
 }
 
 export function MasonryItem({ children }: MasonryItemProps) {
-  return <div className="break-inside-avoid">{children}</div>
+  return <div className="min-w-0">{children}</div>
 }

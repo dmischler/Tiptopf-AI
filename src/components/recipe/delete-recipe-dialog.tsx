@@ -26,7 +26,7 @@ export function DeleteRecipeDialog({
 }: DeleteRecipeDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-md p-0 sm:max-w-md">
+      <DialogContent className="w-full p-0 nav-top:max-w-md">
         <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 pr-12">
           <DialogTitle>Rezept löschen?</DialogTitle>
           <DialogDescription>

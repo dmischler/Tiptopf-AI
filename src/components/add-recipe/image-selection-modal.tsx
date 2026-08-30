@@ -33,9 +33,9 @@ export function ImageSelectionModal({
 }: ImageSelectionModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-3xl p-0 sm:max-w-3xl">
+      <DialogContent className="w-full p-0 nav-top:max-w-3xl">
         <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 pr-12 sm:px-6 sm:pt-6">
-          <DialogTitle>Rezeptbild wählen</DialogTitle>
+          <DialogTitle>Bild auswählen</DialogTitle>
           <DialogDescription>
             Suchergebnisse für <span className="font-medium text-foreground">{title}</span>.
           </DialogDescription>

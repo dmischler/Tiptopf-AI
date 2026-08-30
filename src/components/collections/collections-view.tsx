@@ -2,17 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, FolderPlus, Plus, Search, Trash2, X } from 'lucide-react'
+import { FolderPlus, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 
-import {
-  createCollectionAction,
-  deleteCollectionAction,
-  addRecipeToCollectionAction,
-  removeRecipeFromCollectionAction,
-} from '@/app/actions/collections'
+import { createCollectionAction } from '@/app/actions/collections'
 import { CollectionCard } from '@/components/collections/collection-card'
-import { RecipeCard } from '@/components/library/recipe-card'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -71,10 +65,10 @@ export function CollectionsView({ collections, recipes }: CollectionsViewProps) 
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-8 pb-[max(6rem,env(safe-area-inset-bottom))] md:pb-8 sm:px-6 lg:px-8">
+    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 pt-8 pb-[max(6rem,env(safe-area-inset-bottom))] standalone:pt-4 nav-top:pb-8 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Sammlungen</h1>
+          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Sammlungen</h1>
           <p className="text-sm text-muted-foreground">
             {collections.length} Sammlung{collections.length === 1 ? '' : 'en'}
           </p>
@@ -115,7 +109,7 @@ export function CollectionsView({ collections, recipes }: CollectionsViewProps) 
       )}
 
       <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-        <DialogContent className="w-full max-w-md p-0 sm:max-w-md">
+        <DialogContent className="w-full p-0 nav-top:max-w-md">
           <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 pr-12">
             <DialogTitle>Neue Sammlung</DialogTitle>
             <DialogDescription>

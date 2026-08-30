@@ -43,14 +43,6 @@ const nextConfig = {
       },
     ]
   },
-  async rewrites() {
-    return [
-      {
-        source: '/manifest.webmanifest',
-        destination: '/manifest.json',
-      },
-    ]
-  },
 }
 
 module.exports = nextConfig

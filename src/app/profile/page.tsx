@@ -8,9 +8,9 @@ export default async function ProfilePage() {
   const [profile, settings] = await Promise.all([getProfile(), getSettings()])
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-8 pb-[max(6rem,env(safe-area-inset-bottom))] md:pb-8 sm:px-6 lg:px-8">
+    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 pt-8 pb-[max(6rem,env(safe-area-inset-bottom))] standalone:pt-4 nav-top:pb-8 sm:px-6 lg:px-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Profil</h1>
+        <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Profil</h1>
         <p className="text-sm text-muted-foreground">
           Deine persönlichen Einstellungen.
         </p>

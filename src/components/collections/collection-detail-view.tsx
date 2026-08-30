@@ -31,7 +31,7 @@ interface CollectionDetailViewProps {
   allRecipes: Recipe[]
 }
 
-type RecipePatch = Partial<Pick<Recipe, 'is_favorite' | 'rating'>>
+type RecipePatch = Partial<Pick<Recipe, 'is_favorite'>>
 
 export function CollectionDetailView({ collection, allRecipes }: CollectionDetailViewProps) {
   const router = useRouter()
@@ -142,7 +142,7 @@ export function CollectionDetailView({ collection, allRecipes }: CollectionDetai
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-8 pb-[max(6rem,env(safe-area-inset-bottom))] md:pb-8 sm:px-6 lg:px-8">
+    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 pt-8 pb-[max(6rem,env(safe-area-inset-bottom))] standalone:pt-4 nav-top:pb-8 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="outline" size="icon" onClick={() => router.push('/collections')}>
           <ArrowLeft className="h-4 w-4" />
@@ -166,7 +166,7 @@ export function CollectionDetailView({ collection, allRecipes }: CollectionDetai
           </div>
         ) : (
           <>
-            <h1 className="text-3xl font-semibold tracking-tight">{currentCollection.name}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{currentCollection.name}</h1>
             <Button variant="ghost" size="sm" onClick={() => setIsEditingName(true)}>
               Bearbeiten
             </Button>
@@ -221,7 +221,6 @@ export function CollectionDetailView({ collection, allRecipes }: CollectionDetai
                   recipe={recipe}
                   index={index}
                   onFavoriteChange={(value) => patchRecipe(recipe.id, { is_favorite: value })}
-                  onRatingChange={(value) => patchRecipe(recipe.id, { rating: value })}
                 />
                 <button
                   type="button"
@@ -230,9 +229,10 @@ export function CollectionDetailView({ collection, allRecipes }: CollectionDetai
                     event.stopPropagation()
                     void handleRemoveRecipe(recipe.id)
                   }}
-                  className="absolute top-2 right-2 z-10 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70 transition-colors"
+                  className="absolute top-2 right-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70"
+                  aria-label="Rezept aus Sammlung entfernen"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-4 w-4" />
                 </button>
               </div>
             </MasonryItem>
@@ -242,7 +242,7 @@ export function CollectionDetailView({ collection, allRecipes }: CollectionDetai
 
       {/* Add Recipe Modal */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-        <DialogContent className="w-full max-w-2xl p-0 sm:max-w-2xl max-h-[80vh]">
+        <DialogContent className="w-full max-h-[80vh] p-0 nav-top:max-w-2xl">
           <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 pr-12">
             <DialogTitle>Rezept hinzufügen</DialogTitle>
             <DialogDescription>
@@ -310,7 +310,7 @@ export function CollectionDetailView({ collection, allRecipes }: CollectionDetai
 
       {/* Delete Confirmation */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="w-full max-w-md p-0 sm:max-w-md">
+        <DialogContent className="w-full p-0 nav-top:max-w-md">
           <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 pr-12">
             <DialogTitle>Sammlung löschen?</DialogTitle>
             <DialogDescription>

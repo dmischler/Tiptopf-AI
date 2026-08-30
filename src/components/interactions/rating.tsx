@@ -12,6 +12,7 @@ type RatingProps = {
   initialRating: number | null
   size?: 'sm' | 'md'
   className?: string
+  readOnly?: boolean
   onOptimisticChange?: (rating: number | null) => void
 }
 
@@ -25,6 +26,7 @@ export function Rating({
   initialRating,
   size = 'md',
   className,
+  readOnly = false,
   onOptimisticChange,
 }: RatingProps) {
   const [hover, setHover] = useState(0)
@@ -49,6 +51,28 @@ export function Rating({
     })
   }
 
+  if (readOnly) {
+    return (
+      <div
+        className={cn('flex items-center gap-0.5', className)}
+        aria-label={`${rating} von 5 Sternen`}
+      >
+        {[1, 2, 3, 4, 5].map((star) => {
+          const active = star <= rating
+          return (
+            <Star
+              key={star}
+              className={cn(
+                STAR_SIZE_CLASS[size],
+                active ? 'fill-amber-500 text-amber-500' : 'text-muted-foreground'
+              )}
+            />
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <div
       className={cn('flex items-center gap-0.5', className)}
@@ -69,8 +93,8 @@ export function Rating({
             }}
             onMouseEnter={() => setHover(star)}
             disabled={isPending}
-            className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded p-1 transition-transform hover:scale-110 active:scale-110 touch-manipulation disabled:cursor-not-allowed"
-            aria-label={`Mit ${star} Stern${star === 1 ? '' : 'en'} bewerten`}
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded p-1 transition-transform hover:scale-110 active:scale-110 touch-manipulation disabled:cursor-not-allowed"
+            aria-label={`${star} von 5 Sternen`}
           >
             <Star
               className={cn(

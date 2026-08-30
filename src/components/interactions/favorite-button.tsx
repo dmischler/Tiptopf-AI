@@ -62,7 +62,7 @@ export function FavoriteButton({
         handleToggle()
       }}
       disabled={isPending}
-      aria-label={favorite ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'}
+      aria-label={favorite ? 'Aus Favoriten entfernen' : 'Als Favorit markieren'}
       aria-pressed={favorite}
     >
       <Heart

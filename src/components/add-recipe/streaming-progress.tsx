@@ -5,12 +5,12 @@ import { Loader2 } from 'lucide-react'
 type Stage = 'fetching' | 'parsing' | 'structuring' | 'finding_image' | 'complete' | 'error'
 
 const STAGE_LABELS: Record<Stage, string> = {
-  fetching: 'Fetching recipe content...',
-  parsing: 'AI is reading the recipe...',
-  structuring: 'Structuring ingredients and steps...',
-  finding_image: 'Finding a matching recipe image...',
-  complete: 'Recipe extracted!',
-  error: 'Something went wrong. Please try again.',
+  fetching: 'Seite laden',
+  parsing: 'Rezept erkennen',
+  structuring: 'Rezept erkennen',
+  finding_image: 'Bild suchen',
+  complete: 'Fertig',
+  error: 'Etwas ist schiefgelaufen. Bitte versuche es erneut.',
 }
 
 type StreamingProgressProps = {
@@ -25,10 +25,13 @@ export function StreamingProgress({ stage, streamText }: StreamingProgressProps)
         {stage !== 'complete' && stage !== 'error' && (
           <Loader2 className="h-5 w-5 animate-spin text-primary" />
         )}
-        <span className="text-sm text-foreground">{STAGE_LABELS[stage]}</span>
+        <div className="space-y-1">
+          <p className="text-base font-medium text-foreground">Rezept wird erkannt</p>
+          <span className="text-sm text-muted-foreground">{STAGE_LABELS[stage]}</span>
+        </div>
       </div>
       {streamText && (
-        <div className="max-h-40 overflow-y-auto rounded-md border border-border/60 bg-background/70 p-3 font-mono text-xs text-muted-foreground whitespace-pre-wrap">
+        <div className="max-h-40 overflow-y-auto rounded-md border border-border/60 bg-background/70 p-3 text-sm text-muted-foreground whitespace-pre-wrap">
           {streamText}
         </div>
       )}

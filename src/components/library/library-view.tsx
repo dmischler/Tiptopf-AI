@@ -23,7 +23,7 @@ type LibraryViewProps = {
   initialRecipes: Recipe[]
 }
 
-type RecipePatch = Partial<Pick<Recipe, 'is_favorite' | 'rating'>>
+type RecipePatch = Partial<Pick<Recipe, 'is_favorite'>>
 
 function toMillis(iso: string) {
   const value = new Date(iso).getTime()
@@ -183,12 +183,12 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-8 pb-[max(6rem,env(safe-area-inset-bottom))] md:pb-8 sm:px-6 lg:px-8">
+    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 pt-8 pb-[max(6rem,env(safe-area-inset-bottom))] standalone:pt-4 nav-top:pb-8 sm:px-6 lg:px-8">
       <PullToRefresh onRefresh={handleRefresh}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight">Deine Bibliothek</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Deine Bibliothek</h1>
+            <p className="hidden text-sm text-muted-foreground sm:block">
               {recipes.length} Rezept{recipes.length === 1 ? '' : 'e'} in deiner persönlichen Sammlung.
             </p>
           </div>
@@ -242,18 +242,20 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
             </CardContent>
           </Card>
         ) : (
-          <MasonryGrid>
-            {visibleRecipes.map((recipe, index) => (
-              <MasonryItem key={recipe.id}>
-                <RecipeCard
-                  recipe={recipe}
-                  index={index}
-                  onFavoriteChange={(value) => patchRecipe(recipe.id, { is_favorite: value })}
-                  onRatingChange={(value) => patchRecipe(recipe.id, { rating: value })}
-                />
-              </MasonryItem>
-            ))}
-          </MasonryGrid>
+          <>
+            <MasonryGrid>
+              {visibleRecipes.map((recipe, index) => (
+                <MasonryItem key={recipe.id}>
+                  <RecipeCard
+                    recipe={recipe}
+                    index={index}
+                    onFavoriteChange={(value) => patchRecipe(recipe.id, { is_favorite: value })}
+                  />
+                </MasonryItem>
+              ))}
+            </MasonryGrid>
+            <div className="h-24" aria-hidden="true" />
+          </>
         )}
       </PullToRefresh>
 

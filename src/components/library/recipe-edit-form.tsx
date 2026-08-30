@@ -108,7 +108,7 @@ export function RecipeEditForm({ recipe: initialRecipe, allTags = [] }: RecipeEd
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-8 pb-[max(6rem,env(safe-area-inset-bottom))] md:pb-8 sm:px-6 lg:px-8">
+    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 pt-8 pb-[max(6rem,env(safe-area-inset-bottom))] standalone:pt-4 nav-top:pb-8 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
         <div className="flex items-center gap-3">
           <Button
@@ -155,7 +155,7 @@ export function RecipeEditForm({ recipe: initialRecipe, allTags = [] }: RecipeEd
             disabled={isSaving}
           />
 
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+          <div className="sticky z-20 -mx-4 mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border/70 bg-background/95 px-4 py-3 bottom-[calc(4rem+env(safe-area-inset-bottom))] pb-[max(0.75rem,env(safe-area-inset-bottom))] nav-top:bottom-0">
             <Button
               type="button"
               variant="destructive"
@@ -170,7 +170,7 @@ export function RecipeEditForm({ recipe: initialRecipe, allTags = [] }: RecipeEd
               <Button type="button" variant="outline" onClick={() => router.push(viewHref)} disabled={isSaving}>
                 Abbrechen
               </Button>
-              <Button type="button" onClick={() => void handleSaveEdit()} disabled={isSaving}>
+              <Button type="button" className="h-11" onClick={() => void handleSaveEdit()} disabled={isSaving}>
                 {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Speichern
               </Button>

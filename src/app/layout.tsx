@@ -11,8 +11,17 @@ import './globals.css'
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' })
 
 export const metadata: Metadata = {
-  title: 'Tiptopf-AI - Your AI-Powered Recipe Library',
-  description: 'Upload a photo or URL and transform recipes into a beautiful, searchable collection',
+  title: 'Tiptopf',
+  description: 'Foto aufnehmen oder URL einfügen. Die KI strukturiert deine Rezepte in eine durchsuchbare Bibliothek.',
+  applicationName: 'Tiptopf',
+  appleWebApp: {
+    capable: true,
+    title: 'Tiptopf',
+    statusBarStyle: 'black-translucent',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
 }
 
 export const viewport: Viewport = {
@@ -30,17 +39,18 @@ export default function RootLayout({
 }) {
   return (
     <html lang="de" className={cn('dark font-sans', geist.variable)}>
-      <head>
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content="Tiptopf-AI" />
-      </head>
-      <body className="min-h-screen bg-background text-foreground antialiased">
+      <body className="min-h-screen bg-background pt-[env(safe-area-inset-top)] text-foreground antialiased">
+        <a
+          href="#app-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-foreground"
+        >
+          Zum Inhalt
+        </a>
         <TopNav />
-        {children}
+        <div id="app-content">{children}</div>
         <BottomNav />
         <div data-print-hide>
-          <Toaster position="top-right" richColors />
+          <Toaster position="top-center" offset={{ top: 'max(0.75rem, env(safe-area-inset-top))' }} richColors />
         </div>
       </body>
     </html>

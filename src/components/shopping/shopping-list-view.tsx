@@ -144,11 +144,11 @@ export function ShoppingListView({ initialItems }: ShoppingListViewProps) {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 px-4 py-8 pb-[max(6rem,env(safe-area-inset-bottom))] md:pb-8 sm:px-6">
+    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 px-4 pt-8 pb-[max(6rem,env(safe-area-inset-bottom))] standalone:pt-4 nav-top:pb-8 sm:px-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <ShoppingCart className="h-7 w-7 text-primary" />
-          <h1 className="text-3xl font-semibold tracking-tight">Einkaufsliste</h1>
+          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Einkaufsliste</h1>
         </div>
         {totalCount > 0 && (
           <Button
@@ -238,7 +238,7 @@ export function ShoppingListView({ initialItems }: ShoppingListViewProps) {
                     </button>
 
                     <span
-                      className={`flex-1 text-sm leading-relaxed ${
+                      className={`flex-1 text-base leading-relaxed ${
                         item.checked ? 'text-muted-foreground line-through' : ''
                       }`}
                     >

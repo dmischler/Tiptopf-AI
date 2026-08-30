@@ -35,20 +35,23 @@ export function ExpandableFab({ onRandom, onManual, onUrl, onImage }: Expandable
       }
     }
 
-    function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+    function handlePointerOutside(event: Event) {
+      const target = event.target as Node | null
+      if (containerRef.current && target && !containerRef.current.contains(target)) {
         setOpen(false)
       }
     }
 
     if (open) {
       document.addEventListener('keydown', handleKeyDown)
-      document.addEventListener('mousedown', handleClickOutside)
+      document.addEventListener('mousedown', handlePointerOutside)
+      document.addEventListener('touchstart', handlePointerOutside)
     }
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
-      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('mousedown', handlePointerOutside)
+      document.removeEventListener('touchstart', handlePointerOutside)
     }
   }, [open])
 
@@ -61,7 +64,11 @@ export function ExpandableFab({ onRandom, onManual, onUrl, onImage }: Expandable
           onClick={() => setOpen(false)}
         />
       )}
-      <div ref={containerRef} data-print-hide className="fixed right-6 z-[60] flex flex-col items-end gap-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] md:bottom-6">
+      <div
+        ref={containerRef}
+        data-print-hide
+        className="fixed z-[60] flex flex-col items-end gap-3 right-[max(1.5rem,env(safe-area-inset-right))] bottom-[calc(5rem+env(safe-area-inset-bottom))] nav-top:bottom-6"
+      >
         {ACTIONS.map((action, index) => {
           const Icon = action.icon
           const isVisible = open

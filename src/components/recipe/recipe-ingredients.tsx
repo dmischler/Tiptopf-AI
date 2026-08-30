@@ -9,7 +9,7 @@ export function RecipeIngredients({ ingredients, scaleRatio = 1 }: RecipeIngredi
   return (
     <section className="space-y-3">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Zutaten</h2>
-      <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed">
+      <ul className="list-disc space-y-1 pl-5 text-base leading-relaxed">
         {ingredients.map((ingredient, index) => {
           const display = scaleRatio !== 1 ? scaleIngredient(ingredient, scaleRatio) : ingredient
           return <li key={index}>{display}</li>
