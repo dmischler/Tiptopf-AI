@@ -1,6 +1,6 @@
 # Phase 06 — Mobile-first, adaptive desktop (zoom stays off)
 
-**Status:** DONE  
+**Status:** COMPLETED  
 **Depends on:** 04 (recipe page exists), 05 (components are splittable)  
 **Goal:** Phone is the primary device and feels like an app. Desktop is a real layout, not a stretched phone. Pinch-zoom remains disabled; type and targets make it unnecessary.
 

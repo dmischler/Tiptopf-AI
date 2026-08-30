@@ -1,6 +1,6 @@
 # Phase 08 — Client state, shopping list, cache
 
-**Status:** NOT STARTED  
+**Status:** COMPLETED  
 **Depends on:** 02 (upsert/ids), 04 (recipe page; collections link there)  
 **Goal:** UI state follows server action return values. No temp ids. Favorites/ratings do not snap back. Extract can be cancelled.
 

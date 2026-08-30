@@ -1,6 +1,6 @@
 # Phase 02 — One recipe identity, images, delete, undo
 
-**Status:** NOT STARTED  
+**Status:** COMPLETED  
 **Depends on:** 01  
 **Goal:** A recipe’s `id` is stable for its whole life. Image files, collection membership, and undo all use that id.
 

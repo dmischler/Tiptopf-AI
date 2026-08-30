@@ -1,6 +1,6 @@
 # Phase 07 — URL extract pipeline (JSON-LD is input, not output)
 
-**Status:** NOT STARTED  
+**Status:** COMPLETED  
 **Depends on:** 03 (`safe-fetch` exists), 02 (images persist on save, not during extract)  
 **Goal:** A URL always yields a German, metric, numbered-step recipe when AI is configured. Fetch is bounded and not SSRF. Image-handler is a normal lib module.
 

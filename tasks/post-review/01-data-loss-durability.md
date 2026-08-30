@@ -1,6 +1,6 @@
 # Phase 01 — Stop data loss (durability)
 
-**Status:** NOT STARTED  
+**Status:** COMPLETED  
 **Depends on:** 00  
 **Goal:** A crash, truncated write, or hand-edited invalid JSON must not wipe recipes, collections, shopping list, or API keys.
 

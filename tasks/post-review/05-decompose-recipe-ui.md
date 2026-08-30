@@ -1,6 +1,6 @@
 # Phase 05 — Decompose recipe UI (one form, one picker, one labels module)
 
-**Status:** NOT STARTED  
+**Status:** COMPLETED  
 **Depends on:** 04 (recipe is already a page; we split the page modules, not the dialog)  
 **Goal:** No 1000+ line UI file. Add / manual / edit share one fields component. Labels and image picking exist in one place.
 

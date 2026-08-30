@@ -1,6 +1,6 @@
 # Phase 04 — Recipe is a page
 
-**Status:** NOT STARTED  
+**Status:** COMPLETED  
 **Depends on:** 02 (stable ids), 03 not strictly required but do not regress security  
 **Goal:** Opening a recipe is a URL. Back, print, share, collections, and cook layout all use that page. The library overlay is deleted.
 

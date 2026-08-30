@@ -1,6 +1,6 @@
 # Phase 03 — Security floor (Tailscale-only, no accounts)
 
-**Status:** IMPLEMENTED  
+**Status:** COMPLETED  
 **Depends on:** 01, 02 (02 for UUID image names; 03 image write checks can ship with 02 if needed)  
 **Goal:** Keep “no login”. Make LAN/tailnet abuse, SSRF, path traversal, and secret leakage much harder. Do not pretend Tailscale is a small trusted LAN unless ACLs say so.
 

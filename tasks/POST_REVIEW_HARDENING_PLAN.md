@@ -1,6 +1,6 @@
 # Post-Review Hardening Plan
 
-**Status:** READY TO IMPLEMENT (not started)  
+**Status:** IMPLEMENTED (phases 01–10 on `feat/post-review-hardening`; phase 11 parked)  
 **Date:** 2026-08-30  
 **Source:** Full-codebase review (architecture, backend, data model, security, mobile-first UI, frontend correctness)  
 **UI language:** German  
