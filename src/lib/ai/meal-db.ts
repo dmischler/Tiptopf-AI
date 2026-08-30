@@ -25,16 +25,20 @@ export async function searchMealDbImages(query: string, limit = 4): Promise<Reci
     return []
   }
 
-  const parsed = mealDbResponseSchema.parse(await response.json())
-  if (!parsed.meals || parsed.meals.length === 0) {
+  try {
+    const parsed = mealDbResponseSchema.parse(await response.json())
+    if (!parsed.meals || parsed.meals.length === 0) {
+      return []
+    }
+
+    return parsed.meals.slice(0, Math.max(1, limit)).map((meal) => ({
+      id: `mealdb-${meal.idMeal}`,
+      source: 'mealdb' as const,
+      url: meal.strMealThumb,
+      thumbnailUrl: meal.strMealThumb,
+      alt: meal.strMeal,
+    }))
+  } catch {
     return []
   }
-
-  return parsed.meals.slice(0, Math.max(1, limit)).map((meal) => ({
-    id: `mealdb-${meal.idMeal}`,
-    source: 'mealdb' as const,
-    url: meal.strMealThumb,
-    thumbnailUrl: meal.strMealThumb,
-    alt: meal.strMeal,
-  }))
 }

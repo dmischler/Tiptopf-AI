@@ -65,6 +65,7 @@ export interface ParsedRecipe {
   source_url?: string | null;
   source_type: 'image' | 'url';
   tags?: string[];
+  untranslated?: boolean;
 }
 
 export type SortOption = 'newest' | 'oldest' | 'prep_time' | 'rating';

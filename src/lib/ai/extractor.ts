@@ -1,57 +1,120 @@
-import { generateText } from 'ai'
-import { z } from 'zod'
+import {
+  APICallError,
+  generateObject,
+  NoObjectGeneratedError,
+  type LanguageModel,
+  type ModelMessage,
+} from 'ai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
+import { z } from 'zod'
 
-import type { ParsedRecipe } from '@/types'
 import { resolveAiBaseUrl, resolveAiModelId } from '@/lib/ai/client'
-import { IMAGE_EXTRACTION_PROMPT, URL_EXTRACTION_PROMPT } from '@/lib/ai/prompts'
+import { URL_EXTRACTION_PROMPT } from '@/lib/ai/prompts'
+import { aiRecipeSchema, toParsedRecipe, type AiRecipe } from '@/lib/ai/recipe-schema'
 import { formatSafeError } from '@/lib/safe-error'
+import type { ParsedRecipe } from '@/types'
 
-const recipeSchema = z.object({
-  title: z.string().min(1),
-  ingredients: z.array(z.string()),
-  instructions: z.string().min(1),
-  prepTime: z.number().int().nullable(),
-  cookTime: z.number().int().nullable(),
-  servings: z.number().int().nullable(),
-  category: z.enum(['starter', 'main', 'dessert', 'side', 'breakfast', 'snack']),
-  difficulty: z.enum(['easy', 'medium', 'hard']),
-  tags: z.array(z.string()).optional(),
-  confidence: z.number().min(0).max(1),
-})
+type StructuredExtractionInput = {
+  model: LanguageModel
+  system?: string
+  maxOutputTokens?: number
+  temperature?: number
+  providerOptions?: NonNullable<Parameters<typeof generateObject>[0]>['providerOptions']
+} & ({ prompt: string; messages?: never } | { messages: ModelMessage[]; prompt?: never })
 
-type RecipeSchema = z.infer<typeof recipeSchema>
-
-function normalizeParsedRecipe(recipe: RecipeSchema, sourceType: 'image' | 'url'): ParsedRecipe {
-  return {
-    title: recipe.title,
-    ingredients: recipe.ingredients,
-    instructions: recipe.instructions,
-    prep_time: recipe.prepTime,
-    cook_time: recipe.cookTime,
-    servings: recipe.servings,
-    category: recipe.category,
-    difficulty: recipe.difficulty,
-    confidence: recipe.confidence,
-    tags: recipe.tags,
-    source_type: sourceType,
-  }
-}
-
-function cleanJsonResponse(raw: string) {
-  let cleaned = raw.trim()
+async function repairJsonFences({ text }: { text: string }): Promise<string | null> {
+  let cleaned = text.trim()
   cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```$/i, '').trim()
   cleaned = cleaned.replace(/^```\s*/i, '').replace(/```$/i, '').trim()
+  if (!cleaned || cleaned === text.trim()) {
+    return null
+  }
   return cleaned
 }
 
-async function runExtraction(
-  content: string,
-  systemPrompt: string,
+function logExtractionFailure(err: unknown) {
+  if (NoObjectGeneratedError.isInstance(err)) {
+    const text = err.text ?? ''
+    console.error('AI extraction parse failed', {
+      length: text.length,
+      preview: text.slice(0, 200),
+      finishReason: err.finishReason ?? null,
+    })
+    return
+  }
+
+  console.error('AI extraction failed:', formatSafeError(err))
+}
+
+function mapOpenCodeError(err: unknown): Error {
+  if (APICallError.isInstance(err)) {
+    if (err.statusCode === 401 || err.statusCode === 403) {
+      return new Error('OpenCode API-Key ungültig. Bitte im Profil prüfen.')
+    }
+    if (err.statusCode === 429) {
+      return new Error('OpenCode-Kontingent erschöpft. Bitte später erneut versuchen.')
+    }
+  }
+
+  const message = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase()
+  if (
+    message.includes('unauthorized') ||
+    message.includes('invalid api key') ||
+    message.includes('api key not valid') ||
+    /\b401\b/.test(message)
+  ) {
+    return new Error('OpenCode API-Key ungültig. Bitte im Profil prüfen.')
+  }
+  if (message.includes('quota') || message.includes('rate limit') || message.includes('resource exhausted')) {
+    return new Error('OpenCode-Kontingent erschöpft. Bitte später erneut versuchen.')
+  }
+  if (NoObjectGeneratedError.isInstance(err) || err instanceof z.ZodError) {
+    return new Error('Rezept konnte nicht aus der Seite erkannt werden. Bitte versuche eine andere URL.')
+  }
+
+  return new Error('AI-Extraktion fehlgeschlagen.')
+}
+
+export async function runStructuredExtraction(input: StructuredExtractionInput): Promise<AiRecipe> {
+  const shared = {
+    model: input.model,
+    schema: aiRecipeSchema,
+    system: input.system,
+    maxOutputTokens: input.maxOutputTokens,
+    temperature: input.temperature,
+    providerOptions: input.providerOptions,
+    experimental_repairText: repairJsonFences,
+  }
+
+  try {
+    const result = input.messages
+      ? await generateObject({
+          ...shared,
+          messages: input.messages,
+        })
+      : await generateObject({
+          ...shared,
+          prompt: input.prompt,
+        })
+
+    return result.object
+  } catch (err) {
+    logExtractionFailure(err)
+    throw err
+  }
+}
+
+export async function extractRecipeFromText(
+  text: string,
   apiKey: string,
   baseUrl?: string,
   modelId?: string
-) {
+): Promise<ParsedRecipe> {
+  const content = text.trim()
+  if (!content) {
+    throw new Error('Auf der Seite wurde kein Rezeptinhalt gefunden.')
+  }
+
   const resolvedBaseUrl = resolveAiBaseUrl(baseUrl)
   const resolvedModelId = resolveAiModelId(modelId)
 
@@ -61,47 +124,14 @@ async function runExtraction(
     baseURL: resolvedBaseUrl,
   })
 
-  let raw = ''
   try {
-    const result = await generateText({
+    const parsed = await runStructuredExtraction({
       model: provider(resolvedModelId),
-      system: systemPrompt,
+      system: URL_EXTRACTION_PROMPT,
       prompt: content,
     })
-    raw = result.text
+    return toParsedRecipe(parsed, 'url')
   } catch (err) {
-    console.error('generateText error:', formatSafeError(err))
-    throw err
+    throw mapOpenCodeError(err)
   }
-
-  const cleaned = cleanJsonResponse(raw)
-  if (!cleaned) {
-    console.error('AI extraction failed - empty response')
-    throw new Error('Empty response from AI. Check API key and model.')
-  }
-  try {
-    const parsed = recipeSchema.parse(JSON.parse(cleaned))
-    return parsed
-  } catch (parseError) {
-    console.error('JSON parse error:', formatSafeError(parseError))
-    throw new Error(`Failed to parse AI response: ${parseError instanceof Error ? parseError.message : 'Invalid JSON'}`)
-  }
-}
-
-export async function extractRecipeFromText(
-  text: string,
-  apiKey: string,
-  baseUrl?: string,
-  modelId?: string,
-  isUrl = false
-): Promise<ParsedRecipe> {
-  const parsed = await runExtraction(
-    text,
-    isUrl ? URL_EXTRACTION_PROMPT : IMAGE_EXTRACTION_PROMPT,
-    apiKey,
-    baseUrl,
-    modelId
-  )
-
-  return normalizeParsedRecipe(parsed, isUrl ? 'url' : 'image')
 }

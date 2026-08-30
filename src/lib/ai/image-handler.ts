@@ -1,70 +1,84 @@
-import { generateObject } from 'ai'
+import { createGoogleGenerativeAI, type GoogleLanguageModelOptions } from '@ai-sdk/google'
+import { APICallError, NoObjectGeneratedError, type LanguageModel } from 'ai'
 import { z } from 'zod'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
 
 import {
   resolveGeminiBaseUrl,
   resolveGeminiFallbackModelId,
   resolveGeminiModelId,
 } from '@/lib/ai/client'
+import { runStructuredExtraction } from '@/lib/ai/extractor'
 import { IMAGE_EXTRACTION_PROMPT } from '@/lib/ai/prompts'
+import { toParsedRecipe } from '@/lib/ai/recipe-schema'
 import { formatSafeError } from '@/lib/safe-error'
 import type { ParsedRecipe } from '@/types'
 
-const recipeSchema = z.object({
-  title: z.string().min(1, 'Titel fehlt im extrahierten Rezept.'),
-  ingredients: z.array(z.string()).min(1, 'Zutatenliste fehlt im extrahierten Rezept.'),
-  instructions: z.string().min(1, 'Zubereitung fehlt im extrahierten Rezept.'),
-  prepTime: z.number().int().nullable(),
-  cookTime: z.number().int().nullable(),
-  servings: z.number().int().nullable(),
-  category: z.enum(['starter', 'main', 'dessert', 'side', 'breakfast', 'snack']),
-  difficulty: z.enum(['easy', 'medium', 'hard']),
-  tags: z.array(z.string()).optional(),
-  confidence: z.number().min(0).max(1),
-})
-
-function cleanJsonResponse(raw: string) {
-  return raw.replace(/^```json\s*/i, '').replace(/```$/i, '').trim()
-}
-
 const ALLOWED_IMAGE_DATA_URL_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 
-function parseDataUrl(dataUrl: string): { mimeType: string; base64: string } | null {
+function parseDataUrl(dataUrl: string): { mimeType: string; bytes: Uint8Array } | null {
   const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
   if (!match) return null
   const mimeType = match[1]?.trim().toLowerCase() || ''
   if (!ALLOWED_IMAGE_DATA_URL_TYPES.has(mimeType)) {
     return null
   }
-  return { mimeType: mimeType === 'image/jpg' ? 'image/jpeg' : mimeType, base64: match[2] }
-}
-
-function getFinishReasonString(finishReason: unknown): string {
-  if (typeof finishReason === 'string') return finishReason
-  if (finishReason && typeof finishReason === 'object') {
-    const fr = finishReason as { unified?: string; raw?: string }
-    return fr.unified || fr.raw || String(finishReason)
+  return {
+    mimeType: mimeType === 'image/jpg' ? 'image/jpeg' : mimeType,
+    bytes: Buffer.from(match[2], 'base64'),
   }
-  return String(finishReason || '')
 }
 
-type ExtractionResult = {
-  text: string
-  finishReason: string
+function mapGeminiUserError(err: unknown): Error | null {
+  if (APICallError.isInstance(err)) {
+    if (err.statusCode === 401 || err.statusCode === 403) {
+      return new Error('Gemini API-Key ungültig. Bitte im Profil prüfen.')
+    }
+    if (err.statusCode === 429) {
+      return new Error('Gemini-Kontingent erschöpft. Bitte später erneut versuchen.')
+    }
+  }
+
+  const message = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase()
+  if (
+    message.includes('unauthorized') ||
+    message.includes('invalid api key') ||
+    message.includes('api key not valid') ||
+    /\b401\b/.test(message)
+  ) {
+    return new Error('Gemini API-Key ungültig. Bitte im Profil prüfen.')
+  }
+  if (
+    message.includes('quota') ||
+    message.includes('rate limit') ||
+    message.includes('resource exhausted') ||
+    /\b429\b/.test(message)
+  ) {
+    return new Error('Gemini-Kontingent erschöpft. Bitte später erneut versuchen.')
+  }
+
+  const finishReason = NoObjectGeneratedError.isInstance(err) ? err.finishReason : undefined
+  if (
+    finishReason === 'content-filter' ||
+    message.includes('safety') ||
+    message.includes('content-filter') ||
+    message.includes('blocked by')
+  ) {
+    return new Error(
+      'Das Bild wurde von der Google-Sicherheitsfilterung blockiert. Bitte versuche ein anderes Foto.'
+    )
+  }
+
+  return null
 }
 
-async function runImageExtraction(imageDataUrl: string, model: any): Promise<ExtractionResult> {
+async function runImageExtraction(imageDataUrl: string, model: LanguageModel) {
   const parsedImage = parseDataUrl(imageDataUrl)
   if (!parsedImage) {
-    throw new Error('Invalid image data URL format')
+    throw new Error('Ungültiges Bildformat.')
   }
 
-  const imageDataUrlFull = `data:${parsedImage.mimeType};base64,${parsedImage.base64}`
-
-  const result = await generateObject({
+  return runStructuredExtraction({
     model,
-    schema: recipeSchema,
     messages: [
       {
         role: 'user',
@@ -75,7 +89,8 @@ async function runImageExtraction(imageDataUrl: string, model: any): Promise<Ext
           },
           {
             type: 'image',
-            image: imageDataUrlFull,
+            image: parsedImage.bytes,
+            mediaType: parsedImage.mimeType,
           },
         ],
       },
@@ -88,16 +103,11 @@ async function runImageExtraction(imageDataUrl: string, model: any): Promise<Ext
           { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
           { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
         ],
-      },
+      } satisfies GoogleLanguageModelOptions,
     },
-    maxTokens: 2000,
+    maxOutputTokens: 2000,
     temperature: 0.2,
-  } as any)
-
-  return {
-    text: JSON.stringify(result.object),
-    finishReason: 'stop',
-  }
+  })
 }
 
 export async function extractRecipeFromImage(
@@ -127,77 +137,44 @@ export async function extractRecipeFromImage(
   const primaryModel = resolveGeminiModelId(geminiModelId)
   const fallbackModel = resolveGeminiFallbackModelId(geminiFallbackModelId)
 
-  const hardcodedFallbacks = [
-    'gemini-2.0-flash',
-  ]
+  // Last-resort if the user's primary and fallback Gemini IDs are unavailable (retired/renamed).
+  const hardcodedFallbacks = ['gemini-2.0-flash']
 
   const modelsToTry = [
     primaryModel,
     ...(fallbackModel !== primaryModel ? [fallbackModel] : []),
-    ...hardcodedFallbacks.filter((m) => m !== primaryModel && m !== fallbackModel),
+    ...hardcodedFallbacks.filter((modelName) => modelName !== primaryModel && modelName !== fallbackModel),
   ]
 
-  let raw = ''
   let lastAttemptedModel = primaryModel
-  let finishReason = ''
+  let lastError: unknown
 
-  async function tryExtract(modelName: string): Promise<boolean> {
-    try {
-      const result = await runImageExtraction(imageDataUrl, google(modelName))
-      raw = result.text
-      finishReason = result.finishReason
-      return raw.trim().length > 0
-    } catch (err) {
-      console.error('AI image extraction - Gemini model failed:', modelName, formatSafeError(err))
-      return false
-    }
-  }
-
-  let success = false
   for (const modelName of modelsToTry) {
     lastAttemptedModel = modelName
-    success = await tryExtract(modelName)
-    if (success) {
-      break
+    try {
+      const parsed = await runImageExtraction(imageDataUrl, google(modelName))
+      return {
+        ...toParsedRecipe(parsed, 'image'),
+        image_url: null,
+      }
+    } catch (err) {
+      const mapped = mapGeminiUserError(err)
+      if (mapped) {
+        throw mapped
+      }
+      lastError = err
+      console.error('AI image extraction - Gemini model failed:', modelName, formatSafeError(err))
     }
   }
 
-  if (!success) {
-    console.error('AI image extraction failed - all models returned empty')
-    const isSafetyBlock = finishReason?.toLowerCase().includes('safety') || finishReason?.toLowerCase().includes('block')
-    const modelHint = lastAttemptedModel ? ` (letzter Versuch: ${lastAttemptedModel})` : ''
+  const modelHint = lastAttemptedModel ? ` (letzter Versuch: ${lastAttemptedModel})` : ''
+  if (lastError instanceof z.ZodError || NoObjectGeneratedError.isInstance(lastError)) {
     throw new Error(
-      isSafetyBlock
-        ? 'Das Bild wurde von der Google-Sicherheitsfilterung blockiert. Bitte versuche ein anderes Foto.'
-        : `Keine Antwort von Gemini erhalten${modelHint}. Überprüfe API-Key und Modell-Einstellungen im Profil (z. B. gemini-2.0-flash oder gemini-2.5-flash).`
+      'Rezept konnte nicht vollständig erkannt werden. Bitte versuche es mit einem anderen Foto.'
     )
   }
 
-  let parsed
-  try {
-    parsed = recipeSchema.parse(JSON.parse(cleanJsonResponse(raw)))
-  } catch (parseError) {
-    if (parseError instanceof z.ZodError) {
-      const issues = parseError.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join('; ')
-      throw new Error(
-        `Rezept konnte nicht vollständig erkannt werden (${issues}). Bitte versuche es mit einem anderen Foto.`
-      )
-    }
-    throw parseError
-  }
-
-  return {
-    title: parsed.title,
-    ingredients: parsed.ingredients,
-    instructions: parsed.instructions,
-    prep_time: parsed.prepTime,
-    cook_time: parsed.cookTime,
-    servings: parsed.servings,
-    category: parsed.category,
-    difficulty: parsed.difficulty,
-    confidence: parsed.confidence,
-    tags: parsed.tags,
-    image_url: null,
-    source_type: 'image',
-  }
+  throw new Error(
+    `Keine Antwort von Gemini erhalten${modelHint}. Überprüfe API-Key und Modell-Einstellungen im Profil (z. B. gemini-2.0-flash oder gemini-2.5-flash).`
+  )
 }

@@ -1,7 +1,7 @@
 import { safeFetch } from '@/lib/http/safe-fetch'
 import type { Difficulty, RecipeCategory } from '@/types'
 
-type StructuredUrlRecipe = {
+export type StructuredUrlRecipe = {
   title: string
   ingredients: string[]
   instructions: string
@@ -13,14 +13,16 @@ type StructuredUrlRecipe = {
   confidence: number
 }
 
-type FetchResult = {
+export type FetchResult = {
   content: string
   imageUrl: string | null
   structuredRecipe: StructuredUrlRecipe | null
 }
 
+const MODEL_TEXT_MAX_CHARS = 20_000
+
 type JsonLdRecipeNode = {
-  ['@type']?: string | string[]
+  ['@type']?: unknown
   name?: string
   description?: string
   recipeIngredient?: unknown
@@ -37,6 +39,48 @@ type JsonLdRecipeNode = {
 function normalizeMaybeArray<T>(value: T | T[] | undefined) {
   if (!value) return [] as T[]
   return Array.isArray(value) ? value : [value]
+}
+
+function capText(value: string, maxChars = MODEL_TEXT_MAX_CHARS) {
+  if (value.length <= maxChars) {
+    return value
+  }
+  return value.slice(0, maxChars)
+}
+
+function isRecipeType(type: unknown): boolean {
+  const types = Array.isArray(type) ? type : type ? [type] : []
+  return types.some((entry) => typeof entry === 'string' && entry.toLowerCase() === 'recipe')
+}
+
+function resolveMaybeUrl(raw: string | null, base: string): string | null {
+  if (!raw) return null
+  try {
+    const resolved = new URL(raw.trim(), base)
+    if (resolved.protocol !== 'http:' && resolved.protocol !== 'https:') {
+      return null
+    }
+    return resolved.toString()
+  } catch {
+    return null
+  }
+}
+
+export function buildModelBundle(fetchResult: FetchResult, maxChars = MODEL_TEXT_MAX_CHARS): string {
+  const parts: string[] = []
+
+  if (fetchResult.structuredRecipe) {
+    parts.push('Structured recipe data from the page (JSON-LD):')
+    parts.push(JSON.stringify(fetchResult.structuredRecipe, null, 2))
+  }
+
+  const content = fetchResult.content.trim()
+  if (content) {
+    parts.push('Page text:')
+    parts.push(capText(content, maxChars))
+  }
+
+  return parts.join('\n\n')
 }
 
 function normalizeText(value: string) {
@@ -306,9 +350,7 @@ function extractRecipeFromJsonLd(html: string): FetchResult | null {
       for (const node of candidates) {
         const recipe = node as JsonLdRecipeNode
 
-        const type = recipe['@type']
-        const types = Array.isArray(type) ? type : type ? [type] : []
-        if (!types.some((entry) => entry.toLowerCase() === 'recipe')) continue
+        if (!isRecipeType(recipe['@type'])) continue
 
         const structuredRecipe = buildStructuredRecipe(recipe)
 
@@ -369,15 +411,21 @@ export async function fetchRecipeUrl(url: string, timeoutMs = 15000): Promise<Fe
   })
 
   const html = new TextDecoder('utf-8').decode(fetched.bytes)
+  const pageUrl = fetched.finalUrl || url
   const jsonLdResult = extractRecipeFromJsonLd(html)
+  const imageUrl = resolveMaybeUrl(jsonLdResult?.imageUrl ?? extractOgImage(html), pageUrl)
 
   if (jsonLdResult) {
-    return jsonLdResult
+    return {
+      content: capText(jsonLdResult.content),
+      imageUrl,
+      structuredRecipe: jsonLdResult.structuredRecipe,
+    }
   }
 
   return {
-    content: extractPlainTextFallback(html),
-    imageUrl: extractOgImage(html),
+    content: capText(extractPlainTextFallback(html)),
+    imageUrl,
     structuredRecipe: null,
   }
 }

@@ -33,29 +33,6 @@ Rules:
 - tags should contain up to 5 short German tags (lowercase, no duplicates), e.g. "vegetarisch", "schnell", "glutenfrei".
 - confidence must be between 0 and 1.`
 
-export const SIMPLIFIED_IMAGE_PROMPT = `You are a recipe extraction expert.
-
-Extract the recipe from the photo and return ONLY valid JSON with this exact structure:
-
-{
-  "title": "string",
-  "ingredients": ["string"],
-  "instructions": "string (use numbered steps: 1. ...\\n2. ...)",
-  "prepTime": number | null,
-  "cookTime": number | null,
-  "servings": number | null,
-  "category": "starter" | "main" | "dessert" | "side" | "breakfast" | "snack",
-  "difficulty": "easy" | "medium" | "hard",
-  "tags": ["string"],
-  "confidence": number
-}
-
-Rules:
-- Translate everything to German
-- Fix obvious OCR errors
-- Keep instructions concise but clear
-- Use null for unknown values`
-
 export const IMAGE_EXTRACTION_PROMPT = `${RECIPE_SYSTEM_PROMPT}
 
 Input comes from a photo and can contain OCR errors. Fix obvious OCR mistakes using context.`

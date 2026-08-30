@@ -7,23 +7,23 @@ import { assertAccess } from '@/lib/access-pin'
 import { extractRecipeFromText } from '@/lib/ai/extractor'
 import { searchPexelsImages } from '@/lib/ai/image-search'
 import { searchMealDbImages } from '@/lib/ai/meal-db'
-import type { RecipeCategory } from '@/types'
 import type { RecipeImageCandidate, ResolvedRecipeImage } from '@/lib/ai/image-types'
 import { assertSafeAiBaseUrl } from '@/lib/ai/assert-base-url'
 import { resolveAiBaseUrl, resolveGeminiBaseUrl } from '@/lib/ai/client'
-import { fetchRecipeUrl } from '@/lib/ai/url-fetcher'
 import { extractRecipeFromImage } from '@/lib/ai/image-handler'
+import { buildModelBundle, fetchRecipeUrl } from '@/lib/ai/url-fetcher'
 import { assertExtractRateLimit } from '@/lib/extract-rate-limit'
 import { UnsafeUrlError } from '@/lib/http/safe-fetch'
 import { downloadImageToLocalStorage } from '@/lib/local/images'
 import { getSettings, patchRecipe } from '@/lib/local/store'
 import { formatSafeError } from '@/lib/safe-error'
+import type { ParsedRecipe, RecipeCategory } from '@/types'
 
 const categorySchema = z.enum(['starter', 'main', 'dessert', 'side', 'breakfast', 'snack'])
 const titleSchema = z.string().trim().min(1).max(180)
 const imageUrlSchema = z.string().url().max(2048)
 const recipeIdSchema = z.string().uuid()
-const extractUrlSchema = z.string().trim().url().max(2048)
+const extractUrlSchema = z.string().url().max(2048)
 
 const ALLOWED_EXTRACT_IMAGE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 const MAX_EXTRACT_IMAGE_BYTES = 8 * 1024 * 1024
@@ -36,6 +36,45 @@ const findRecipeImageInputSchema = z.object({
 })
 
 type FindRecipeImageInput = z.infer<typeof findRecipeImageInputSchema>
+
+function mapZodErrorToGerman(error: z.ZodError, fallback: string): string {
+  const issue = error.issues[0]
+  if (!issue) {
+    return fallback
+  }
+
+  switch (issue.code) {
+    case 'invalid_string': {
+      const validation = 'validation' in issue ? issue.validation : undefined
+      if (validation === 'url') return 'URL nicht erlaubt'
+      if (validation === 'uuid') return 'Ungültige ID.'
+      break
+    }
+    case 'too_big':
+      return 'Eingabe ist zu lang.'
+    case 'too_small':
+      return 'Eingabe fehlt oder ist zu kurz.'
+    case 'invalid_enum_value':
+      return 'Ungültiger Wert.'
+    default:
+      break
+  }
+
+  const message = issue.message
+  if (message && message !== 'Required' && !message.startsWith('Expected') && !message.startsWith('Invalid')) {
+    return message
+  }
+
+  return fallback
+}
+
+function parseWithGerman<T>(schema: z.ZodType<T>, value: unknown, fallback: string): T {
+  const result = schema.safeParse(value)
+  if (!result.success) {
+    throw new Error(mapZodErrorToGerman(result.error, fallback))
+  }
+  return result.data
+}
 
 function buildImageSearchQuery(title: string, category: RecipeCategory) {
   const suffixByCategory: Record<RecipeCategory, string> = {
@@ -122,8 +161,8 @@ export async function searchRecipeImageCandidatesAction(
 ): Promise<RecipeImageCandidate[]> {
   await assertAccess()
   const settings = await getSettings()
-  const parsedTitle = titleSchema.parse(title)
-  const parsedCategory = categorySchema.parse(category)
+  const parsedTitle = parseWithGerman(titleSchema, title, 'Titel fehlt oder ist ungültig.')
+  const parsedCategory = parseWithGerman(categorySchema, category, 'Ungültige Kategorie.')
   return collectImageCandidates(parsedTitle, parsedCategory, settings.pexels_api_key)
 }
 
@@ -132,8 +171,8 @@ export async function applyRecipeImageCandidateAction(
   imageUrl: string
 ): Promise<string> {
   await assertAccess()
-  const parsedRecipeId = recipeIdSchema.parse(recipeId)
-  const parsedImageUrl = imageUrlSchema.parse(imageUrl)
+  const parsedRecipeId = parseWithGerman(recipeIdSchema, recipeId, 'Ungültige Rezept-ID.')
+  const parsedImageUrl = parseWithGerman(imageUrlSchema, imageUrl, 'URL nicht erlaubt')
   try {
     const storedUrl = await downloadImageToLocalStorage(parsedImageUrl, parsedRecipeId)
     await patchRecipe(parsedRecipeId, { image_url: storedUrl })
@@ -150,7 +189,7 @@ export async function applyRecipeImageCandidateAction(
 export async function findRecipeImageAction(input: FindRecipeImageInput): Promise<ResolvedRecipeImage | null> {
   await assertAccess()
   const settings = await getSettings()
-  const parsedInput = findRecipeImageInputSchema.parse(input)
+  const parsedInput = parseWithGerman(findRecipeImageInputSchema, input, 'Ungültige Suchangaben.')
   const candidates = await collectImageCandidates(parsedInput.title, parsedInput.category, settings.pexels_api_key)
   const candidate = candidates[0]
   if (!candidate) {
@@ -168,33 +207,17 @@ export async function findRecipeImageAction(input: FindRecipeImageInput): Promis
 export async function extractFromUrlAction(url: string) {
   await assertAccess()
   assertExtractRateLimit()
-  const settings = await getSettings()
 
-  const parsedUrl = extractUrlSchema.safeParse(url)
-  if (!parsedUrl.success) {
-    throw new Error('URL nicht erlaubt')
-  }
+  const normalizedUrl = parseWithGerman(
+    extractUrlSchema,
+    typeof url === 'string' ? url.trim() : url,
+    'URL nicht erlaubt'
+  )
 
-  const normalizedUrl = parsedUrl.data
-  await assertConfiguredAiBaseUrl(settings.opencode_base_url, resolveAiBaseUrl)
-
-  let fetchResult: {
-    content: string
-    imageUrl: string | null
-    structuredRecipe: {
-      title: string
-      ingredients: string[]
-      instructions: string
-      prep_time: number | null
-      cook_time: number | null
-      servings: number | null
-      category: import('@/types').RecipeCategory
-      difficulty: import('@/types').Difficulty
-      confidence: number
-    } | null
-  }
+  let settings: Awaited<ReturnType<typeof getSettings>>
+  let fetchResult: Awaited<ReturnType<typeof fetchRecipeUrl>>
   try {
-    fetchResult = await fetchRecipeUrl(normalizedUrl)
+    ;[settings, fetchResult] = await Promise.all([getSettings(), fetchRecipeUrl(normalizedUrl)])
   } catch (err) {
     if (err instanceof UnsafeUrlError) {
       throw new Error('URL nicht erlaubt')
@@ -203,35 +226,45 @@ export async function extractFromUrlAction(url: string) {
     throw new Error(err instanceof Error ? err.message : 'URL konnte nicht geladen werden.')
   }
 
-  const { content, imageUrl, structuredRecipe } = fetchResult
-  let recipe = structuredRecipe
+  await assertConfiguredAiBaseUrl(settings.opencode_base_url, resolveAiBaseUrl)
 
-  if (!recipe) {
-    if (!settings.opencode_api_key) {
-      throw new Error('OpenCode API-Key fehlt. Bitte im Profil hinterlegen.')
+  let recipe: ParsedRecipe
+  let untranslated = false
+
+  if (settings.opencode_api_key) {
+    const bundle = buildModelBundle(fetchResult)
+    if (!bundle.trim()) {
+      throw new Error('Auf der Seite wurde kein Rezeptinhalt gefunden.')
     }
 
-    const baseUrl = resolveAiBaseUrl(settings.opencode_base_url ?? undefined)
     try {
       recipe = await extractRecipeFromText(
-        content,
+        bundle,
         settings.opencode_api_key,
-        baseUrl,
-        settings.opencode_model_id ?? undefined,
-        true
+        resolveAiBaseUrl(settings.opencode_base_url ?? undefined),
+        settings.opencode_model_id ?? undefined
       )
     } catch (err) {
       console.error('extractRecipeFromText error:', formatSafeError(err))
       throw new Error(err instanceof Error ? err.message : 'AI-Extraktion fehlgeschlagen.')
     }
+  } else if (fetchResult.structuredRecipe) {
+    recipe = {
+      ...fetchResult.structuredRecipe,
+      source_type: 'url',
+    }
+    untranslated = true
+  } else {
+    throw new Error('OpenCode API-Key fehlt. Bitte im Profil hinterlegen.')
   }
 
   return {
     ...recipe,
-    image_url: imageUrl,
-    remote_image_url: imageUrl,
+    image_url: fetchResult.imageUrl,
+    remote_image_url: fetchResult.imageUrl,
     source_url: normalizedUrl,
     source_type: 'url' as const,
+    untranslated,
   }
 }
 
