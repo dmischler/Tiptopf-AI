@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -68,6 +69,7 @@ function buildEditableState(recipe: ExtractedRecipePayload): EditableRecipePrevi
 }
 
 export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, initialMode = 'image', allTags = [] }: AddRecipeModalProps) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<'image' | 'url' | 'manual'>(initialMode)
   const [phase, setPhase] = useState<ModalPhase>('input')
   const [progressStage, setProgressStage] = useState<Stage>('fetching')
@@ -373,6 +375,7 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
       }
       onOpenChange(false)
       resetState()
+      router.push(`/library/${saved.id}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to save recipe.'
       toast.error(message)
@@ -415,6 +418,7 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
       }
       onOpenChange(false)
       resetState()
+      router.push(`/library/${saved.id}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to save recipe.'
       toast.error(message)

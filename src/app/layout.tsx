@@ -39,7 +39,9 @@ export default function RootLayout({
         <TopNav />
         {children}
         <BottomNav />
-        <Toaster position="top-right" richColors />
+        <div data-print-hide>
+          <Toaster position="top-right" richColors />
+        </div>
       </body>
     </html>
   )

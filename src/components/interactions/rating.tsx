@@ -62,6 +62,7 @@ export function Rating({
             key={star}
             type="button"
             onClick={(event) => {
+              event.preventDefault()
               event.stopPropagation()
               handleRate(star)
             }}

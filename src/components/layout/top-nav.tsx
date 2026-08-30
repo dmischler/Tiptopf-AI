@@ -10,7 +10,7 @@ export function TopNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="sticky top-0 z-40 hidden border-b border-border bg-background/95 backdrop-blur-sm md:block">
+    <nav data-print-hide className="sticky top-0 z-40 hidden border-b border-border bg-background/95 backdrop-blur-sm md:block">
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-6 lg:px-8">
         <Link href="/library" className="text-sm font-semibold tracking-wide text-foreground">
           Tiptopf-AI

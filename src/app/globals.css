@@ -61,14 +61,22 @@
 
 @media print {
   nav,
-  .fixed,
-  [data-state="open"] > [role="dialog"] + [data-state="open"] {
+  [data-print-hide] {
     display: none !important;
   }
 
   body {
     background: white !important;
     color: black !important;
+  }
+
+  [data-print-root] {
+    background: white !important;
+    color: black !important;
+  }
+
+  [data-print-root] img {
+    page-break-inside: avoid;
   }
 
   main {

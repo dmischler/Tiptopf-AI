@@ -1,16 +1,11 @@
 'use client'
 
 import { Dices, SearchX } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
-import {
-  deleteRecipeAction,
-  listRecipesAction,
-  purgeTrashedRecipeImageAction,
-  restoreRecipe,
-} from '@/app/actions/recipe'
-import { listCollectionsAction } from '@/app/actions/collections'
+import { listRecipesAction } from '@/app/actions/recipe'
 
 import { AddRecipeModal } from '@/components/add-recipe/modal'
 import { ExpandableFab } from '@/components/add-recipe/expandable-fab'
@@ -18,41 +13,17 @@ import { FilterBar } from '@/components/library/filter-bar'
 import { RandomRecipeDrawer } from '@/components/library/random-recipe-drawer'
 import { MasonryGrid, MasonryItem } from '@/components/library/masonry-grid'
 import { RecipeCard } from '@/components/library/recipe-card'
-import { RecipeDetail } from '@/components/library/recipe-detail'
 import { SortDropdown } from '@/components/library/sort-dropdown'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PullToRefresh } from '@/components/ui/pull-to-refresh'
-import type { Collection, Difficulty, Recipe, RecipeCategory, SortOption } from '@/types'
+import type { Difficulty, Recipe, RecipeCategory, SortOption } from '@/types'
 
 type LibraryViewProps = {
   initialRecipes: Recipe[]
-  initialCollections?: Collection[]
 }
 
-type RecipePatch = Partial<
-  Pick<
-    Recipe,
-    | 'is_favorite'
-    | 'rating'
-    | 'title'
-    | 'ingredients'
-    | 'instructions'
-    | 'prep_time'
-    | 'cook_time'
-    | 'servings'
-    | 'category'
-    | 'difficulty'
-    | 'tags'
-    | 'notes'
-  >
->
-
-type PendingDeletion = {
-  recipe: Recipe
-  index: number
-  timeoutId: ReturnType<typeof setTimeout>
-}
+type RecipePatch = Partial<Pick<Recipe, 'is_favorite' | 'rating'>>
 
 function toMillis(iso: string) {
   const value = new Date(iso).getTime()
@@ -80,9 +51,9 @@ function sortRecipes(recipes: Recipe[], sortOption: SortOption) {
   return sorted
 }
 
-export function LibraryView({ initialRecipes, initialCollections = [] }: LibraryViewProps) {
+export function LibraryView({ initialRecipes }: LibraryViewProps) {
+  const router = useRouter()
   const [recipes, setRecipes] = useState(initialRecipes)
-  const [collections, setCollections] = useState(initialCollections)
   const [searchTerm, setSearchTerm] = useState('')
   const [sortOption, setSortOption] = useState<SortOption>('newest')
   const [activeCategory, setActiveCategory] = useState<RecipeCategory | null>(null)
@@ -90,13 +61,11 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
   const [maxTime, setMaxTime] = useState<number | null>(null)
   const [activeDifficulty, setActiveDifficulty] = useState<Difficulty | null>(null)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
-  const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null)
   const [isDrawOpen, setIsDrawOpen] = useState(false)
   const [drawKey, setDrawKey] = useState(0)
   const [drawPool, setDrawPool] = useState<Recipe[]>([])
   const [addOpen, setAddOpen] = useState(false)
   const [addMode, setAddMode] = useState<'image' | 'url' | 'manual'>('image')
-  const pendingDeletionRef = useRef<PendingDeletion | null>(null)
 
   const maxTimeLimit = useMemo(() => {
     const maxTotal = recipes.reduce((currentMax, recipe) => {
@@ -106,15 +75,6 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
 
     return Math.max(180, maxTotal)
   }, [recipes])
-
-  useEffect(() => {
-    return () => {
-      const pending = pendingDeletionRef.current
-      if (pending) {
-        clearTimeout(pending.timeoutId)
-      }
-    }
-  }, [])
 
   const availableTags = useMemo(() => {
     const tagSet = new Set<string>()
@@ -174,116 +134,10 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
     [filteredRecipes, sortOption]
   )
 
-  const selectedRecipe = useMemo(
-    () => recipes.find((recipe) => recipe.id === selectedRecipeId) ?? null,
-    [recipes, selectedRecipeId]
-  )
-
   function patchRecipe(recipeId: string, patch: RecipePatch) {
     setRecipes((current) =>
       current.map((recipe) => (recipe.id === recipeId ? { ...recipe, ...patch } : recipe))
     )
-  }
-
-  function insertRecipeAt(recipesList: Recipe[], recipe: Recipe, index: number) {
-    const next = [...recipesList]
-    const targetIndex = Math.max(0, Math.min(index, next.length))
-    next.splice(targetIndex, 0, recipe)
-    return next
-  }
-
-  // Note: deletion is now immediate (durable across navigation/refresh).
-  // The 30s window only controls availability of the in-memory undo opportunity.
-  function handleUndoDelete(recipeId: string) {
-    const pending = pendingDeletionRef.current
-    if (!pending || pending.recipe.id !== recipeId) {
-      return
-    }
-
-    clearTimeout(pending.timeoutId)
-    pendingDeletionRef.current = null
-
-    setRecipes((current) => {
-      if (current.some((item) => item.id === pending.recipe.id)) {
-        return current
-      }
-
-      return insertRecipeAt(current, pending.recipe, pending.index)
-    })
-
-    void restoreRecipe(pending.recipe)
-      .then((restored) => {
-        setRecipes((current) => {
-          const index = current.findIndex((item) => item.id === pending.recipe.id)
-          if (index < 0) {
-            return insertRecipeAt(current, restored as Recipe, pending.index)
-          }
-
-          const next = [...current]
-          next[index] = restored as Recipe
-          return next
-        })
-
-        setSelectedRecipeId((currentSelected) =>
-          currentSelected === pending.recipe.id ? restored.id : currentSelected
-        )
-      })
-      .catch((error) => {
-        const message = error instanceof Error ? error.message : 'Wiederherstellen fehlgeschlagen.'
-        toast.error(message)
-      })
-  }
-
-  function handleDeleteRequested(recipe: Recipe) {
-    // Force-commit any still-pending previous deletion (harmless now that deletes are immediate).
-    const previousPending = pendingDeletionRef.current
-    if (previousPending) {
-      clearTimeout(previousPending.timeoutId)
-      pendingDeletionRef.current = null
-      void purgeTrashedRecipeImageAction(previousPending.recipe.id).catch(() => {
-        /* already purged or race — ignore */
-      })
-    }
-
-    const removedIndex = recipes.findIndex((item) => item.id === recipe.id)
-    if (removedIndex < 0) {
-      return
-    }
-
-    // Optimistic removal from UI (same as before).
-    setRecipes((current) => current.filter((item) => item.id !== recipe.id))
-    setSelectedRecipeId((currentSelected) => (currentSelected === recipe.id ? null : currentSelected))
-
-    // Immediate persistent delete. Success toast + undo window only appear if the server action succeeds.
-    void deleteRecipeAction(recipe.id)
-      .then(() => {
-        const timeoutId = setTimeout(() => {
-          if (pendingDeletionRef.current?.recipe.id === recipe.id) {
-            pendingDeletionRef.current = null
-            void purgeTrashedRecipeImageAction(recipe.id).catch(() => undefined)
-          }
-        }, 30_000)
-
-        pendingDeletionRef.current = {
-          recipe,
-          index: removedIndex,
-          timeoutId,
-        }
-
-        toast.success('Rezept gelöscht', {
-          duration: 30_000,
-          action: {
-            label: 'Rückgängig',
-            onClick: () => handleUndoDelete(recipe.id),
-          },
-        })
-      })
-      .catch((error) => {
-        // Delete failed — restore UI immediately, no success toast, no undo entry.
-        setRecipes((current) => insertRecipeAt(current, recipe, removedIndex))
-        const message = error instanceof Error ? error.message : 'Löschen fehlgeschlagen.'
-        toast.error(message)
-      })
   }
 
   function handleTagToggle(tag: string) {
@@ -310,24 +164,13 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
   }
 
   function handleRecipeSelected(recipe: Recipe) {
-    setSelectedRecipeId(recipe.id)
+    router.push(`/library/${recipe.id}`)
   }
 
   async function handleRefresh() {
     try {
-      const [freshRecipes, freshCollections] = await Promise.all([
-        listRecipesAction(),
-        listCollectionsAction(),
-      ])
-
+      const freshRecipes = await listRecipesAction()
       setRecipes(freshRecipes as Recipe[])
-      setCollections(freshCollections as Collection[])
-
-      // Close detail if the recipe no longer exists after refresh
-      if (selectedRecipeId && !freshRecipes.some((r) => r.id === selectedRecipeId)) {
-        setSelectedRecipeId(null)
-      }
-      // Keep search, filters, and sort — user expects their current view to survive
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Aktualisieren fehlgeschlagen.'
       toast.error(message)
@@ -401,7 +244,6 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
                 <RecipeCard
                   recipe={recipe}
                   index={index}
-                  onOpen={() => setSelectedRecipeId(recipe.id)}
                   onFavoriteChange={(value) => patchRecipe(recipe.id, { is_favorite: value })}
                   onRatingChange={(value) => patchRecipe(recipe.id, { rating: value })}
                 />
@@ -410,32 +252,6 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
           </MasonryGrid>
         )}
       </PullToRefresh>
-
-      <RecipeDetail
-        recipe={selectedRecipe}
-        open={Boolean(selectedRecipe)}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            setSelectedRecipeId(null)
-          }
-        }}
-        onFavoriteChange={(value) => {
-          if (!selectedRecipe) return
-          patchRecipe(selectedRecipe.id, { is_favorite: value })
-        }}
-        onRatingChange={(value) => {
-          if (!selectedRecipe) return
-          patchRecipe(selectedRecipe.id, { rating: value })
-        }}
-        onRecipeUpdated={(updatedRecipe) => {
-          setRecipes((current) =>
-            current.map((item) => (item.id === updatedRecipe.id ? updatedRecipe : item))
-          )
-        }}
-        onRecipeDeleteRequested={handleDeleteRequested}
-        collections={collections}
-        allTags={availableTags}
-      />
 
       <RandomRecipeDrawer
         isOpen={isDrawOpen}

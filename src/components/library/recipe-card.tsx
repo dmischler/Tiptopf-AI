@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import Link from 'next/link'
 import { Clock, UtensilsCrossed } from 'lucide-react'
 
 import { FavoriteButton } from '@/components/interactions/favorite-button'
@@ -28,7 +29,6 @@ const DIFFICULTY_LABELS: Record<Difficulty, string> = {
 type RecipeCardProps = {
   recipe: Recipe
   index?: number
-  onOpen: () => void
   onFavoriteChange?: (value: boolean) => void
   onRatingChange?: (value: number | null) => void
 }
@@ -44,7 +44,7 @@ const CATEGORY_CLASS: Record<Recipe['category'], string> = {
 
 function formatTotalTime(prepTime: number, cookTime: number) {
   const total = prepTime + cookTime
-  return total > 0 ? `${total} min` : 'No time set'
+  return total > 0 ? `${total} min` : 'Keine Zeit'
 }
 
 function formatCategoryLabel(category: Recipe['category']) {
@@ -55,87 +55,81 @@ function formatDifficultyLabel(difficulty: Recipe['difficulty']) {
   return DIFFICULTY_LABELS[difficulty]
 }
 
-export function RecipeCard({ recipe, index = 0, onOpen, onFavoriteChange, onRatingChange }: RecipeCardProps) {
+export function RecipeCard({ recipe, index = 0, onFavoriteChange, onRatingChange }: RecipeCardProps) {
   const imageSrc = toRecipeImageSrc(recipe)
 
   return (
-    <Card
-      className="cursor-pointer py-0 transition duration-150 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.985] active:shadow-md"
-      onClick={onOpen}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault()
-          onOpen()
-        }
-      }}
+    <Link
+      href={`/library/${recipe.id}`}
+      className="block rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
     >
-      {imageSrc ? (
-        <div className="relative aspect-[16/10] w-full overflow-hidden sm:aspect-[4/3]">
-          <Image
-            src={imageSrc}
-            alt={recipe.title}
-            fill
-            className="object-cover"
-            sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
-            priority={index < 4}
-          />
-        </div>
-      ) : null}
-
-      <CardContent className="space-y-3 p-4">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="line-clamp-2 text-base font-semibold leading-tight">{recipe.title}</h3>
-          <FavoriteButton
-            recipeId={recipe.id}
-            isFavorite={recipe.is_favorite}
-            size="sm"
-            className="-mr-1 -mt-1"
-            onOptimisticChange={onFavoriteChange}
-          />
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Badge className={CATEGORY_CLASS[recipe.category]}>{formatCategoryLabel(recipe.category)}</Badge>
-          <Badge variant="outline">{formatDifficultyLabel(recipe.difficulty)}</Badge>
-        </div>
-
-        {recipe.tags.length > 0 ? (
-          <div className="flex flex-wrap gap-1">
-            {recipe.tags.slice(0, 3).map((tag) => (
-              <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300">
-                {tag}
-              </span>
-            ))}
-            {recipe.tags.length > 3 && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">
-                +{recipe.tags.length - 3}
-              </span>
-            )}
+      <Card className="py-0 transition duration-150 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.985] active:shadow-md">
+        {imageSrc ? (
+          <div className="relative aspect-[16/10] w-full overflow-hidden sm:aspect-[4/3]">
+            <Image
+              src={imageSrc}
+              alt={recipe.title}
+              fill
+              className="object-cover"
+              sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
+              priority={index < 4}
+            />
           </div>
         ) : null}
 
-        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            {formatTotalTime(recipe.prep_time, recipe.cook_time)}
-          </span>
-          {recipe.servings > 0 ? (
-            <span className="inline-flex items-center gap-1">
-              <UtensilsCrossed className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              {recipe.servings}
-            </span>
-          ) : null}
-        </div>
+        <CardContent className="space-y-3 p-4">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="line-clamp-2 text-base font-semibold leading-tight">{recipe.title}</h3>
+            <FavoriteButton
+              recipeId={recipe.id}
+              isFavorite={recipe.is_favorite}
+              size="sm"
+              className="-mr-1 -mt-1"
+              onOptimisticChange={onFavoriteChange}
+            />
+          </div>
 
-        <Rating
-          recipeId={recipe.id}
-          initialRating={recipe.rating}
-          size="sm"
-          onOptimisticChange={onRatingChange}
-        />
-      </CardContent>
-    </Card>
+          <div className="flex flex-wrap gap-2">
+            <Badge className={CATEGORY_CLASS[recipe.category]}>{formatCategoryLabel(recipe.category)}</Badge>
+            <Badge variant="outline">{formatDifficultyLabel(recipe.difficulty)}</Badge>
+          </div>
+
+          {recipe.tags.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {recipe.tags.slice(0, 3).map((tag) => (
+                <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300">
+                  {tag}
+                </span>
+              ))}
+              {recipe.tags.length > 3 && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">
+                  +{recipe.tags.length - 3}
+                </span>
+              )}
+            </div>
+          ) : null}
+
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              {formatTotalTime(recipe.prep_time, recipe.cook_time)}
+            </span>
+            {recipe.servings > 0 ? (
+              <span className="inline-flex items-center gap-1">
+                <UtensilsCrossed className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                {recipe.servings}
+              </span>
+            ) : null}
+          </div>
+
+          <Rating
+            recipeId={recipe.id}
+            initialRating={recipe.rating}
+            size="sm"
+            onOptimisticChange={onRatingChange}
+          />
+        </CardContent>
+      </Card>
+    </Link>
   )
 }

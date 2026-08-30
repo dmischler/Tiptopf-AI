@@ -39,7 +39,6 @@ export function CollectionDetailView({ collection, allRecipes }: CollectionDetai
   const [isEditingName, setIsEditingName] = useState(false)
   const [editName, setEditName] = useState(collection.name)
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null)
 
   const collectionRecipes = useMemo(() => {
     return allRecipes.filter((recipe) => currentCollection.recipe_ids.includes(recipe.id))
@@ -129,8 +128,6 @@ export function CollectionDetailView({ collection, allRecipes }: CollectionDetai
     toast.success('Sammlung exportiert.')
   }
 
-  const selectedRecipe = allRecipes.find((r) => r.id === selectedRecipeId) ?? null
-
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-8 pb-[max(6rem,env(safe-area-inset-bottom))] md:pb-8 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-center gap-3">
@@ -210,11 +207,15 @@ export function CollectionDetailView({ collection, allRecipes }: CollectionDetai
                 <RecipeCard
                   recipe={recipe}
                   index={index}
-                  onOpen={() => setSelectedRecipeId(recipe.id)}
                 />
                 <button
-                  onClick={() => void handleRemoveRecipe(recipe.id)}
-                  className="absolute top-2 right-2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70 transition-colors"
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    void handleRemoveRecipe(recipe.id)
+                  }}
+                  className="absolute top-2 right-2 z-10 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70 transition-colors"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -312,35 +313,6 @@ export function CollectionDetailView({ collection, allRecipes }: CollectionDetai
         </DialogContent>
       </Dialog>
 
-      {/* Recipe Detail */}
-      {selectedRecipeId && selectedRecipe && (
-        <Dialog
-          open={Boolean(selectedRecipeId)}
-          onOpenChange={(open) => {
-            if (!open) setSelectedRecipeId(null)
-          }}
-        >
-          <DialogContent className="w-full max-w-2xl gap-0 p-0 sm:max-w-2xl">
-            <DialogHeader className="gap-2 border-b border-border/70 px-5 pb-2 pt-4 pr-12">
-              <DialogTitle className="text-lg leading-tight">{selectedRecipe.title}</DialogTitle>
-            </DialogHeader>
-            <div className="px-5 py-4 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                {selectedRecipe.ingredients.length} Zutaten · {selectedRecipe.prep_time + selectedRecipe.cook_time} min
-              </p>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSelectedRecipeId(null)
-                  router.push(`/library`)
-                }}
-              >
-                In Bibliothek öffnen
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
     </main>
   )
 }

@@ -57,6 +57,7 @@ export function FavoriteButton({
       size="icon"
       className={cn('rounded-full min-h-[44px] min-w-[44px] touch-manipulation', className)}
       onClick={(event) => {
+        event.preventDefault()
         event.stopPropagation()
         handleToggle()
       }}

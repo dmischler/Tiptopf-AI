@@ -56,11 +56,12 @@ export function ExpandableFab({ onRandom, onManual, onUrl, onImage }: Expandable
     <>
       {open && (
         <div
+          data-print-hide
           className="fixed inset-0 z-[55] bg-black/20 transition-opacity duration-200"
           onClick={() => setOpen(false)}
         />
       )}
-      <div ref={containerRef} className="fixed right-6 z-[60] flex flex-col items-end gap-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] md:bottom-6">
+      <div ref={containerRef} data-print-hide className="fixed right-6 z-[60] flex flex-col items-end gap-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] md:bottom-6">
         {ACTIONS.map((action, index) => {
           const Icon = action.icon
           const isVisible = open

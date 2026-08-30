@@ -640,6 +640,11 @@ export async function listRecipes() {
   return [...store.recipes]
 }
 
+export async function getRecipe(recipeId: string) {
+  const store = await loadStore()
+  return store.recipes.find((recipe) => recipe.id === recipeId) ?? null
+}
+
 function findRecipeIndex(recipes: Recipe[], recipeId: string) {
   return recipes.findIndex((recipe) => recipe.id === recipeId)
 }
