@@ -66,7 +66,7 @@ export async function toggleFavorite(recipeId: string, isFavorite: boolean) {
   const data = await updateRecipeFavorite(parsedRecipeId, parsedFavorite)
 
   if (!data) {
-    throw new Error('Recipe not found')
+    throw new Error('Rezept nicht gefunden.')
   }
 
   revalidateApp()
@@ -83,7 +83,7 @@ export async function setRating(recipeId: string, rating: number) {
   const data = await updateRecipeRating(parsedRecipeId, parsedRating === 0 ? null : parsedRating)
 
   if (!data) {
-    throw new Error('Recipe not found')
+    throw new Error('Rezept nicht gefunden.')
   }
 
   revalidateApp()

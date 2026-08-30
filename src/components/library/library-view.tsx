@@ -2,7 +2,7 @@
 
 import { Dices, SearchX } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
 import { listRecipesAction } from '@/app/actions/recipe'
@@ -66,6 +66,10 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
   const [drawPool, setDrawPool] = useState<Recipe[]>([])
   const [addOpen, setAddOpen] = useState(false)
   const [addMode, setAddMode] = useState<'image' | 'url' | 'manual'>('image')
+
+  useEffect(() => {
+    setRecipes(initialRecipes)
+  }, [initialRecipes])
 
   const maxTimeLimit = useMemo(() => {
     const maxTotal = recipes.reduce((currentMax, recipe) => {
@@ -170,7 +174,7 @@ export function LibraryView({ initialRecipes }: LibraryViewProps) {
   async function handleRefresh() {
     try {
       const freshRecipes = await listRecipesAction()
-      setRecipes(freshRecipes as Recipe[])
+      setRecipes(freshRecipes)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Aktualisieren fehlgeschlagen.'
       toast.error(message)

@@ -44,7 +44,7 @@ export function FavoriteButton({
       } catch (error) {
         setFavoriteOptimistic(favorite)
         onOptimisticChange?.(favorite)
-        const message = error instanceof Error ? error.message : 'Failed to update favorites.'
+        const message = error instanceof Error ? error.message : 'Favorit konnte nicht aktualisiert werden.'
         toast.error(message)
       }
     })
@@ -62,7 +62,7 @@ export function FavoriteButton({
         handleToggle()
       }}
       disabled={isPending}
-      aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
+      aria-label={favorite ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'}
       aria-pressed={favorite}
     >
       <Heart

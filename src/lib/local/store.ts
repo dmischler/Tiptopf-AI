@@ -1130,6 +1130,7 @@ export async function addManualShoppingItem(text: string) {
 export async function clearShoppingList() {
   return runMutatingStoreOperation((store) => {
     store.shoppingList = []
+    return [...store.shoppingList]
   })
 }
 

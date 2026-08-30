@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Check, Plus, ShoppingCart, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -61,6 +61,10 @@ export function ShoppingListView({ initialItems }: ShoppingListViewProps) {
   const [isAddingManual, setIsAddingManual] = useState(false)
   const [isClearing, setIsClearing] = useState(false)
 
+  useEffect(() => {
+    setItems(initialItems)
+  }, [initialItems])
+
   const checkedCount = items.filter((i) => i.checked).length
   const totalCount = items.length
 
@@ -70,7 +74,6 @@ export function ShoppingListView({ initialItems }: ShoppingListViewProps) {
     const newChecked = !item.checked
     const previous = items
 
-    // Optimistic update with the same reorder rule the server uses
     setItems((current) => {
       const flipped = current.map((i) =>
         i.id === item.id ? { ...i, checked: newChecked } : i
@@ -79,7 +82,8 @@ export function ShoppingListView({ initialItems }: ShoppingListViewProps) {
     })
 
     try {
-      await toggleShoppingListItemAction(item.id, newChecked)
+      const next = await toggleShoppingListItemAction(item.id, newChecked)
+      setItems(next)
     } catch (error) {
       setItems(previous)
       const message = error instanceof Error ? error.message : 'Aktion fehlgeschlagen.'
@@ -92,24 +96,12 @@ export function ShoppingListView({ initialItems }: ShoppingListViewProps) {
     if (!text) return
 
     setIsAddingManual(true)
-    const optimisticItem: ShoppingListItem = {
-      id: `temp-${Date.now()}`,
-      text,
-      checked: false,
-      addedAt: new Date().toISOString(),
-    }
-
-    setItems((current) => [...current, optimisticItem])
-    setManualText('')
 
     try {
-      await addManualItemAction(text)
-      // The server will revalidate; we can keep optimistic or refetch, but for simplicity we leave it
-      // (next navigation will have fresh data)
+      const next = await addManualItemAction(text)
+      setItems(next)
+      setManualText('')
     } catch (error) {
-      // Remove optimistic
-      setItems((current) => current.filter((i) => i.id !== optimisticItem.id))
-      setManualText(text)
       const message = error instanceof Error ? error.message : 'Hinzufügen fehlgeschlagen.'
       toast.error(message)
     } finally {
@@ -125,7 +117,8 @@ export function ShoppingListView({ initialItems }: ShoppingListViewProps) {
     setItems([])
 
     try {
-      await clearShoppingListAction()
+      const next = await clearShoppingListAction()
+      setItems(next)
       toast.success('Einkaufsliste geleert.')
     } catch (error) {
       setItems(previous)
@@ -141,7 +134,8 @@ export function ShoppingListView({ initialItems }: ShoppingListViewProps) {
     setItems((current) => current.filter((i) => i.id !== itemId))
 
     try {
-      await removeShoppingListItemAction(itemId)
+      const next = await removeShoppingListItemAction(itemId)
+      setItems(next)
     } catch (error) {
       setItems(previous)
       const message = error instanceof Error ? error.message : 'Entfernen fehlgeschlagen.'
@@ -233,7 +227,7 @@ export function ShoppingListView({ initialItems }: ShoppingListViewProps) {
                       type="button"
                       onClick={() => void handleToggle(item)}
                       className={cn(
-                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-2 transition-all active:scale-95",
+                        "flex h-11 w-11 min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-md border-2 transition-all touch-manipulation active:scale-95",
                         item.checked
                           ? "border-primary bg-primary text-primary-foreground shadow-sm"
                           : "border-muted-foreground/60 bg-background hover:border-muted-foreground/90 active:bg-muted/40"
@@ -254,7 +248,7 @@ export function ShoppingListView({ initialItems }: ShoppingListViewProps) {
                     <button
                       type="button"
                       onClick={() => void handleRemoveItem(item.id)}
-                      className="ml-2 text-muted-foreground hover:text-destructive"
+                      className="ml-2 flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-muted-foreground touch-manipulation hover:text-destructive"
                       aria-label="Eintrag entfernen"
                     >
                       <Trash2 className="h-4 w-4" />

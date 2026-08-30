@@ -1,11 +1,10 @@
 import { getShoppingList } from '@/lib/local/store'
 import { ShoppingListView } from '@/components/shopping/shopping-list-view'
-import type { ShoppingListItem } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
 export default async function EinkaufslistePage() {
   const items = await getShoppingList()
 
-  return <ShoppingListView initialItems={(items ?? []) as ShoppingListItem[]} />
+  return <ShoppingListView initialItems={items} />
 }

@@ -33,16 +33,17 @@ export function Rating({
 
   function handleRate(star: number) {
     const nextRating = star === rating ? 0 : star
-    setRatingOptimistic(nextRating)
-    onOptimisticChange?.(nextRating === 0 ? null : nextRating)
 
     startTransition(async () => {
+      setRatingOptimistic(nextRating)
+      onOptimisticChange?.(nextRating === 0 ? null : nextRating)
+
       try {
         await setRating(recipeId, nextRating)
       } catch (error) {
         setRatingOptimistic(rating)
         onOptimisticChange?.(rating === 0 ? null : rating)
-        const message = error instanceof Error ? error.message : 'Failed to update rating.'
+        const message = error instanceof Error ? error.message : 'Bewertung konnte nicht gespeichert werden.'
         toast.error(message)
       }
     })
@@ -52,7 +53,7 @@ export function Rating({
     <div
       className={cn('flex items-center gap-0.5', className)}
       onMouseLeave={() => setHover(0)}
-      aria-label="Recipe rating"
+      aria-label="Rezeptbewertung"
     >
       {[1, 2, 3, 4, 5].map((star) => {
         const active = star <= (hover || rating)
@@ -69,7 +70,7 @@ export function Rating({
             onMouseEnter={() => setHover(star)}
             disabled={isPending}
             className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded p-1 transition-transform hover:scale-110 active:scale-110 touch-manipulation disabled:cursor-not-allowed"
-            aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
+            aria-label={`Mit ${star} Stern${star === 1 ? '' : 'en'} bewerten`}
           >
             <Star
               className={cn(

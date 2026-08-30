@@ -49,6 +49,9 @@ interface ParsedIngredient {
   name: string;
 }
 
+const UNICODE_FRACTION_CHARS = Object.keys(UNICODE_FRACTIONS).join('');
+const MIXED_UNICODE_RE = new RegExp(`^(\\d+)\\s*([${UNICODE_FRACTION_CHARS}])`);
+
 function parseNumberToken(s: string): { value: number | [number, number]; raw: string; consumed: number } | null {
   // Range first: 2-3 or 2 – 3 or 1,5-2,5
   const range = s.match(/^(\d+(?:[.,]\d+)?)\s*[-–]\s*(\d+(?:[.,]\d+)?)/);
@@ -60,6 +63,33 @@ function parseNumberToken(s: string): { value: number | [number, number]; raw: s
       raw: range[0],
       consumed: range[0].length,
     };
+  }
+
+  // Mixed unicode: 1½ or 1 ½
+  const mixedUnicode = s.match(MIXED_UNICODE_RE);
+  if (mixedUnicode) {
+    const whole = parseInt(mixedUnicode[1], 10);
+    const frac = UNICODE_FRACTIONS[mixedUnicode[2]];
+    if (frac !== undefined) {
+      return {
+        value: whole + frac,
+        raw: mixedUnicode[0],
+        consumed: mixedUnicode[0].length,
+      };
+    }
+  }
+
+  // Mixed ascii: 1 1/2
+  const mixedAscii = s.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)/);
+  if (mixedAscii) {
+    const den = parseInt(mixedAscii[3], 10);
+    if (den > 0) {
+      return {
+        value: parseInt(mixedAscii[1], 10) + parseInt(mixedAscii[2], 10) / den,
+        raw: mixedAscii[0],
+        consumed: mixedAscii[0].length,
+      };
+    }
   }
 
   // Unicode fraction
@@ -86,7 +116,7 @@ function parseNumberToken(s: string): { value: number | [number, number]; raw: s
     }
   }
 
-  // Decimal / integer
+  // Decimal / integer (1,5 or 1.5 or 1)
   const num = s.match(/^(\d+)([.,](\d+))?/);
   if (num) {
     const val = parseFloat(num[0].replace(',', '.'));
@@ -113,11 +143,10 @@ function parseUnitAndRest(afterAmount: string): { rawUnit: string; unit: string;
   }
 
   const token = m[1];
-  const sep = m[2] || '';
   const rest = (m[3] || '').trimStart();
 
   const lower = token.toLowerCase();
-  if (KNOWN_UNITS.has(lower) || lower.length <= 5) {
+  if (KNOWN_UNITS.has(lower)) {
     return {
       rawUnit: token,
       unit: lower,
