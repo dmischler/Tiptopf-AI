@@ -1,8 +1,8 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
+import { revalidateApp } from '@/app/actions/_revalidate'
 import { assertAccess } from '@/lib/access-pin'
 
 import {
@@ -12,6 +12,7 @@ import {
   removeShoppingListItem,
   toggleShoppingListItem,
 } from '@/lib/local/store'
+import type { ShoppingListItem } from '@/types'
 
 const textSchema = z.string().trim().min(1)
 const uuidSchema = z.string().uuid()
@@ -26,11 +27,11 @@ const addFromRecipeSchema = z.object({
 
 export async function addRecipeIngredientsToShoppingList(
   input: z.infer<typeof addFromRecipeSchema>,
-) {
+): Promise<ShoppingListItem[]> {
   await assertAccess()
   const parsed = addFromRecipeSchema.parse(input)
 
-  await addToShoppingList(
+  const list = await addToShoppingList(
     parsed.items.map((text) => ({
       text,
       sourceRecipeTitle: parsed.sourceRecipeTitle,
@@ -38,35 +39,42 @@ export async function addRecipeIngredientsToShoppingList(
     })),
   )
 
-  revalidatePath('/einkaufsliste')
-  return { success: true }
+  revalidateApp()
+  return list
 }
 
-export async function toggleShoppingListItemAction(itemId: string, checked: boolean) {
+export async function toggleShoppingListItemAction(
+  itemId: string,
+  checked: boolean,
+): Promise<ShoppingListItem[]> {
   await assertAccess()
   const parsedId = uuidSchema.parse(itemId)
   const parsedChecked = booleanSchema.parse(checked)
 
-  await toggleShoppingListItem(parsedId, parsedChecked)
-  revalidatePath('/einkaufsliste')
+  const list = await toggleShoppingListItem(parsedId, parsedChecked)
+  revalidateApp()
+  return list
 }
 
-export async function addManualItemAction(text: string) {
+export async function addManualItemAction(text: string): Promise<ShoppingListItem[]> {
   await assertAccess()
   const parsed = textSchema.parse(text)
-  await addManualShoppingItem(parsed)
-  revalidatePath('/einkaufsliste')
+  const list = await addManualShoppingItem(parsed)
+  revalidateApp()
+  return list
 }
 
-export async function clearShoppingListAction() {
+export async function clearShoppingListAction(): Promise<ShoppingListItem[]> {
   await assertAccess()
-  await clearShoppingList()
-  revalidatePath('/einkaufsliste')
+  const list = await clearShoppingList()
+  revalidateApp()
+  return list
 }
 
-export async function removeShoppingListItemAction(itemId: string) {
+export async function removeShoppingListItemAction(itemId: string): Promise<ShoppingListItem[]> {
   await assertAccess()
   const parsedId = uuidSchema.parse(itemId)
-  await removeShoppingListItem(parsedId)
-  revalidatePath('/einkaufsliste')
+  const list = await removeShoppingListItem(parsedId)
+  revalidateApp()
+  return list
 }

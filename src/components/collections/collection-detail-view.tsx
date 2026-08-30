@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Plus, Search, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -31,22 +31,35 @@ interface CollectionDetailViewProps {
   allRecipes: Recipe[]
 }
 
+type RecipePatch = Partial<Pick<Recipe, 'is_favorite' | 'rating'>>
+
 export function CollectionDetailView({ collection, allRecipes }: CollectionDetailViewProps) {
   const router = useRouter()
   const [currentCollection, setCurrentCollection] = useState<Collection>(collection)
+  const [recipes, setRecipes] = useState<Recipe[]>(allRecipes)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isEditingName, setIsEditingName] = useState(false)
   const [editName, setEditName] = useState(collection.name)
   const [searchQuery, setSearchQuery] = useState('')
 
+  useEffect(() => {
+    setRecipes(allRecipes)
+  }, [allRecipes])
+
+  function patchRecipe(recipeId: string, patch: RecipePatch) {
+    setRecipes((current) =>
+      current.map((recipe) => (recipe.id === recipeId ? { ...recipe, ...patch } : recipe))
+    )
+  }
+
   const collectionRecipes = useMemo(() => {
-    return allRecipes.filter((recipe) => currentCollection.recipe_ids.includes(recipe.id))
-  }, [allRecipes, currentCollection])
+    return recipes.filter((recipe) => currentCollection.recipe_ids.includes(recipe.id))
+  }, [recipes, currentCollection])
 
   const availableRecipes = useMemo(() => {
-    return allRecipes.filter((recipe) => !currentCollection.recipe_ids.includes(recipe.id))
-  }, [allRecipes, currentCollection])
+    return recipes.filter((recipe) => !currentCollection.recipe_ids.includes(recipe.id))
+  }, [recipes, currentCollection])
 
   const filteredAvailableRecipes = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
@@ -207,6 +220,8 @@ export function CollectionDetailView({ collection, allRecipes }: CollectionDetai
                 <RecipeCard
                   recipe={recipe}
                   index={index}
+                  onFavoriteChange={(value) => patchRecipe(recipe.id, { is_favorite: value })}
+                  onRatingChange={(value) => patchRecipe(recipe.id, { rating: value })}
                 />
                 <button
                   type="button"
