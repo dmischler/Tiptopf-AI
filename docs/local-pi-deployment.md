@@ -13,11 +13,11 @@ This guide documents how to run Tiptopf-AI as a local-only service on a Raspberr
 
 ## Overview
 
-- No Supabase dependency
+- No hosted database
 - No in-app login/signup
-- Single local profile persisted on disk
+- Single household library persisted on disk
 - Recipes and images stored in `DATA_DIR`
-- Access control handled by Tailscale network identity
+- Access control handled by Tailscale network identity (optional `ACCESS_PIN`)
 
 ## Prerequisites
 
@@ -103,12 +103,13 @@ Leftover `tiptopf.json.tmp.<uuid>` or `recipe-images/<name>.tmp.<uuid>` files ca
 ## Data model
 
 `tiptopf.json` contains:
-- `schema_version` (current: `2`; missing is treated as `1`)
-- `recipes[]` matching the existing `Recipe` shape
-- `profile` with:
-  - `id` (`local-device`)
-  - `email` (`local@tiptopf.local`)
-- `settings` with API keys and model/base URL configuration for OpenCode, Gemini (unified `gemini_*` fields since 2026-05), and Pexels. Old `gemini_image_*` fields are auto-migrated on load.
+- `schema_version` (current: `3`; missing is treated as `1`. `2` was `{recipeId}.webp` image identity; `3` drops leftover `user_id` / dummy profile)
+- `recipes[]` matching `Recipe` (no `user_id`; older files may still have it — load ignores it, writes omit it)
+- `collections[]`
+- `shoppingList[]` — camelCase on disk (`addedAt`, `sourceRecipeTitle`, `sourceServings`)
+- `settings` with API keys and model/base URL configuration for OpenCode, Gemini (unified `gemini_*` fields), and Pexels. Old `gemini_image_*` fields are read on load and never written.
+
+Older backups may still include a `profile` object (`local-device` / `local@tiptopf.local`). Import ignores it. Default UI backups omit API keys.
 
 ## AI Model Configuration (OpenCode)
 
@@ -320,9 +321,9 @@ This guide documents how to run Tiptopf-AI as a Docker container on any machine 
 
 ### Overview
 
-- No Supabase dependency
+- No hosted database
 - No in-app login/signup
-- Single local profile persisted in a Docker named volume
+- Single household library persisted in a Docker named volume
 - Recipes and images stored in `DATA_DIR` inside the container, backed by a named volume
 - Access control handled by Tailscale network identity
 

@@ -1,6 +1,5 @@
 export interface Recipe {
   id: string;
-  user_id: string;
   title: string;
   ingredients: string[];
   instructions: string;
@@ -31,13 +30,6 @@ export type RecipeCategory =
   | 'snack';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
-
-export interface Profile {
-  id: string;
-  email: string;
-  created_at: string;
-  updated_at: string;
-}
 
 export interface AppSettings {
   opencode_api_key: string | null;

@@ -6,7 +6,6 @@ import type {
   AppSettings,
   Collection,
   Difficulty,
-  Profile,
   Recipe,
   RecipeCategory,
   RecipeSourceType,
@@ -25,9 +24,7 @@ import { canonicalRecipeImageUrl, parseApiImageFileName } from '@/lib/recipe-ima
 import { reorderShoppingList } from '@/lib/shopping'
 import { normalizeTags } from '@/lib/utils'
 
-export const LOCAL_PROFILE_ID = 'local-device'
-const LOCAL_PROFILE_EMAIL = 'local@tiptopf.local'
-export const CURRENT_SCHEMA_VERSION = 2
+export const CURRENT_SCHEMA_VERSION = 3
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 type LocalStore = {
@@ -35,11 +32,10 @@ type LocalStore = {
   recipes: Recipe[]
   collections: Collection[]
   shoppingList: ShoppingListItem[]
-  profile: Profile
   settings: AppSettings
 }
 
-export type RecipePatch = Partial<Omit<Recipe, 'id' | 'user_id' | 'created_at'>>
+export type RecipePatch = Partial<Omit<Recipe, 'id' | 'created_at'>>
 
 type CreateRecipeInput = {
   title: string
@@ -78,17 +74,6 @@ function nowIso() {
   return new Date().toISOString()
 }
 
-function createDefaultProfile(): Profile {
-  const now = nowIso()
-
-  return {
-    id: LOCAL_PROFILE_ID,
-    email: LOCAL_PROFILE_EMAIL,
-    created_at: now,
-    updated_at: now,
-  }
-}
-
 function createDefaultSettings(): AppSettings {
   return {
     opencode_api_key: null,
@@ -108,7 +93,6 @@ function createDefaultStore(): LocalStore {
     recipes: [],
     collections: [],
     shoppingList: [],
-    profile: createDefaultProfile(),
     settings: createDefaultSettings(),
   }
 }
@@ -232,9 +216,9 @@ function normalizeRecipe(value: unknown): Recipe | null {
 
   const tags = normalizeTags(value.tags)
 
+  // Older schema versions stored user_id; ignore it. Writes omit it.
   return {
     id,
-    user_id: typeof value.user_id === 'string' && value.user_id.trim() ? value.user_id : LOCAL_PROFILE_ID,
     title: typeof value.title === 'string' && value.title.trim() ? value.title : 'Untitled recipe',
     ingredients,
     instructions: typeof value.instructions === 'string' ? value.instructions : '',
@@ -255,21 +239,6 @@ function normalizeRecipe(value: unknown): Recipe | null {
     notes: typeof value.notes === 'string' ? value.notes : '',
     created_at: createdAt,
     updated_at: updatedAt,
-  }
-}
-
-function normalizeProfile(value: unknown): Profile {
-  if (!isObject(value)) {
-    return createDefaultProfile()
-  }
-
-  const base = createDefaultProfile()
-
-  return {
-    id: base.id,
-    email: base.email,
-    created_at: toIsoOrNow(value.created_at),
-    updated_at: toIsoOrNow(value.updated_at),
   }
 }
 
@@ -325,6 +294,8 @@ function normalizeCollection(value: unknown): Collection | null {
   }
 }
 
+// Shopping list items are camelCase on disk (addedAt, sourceRecipeTitle, sourceServings).
+// Older backups may still use snake_case; this reads both and always writes camelCase.
 function normalizeShoppingListItem(value: unknown): ShoppingListItem | null {
   if (!isObject(value)) {
     return null
@@ -386,7 +357,6 @@ function normalizeStore(value: unknown): LocalStore {
     recipes,
     collections,
     shoppingList,
-    profile: normalizeProfile(value.profile),
     settings: normalizeSettings(value.settings),
   }
 }
@@ -552,7 +522,10 @@ async function ensureStoreSchema(store: LocalStore) {
     return
   }
 
-  await migrateStoreMedia(store)
+  if (store.schema_version < 2) {
+    await migrateStoreMedia(store)
+  }
+
   store.schema_version = CURRENT_SCHEMA_VERSION
 }
 
@@ -664,7 +637,6 @@ function applyRecipePatchAtIndex(store: LocalStore, index: number, patch: Recipe
     ...current,
     ...patch,
     id: current.id,
-    user_id: LOCAL_PROFILE_ID,
     created_at: current.created_at,
     updated_at: nowIso(),
   }
@@ -708,7 +680,6 @@ export async function createRecipe(input: CreateRecipeInput, options?: CreateRec
 
     const recipe: Recipe = {
       id,
-      user_id: LOCAL_PROFILE_ID,
       title: input.title,
       ingredients: input.ingredients,
       instructions: input.instructions,
@@ -750,12 +721,22 @@ export async function upsertRecipe(recipe: Recipe, options?: UpsertRecipeOptions
         : now
 
     const next: Recipe = {
-      ...recipe,
       id: recipe.id,
-      user_id: LOCAL_PROFILE_ID,
+      title: recipe.title,
+      ingredients: recipe.ingredients,
+      instructions: recipe.instructions,
+      prep_time: recipe.prep_time,
+      cook_time: recipe.cook_time,
+      servings: recipe.servings,
+      category: recipe.category,
+      difficulty: recipe.difficulty,
+      rating: recipe.rating,
+      is_favorite: recipe.is_favorite,
+      image_url: sanitizeStoredImageUrl(recipe.image_url),
+      source_url: recipe.source_url,
+      source_type: recipe.source_type,
       tags: normalizeTags(recipe.tags),
       notes: recipe.notes ?? '',
-      image_url: sanitizeStoredImageUrl(recipe.image_url),
       created_at: createdAt,
       updated_at: updatedAt,
     }
@@ -836,17 +817,12 @@ export async function updateRecipeRating(recipeId: string, rating: number | null
   })
 }
 
-export async function getProfile() {
-  const store = await loadStore()
-  return store.profile
-}
-
 export async function getSettings() {
   const store = await loadStore()
   return { ...store.settings }
 }
 
-export async function updateSettings(input: Partial<AppSettings> & Record<string, unknown>) {
+export async function updateSettings(input: Partial<AppSettings>) {
   return runMutatingStoreOperation((store) => {
     const next = { ...store.settings }
 
@@ -870,15 +846,12 @@ export async function updateSettings(input: Partial<AppSettings> & Record<string
       next.gemini_base_url = normalizeOptionalString(input.gemini_base_url)
     }
 
-    // Support both old (gemini_image_*) and new unified field names during transition
-    if ('gemini_model_id' in input || 'gemini_image_model_id' in input) {
-      const newVal = ('gemini_model_id' in input ? input.gemini_model_id : (input as any).gemini_image_model_id) as string | null | undefined
-      next.gemini_model_id = normalizeOptionalString(newVal)
+    if ('gemini_model_id' in input) {
+      next.gemini_model_id = normalizeOptionalString(input.gemini_model_id)
     }
 
-    if ('gemini_fallback_model_id' in input || 'gemini_image_fallback_model_id' in input) {
-      const newVal = ('gemini_fallback_model_id' in input ? input.gemini_fallback_model_id : (input as any).gemini_image_fallback_model_id) as string | null | undefined
-      next.gemini_fallback_model_id = normalizeOptionalString(newVal)
+    if ('gemini_fallback_model_id' in input) {
+      next.gemini_fallback_model_id = normalizeOptionalString(input.gemini_fallback_model_id)
     }
 
     if ('pexels_api_key' in input) {
@@ -989,7 +962,17 @@ export async function exportStoreJson(options?: { includeSecrets?: boolean }): P
         pexels_api_key: null,
       }
 
-  return JSON.stringify({ ...store, settings }, null, 2)
+  return JSON.stringify(
+    {
+      schema_version: store.schema_version,
+      recipes: store.recipes,
+      collections: store.collections,
+      shoppingList: store.shoppingList,
+      settings,
+    },
+    null,
+    2,
+  )
 }
 
 function assertImportShape(value: unknown): asserts value is Record<string, unknown> {
@@ -1024,7 +1007,6 @@ export async function importStoreJson(raw: string, options?: { includeSecrets?: 
     store.recipes = incoming.recipes
     store.collections = incoming.collections
     store.shoppingList = incoming.shoppingList
-    store.profile = incoming.profile
     store.settings = {
       ...incoming.settings,
       opencode_api_key: includeSecrets ? incoming.settings.opencode_api_key : existingSettings.opencode_api_key,

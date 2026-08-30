@@ -1,17 +1,17 @@
 # Tiptopf-AI
 
-Local-first, AI-powered recipe library for a Raspberry Pi.
+Local-first, German, AI-powered recipe library for a Raspberry Pi.
 
-This version runs without Supabase. It stores recipes and profile settings on local disk and is designed to be accessed remotely through Tailscale.
+The app stores recipes, collections, the shopping list, and API settings as JSON on disk. Reach it over Tailscale. There is no in-app login and no hosted database.
 
-## What changed
+## Features
 
-- No app authentication flow (Option A): `/` redirects to `/library` and auth routes are removed
-- Local JSON data store at `DATA_DIR/tiptopf.json`
-- Local image storage at `DATA_DIR/recipe-images`
-- Image serving route: `/api/images/[imageName]`
-- API keys and AI model settings are managed in `/profile`
-- Expandable FAB in the library provides quick access to: random recipe, manual entry, URL extraction, and image extraction
+- Add recipes from a photo, a URL, or a manual form
+- Recipe pages at `/library/[id]` (edit at `/library/[id]/edit`)
+- Collections at `/collections`, shopping list at `/einkaufsliste`
+- Dark-only German UI (**du**)
+- OpenCode for URL/text extraction, Gemini for photos
+- JSON backup from `/profile` (API keys stripped unless you opt in)
 
 ## Getting started
 
@@ -24,7 +24,7 @@ This version runs without Supabase. It stores recipes and profile settings on lo
 npm install
 ```
 
-5. Run development server:
+5. Run the development server:
 
 ```bash
 npm run dev
@@ -32,9 +32,11 @@ npm run dev
 
 6. Open [http://localhost:3000](http://localhost:3000)
 
+Configure OpenCode / Gemini / Pexels keys in **/profile** after startup.
+
 ## Required environment variables
 
-- `DATA_DIR` — directory where local database file and images are stored
+- `DATA_DIR` — directory where the local store and images live
 
 ## Optional environment variables
 
@@ -44,14 +46,18 @@ npm run dev
 
 ## Local data layout
 
-When `DATA_DIR=./data`, the runtime storage looks like:
+When `DATA_DIR=./data`:
 
 ```text
 data/
   tiptopf.json
+  tiptopf.json.bak
   recipe-images/
-    <recipe-id>.jpg|png|webp
+    {recipe-id}.webp
+    .trash/
 ```
+
+Run **one** process per `DATA_DIR`.
 
 ## Tech stack
 
@@ -59,7 +65,7 @@ data/
 - TypeScript
 - Tailwind CSS
 - Vercel AI SDK
-- Local filesystem persistence (JSON + image files)
+- Local filesystem persistence (JSON + `{id}.webp` files)
 
 ## Verification
 
@@ -77,17 +83,17 @@ cp .env.docker.example .env.docker
 docker compose up -d --build
 ```
 
-Data persists in a Docker named volume — survive container restarts.
+Data persists in a Docker named volume.
 
-For detailed Docker operations (backup, restore, update), see `docs/local-pi-deployment.md` (Option B).
+For bind modes, Tailscale Serve, backup, restore, and corrupt-JSON recovery, see `docs/local-pi-deployment.md` (Option B).
 
-### Manual
+### Manual (Raspberry Pi)
 
-See `docs/local-pi-deployment.md` (Option A) for Raspberry Pi deployment without Docker.
+See `docs/local-pi-deployment.md` (Option A).
 
 ## Notes
 
-- API keys and AI models (OpenCode + Gemini) are configured in `/profile` and persisted in local store (currently unencrypted).
-- Default recipe extraction model: `big-pickle` (free OpenCode Zen). OpenCode Go subscription supported via custom base URL.
-- Image uploads from URL are downloaded and persisted locally.
 - UI language: German
+- API keys and models (OpenCode + Gemini) are configured in `/profile` and stored unencrypted in `tiptopf.json`. Default backups omit keys.
+- Default recipe extraction model: `big-pickle` (OpenCode Zen). OpenCode Go is supported via a custom base URL.
+- Recipe images from URLs are downloaded and stored locally as `{recipeId}.webp`.
