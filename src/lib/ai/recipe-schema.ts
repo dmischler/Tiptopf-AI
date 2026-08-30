@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { categorySchema, difficultySchema } from '@/lib/recipe-schema'
 import type { ParsedRecipe } from '@/types'
 
 export const aiRecipeSchema = z.object({
@@ -9,8 +10,8 @@ export const aiRecipeSchema = z.object({
   prepTime: z.number().int().nullable(),
   cookTime: z.number().int().nullable(),
   servings: z.number().int().nullable(),
-  category: z.enum(['starter', 'main', 'dessert', 'side', 'breakfast', 'snack']),
-  difficulty: z.enum(['easy', 'medium', 'hard']),
+  category: categorySchema,
+  difficulty: difficultySchema,
   tags: z.array(z.string()).optional(),
   confidence: z.number().min(0).max(1),
 })

@@ -16,14 +16,18 @@ import {
   upsertRecipe,
 } from '@/lib/local/store'
 import { canonicalRecipeImageUrl, parseApiImageFileName } from '@/lib/recipe-image'
-import { storedRecipeImageUrlSchema } from '@/lib/recipe-schema'
+import {
+  categorySchema,
+  difficultySchema,
+  recipeIdSchema,
+  recipeSourceTypeSchema,
+  storedRecipeImageUrlSchema,
+} from '@/lib/recipe-schema'
+import { normalizeTags } from '@/lib/utils'
 import type { Recipe } from '@/types'
 
-const recipeIdSchema = z.string().uuid()
 const favoriteSchema = z.boolean()
 const ratingSchema = z.number().int().min(0).max(5)
-const categorySchema = z.enum(['starter', 'main', 'dessert', 'side', 'breakfast', 'snack'])
-const difficultySchema = z.enum(['easy', 'medium', 'hard'])
 
 const editRecipeSchema = z.object({
   title: z.string().trim().min(1).optional(),
@@ -39,7 +43,7 @@ const editRecipeSchema = z.object({
 })
 
 const restoreRecipeSchema = z.object({
-  id: z.string().uuid(),
+  id: recipeIdSchema,
   title: z.string().trim().min(1),
   ingredients: z.array(z.string()),
   instructions: z.string().trim().min(1),
@@ -52,7 +56,7 @@ const restoreRecipeSchema = z.object({
   is_favorite: z.boolean(),
   image_url: z.string().nullable(),
   source_url: z.string().nullable(),
-  source_type: z.enum(['image', 'url', 'manual']),
+  source_type: recipeSourceTypeSchema,
   tags: z.array(z.string()).optional(),
   notes: z.string().optional(),
   created_at: z.string().optional(),
@@ -140,10 +144,7 @@ export async function editRecipe(recipeId: string, input: z.infer<typeof editRec
   }
 
   if (parsedInput.tags !== undefined) {
-    normalizedInput.tags = parsedInput.tags
-      .map((tag) => tag.trim().toLowerCase())
-      .filter((tag) => tag.length > 0)
-      .filter((tag, index, arr) => arr.indexOf(tag) === index)
+    normalizedInput.tags = normalizeTags(parsedInput.tags)
   }
 
   if (parsedInput.notes !== undefined) {

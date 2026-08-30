@@ -8,13 +8,18 @@ import { UnsafeUrlError } from '@/lib/http/safe-fetch'
 import { downloadImageToLocalStorage, saveUploadedRecipeImage } from '@/lib/local/images'
 import { createRecipe, patchRecipe } from '@/lib/local/store'
 import {
+  ALLOWED_UPLOADED_IMAGE_MIME_TYPES,
   canonicalRecipeImageUrl,
   isCanonicalRecipeImageUrl,
+  MAX_UPLOADED_IMAGE_SIZE_BYTES,
 } from '@/lib/recipe-image'
-import { storedRecipeImageUrlSchema } from '@/lib/recipe-schema'
-
-const categorySchema = z.enum(['starter', 'main', 'dessert', 'side', 'breakfast', 'snack'])
-const difficultySchema = z.enum(['easy', 'medium', 'hard'])
+import {
+  categorySchema,
+  difficultySchema,
+  recipeIdSchema,
+  recipeSourceTypeSchema,
+  storedRecipeImageUrlSchema,
+} from '@/lib/recipe-schema'
 
 const saveRecipeSchema = z.object({
   title: z.string().min(1),
@@ -28,12 +33,10 @@ const saveRecipeSchema = z.object({
   imageUrl: storedRecipeImageUrlSchema.optional(),
   remoteImageUrl: z.string().url().nullable().optional(),
   sourceUrl: z.string().nullable(),
-  sourceType: z.enum(['image', 'url', 'manual']),
+  sourceType: recipeSourceTypeSchema,
   tags: z.array(z.string()).optional(),
+  notes: z.string().max(2000).optional(),
 })
-
-const ALLOWED_REPLACE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
-const MAX_REPLACE_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
 
 export async function saveRecipe(
   input: z.infer<typeof saveRecipeSchema>,
@@ -59,6 +62,7 @@ export async function saveRecipe(
     source_url: parsed.sourceUrl,
     source_type: parsed.sourceType,
     tags: parsed.tags,
+    notes: parsed.notes,
   })
 
   const canonicalUrl = canonicalRecipeImageUrl(recipe.id)
@@ -90,7 +94,7 @@ export async function uploadRecipeImage(formData: FormData): Promise<string> {
   const recipeId = formData.get('recipeId')
   const file = formData.get('image')
 
-  if (typeof recipeId !== 'string' || !z.string().uuid().safeParse(recipeId).success) {
+  if (typeof recipeId !== 'string' || !recipeIdSchema.safeParse(recipeId).success) {
     throw new Error('Ungültige Rezept-ID')
   }
 
@@ -98,11 +102,11 @@ export async function uploadRecipeImage(formData: FormData): Promise<string> {
     throw new Error('Bilddatei fehlt')
   }
 
-  if (!ALLOWED_REPLACE_IMAGE_TYPES.has(file.type)) {
+  if (!ALLOWED_UPLOADED_IMAGE_MIME_TYPES.has(file.type)) {
     throw new Error('Nur JPG, PNG und WEBP sind erlaubt.')
   }
 
-  if (file.size > MAX_REPLACE_IMAGE_SIZE_BYTES) {
+  if (file.size > MAX_UPLOADED_IMAGE_SIZE_BYTES) {
     throw new Error('Bild darf höchstens 5 MB groß sein.')
   }
 

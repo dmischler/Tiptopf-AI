@@ -1,5 +1,11 @@
 const SAFE_IMAGE_NAME_RE = /^[A-Za-z0-9._-]+$/
 export const CANONICAL_RECIPE_IMAGE_URL_RE = /^\/api\/images\/[0-9a-f-]{36}\.webp$/i
+export const MAX_UPLOADED_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
+export const ALLOWED_UPLOADED_IMAGE_MIME_TYPES: ReadonlySet<string> = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+])
 
 export function isSafeImageName(value: string) {
   return SAFE_IMAGE_NAME_RE.test(value) && !value.includes('..')

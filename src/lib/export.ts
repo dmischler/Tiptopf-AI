@@ -1,3 +1,4 @@
+import { CATEGORY_LABELS, DIFFICULTY_LABELS } from '@/lib/recipe-meta'
 import type { Collection, Recipe } from '@/types'
 
 function slugify(value: string) {
@@ -20,26 +21,11 @@ function formatInstructions(instructions: string) {
 }
 
 function categoryLabel(category: Recipe['category']) {
-  const labels: Record<Recipe['category'], string> = {
-    starter: 'Vorspeise',
-    main: 'Hauptgericht',
-    dessert: 'Dessert',
-    side: 'Beilage',
-    breakfast: 'Frühstück',
-    snack: 'Snack',
-  }
-
-  return labels[category]
+  return CATEGORY_LABELS[category]
 }
 
 function difficultyLabel(difficulty: Recipe['difficulty']) {
-  const labels: Record<Recipe['difficulty'], string> = {
-    easy: 'Einfach',
-    medium: 'Mittel',
-    hard: 'Schwer',
-  }
-
-  return labels[difficulty]
+  return DIFFICULTY_LABELS[difficulty]
 }
 
 export function buildCollectionMarkdown(collection: Collection, recipes: Recipe[]) {

@@ -6,8 +6,10 @@ import { safeFetch } from '@/lib/http/safe-fetch'
 import { writeFileDurable } from '@/lib/local/durable-write'
 import { getRecipeImagesDir } from '@/lib/local/paths'
 import {
+  ALLOWED_UPLOADED_IMAGE_MIME_TYPES,
   canonicalRecipeImageUrl,
   isSafeImageName,
+  MAX_UPLOADED_IMAGE_SIZE_BYTES,
   parseApiImageFileName,
   toImageUrl,
 } from '@/lib/recipe-image'
@@ -15,9 +17,7 @@ import type { Recipe } from '@/types'
 
 export { isSafeImageName, toImageUrl }
 
-const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const ALLOWED_SHARP_FORMATS = new Set(['jpeg', 'png', 'webp'])
-const MAX_UPLOADED_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
 const MAX_DOWNLOADED_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
 const MAX_IMAGE_WIDTH = 1200
 const IMAGE_QUALITY = 85
@@ -140,7 +140,7 @@ export async function saveRecipeImageBytes(
   }
 
   const normalizedMime = toNormalizedMime(mimeType)
-  if (!ALLOWED_IMAGE_TYPES.has(normalizedMime)) {
+  if (!ALLOWED_UPLOADED_IMAGE_MIME_TYPES.has(normalizedMime)) {
     throw new Error('Only JPG, PNG, and WEBP images are supported')
   }
 
@@ -151,7 +151,7 @@ export async function saveRecipeImageBytes(
 export async function saveUploadedRecipeImage(file: File, recipeId: string) {
   const mime = toNormalizedMime(file.type)
 
-  if (!ALLOWED_IMAGE_TYPES.has(mime)) {
+  if (!ALLOWED_UPLOADED_IMAGE_MIME_TYPES.has(mime)) {
     throw new Error('Only JPG, PNG, and WEBP images are supported')
   }
 

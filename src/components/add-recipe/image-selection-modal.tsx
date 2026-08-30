@@ -35,9 +35,9 @@ export function ImageSelectionModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full max-w-3xl p-0 sm:max-w-3xl">
         <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 pr-12 sm:px-6 sm:pt-6">
-          <DialogTitle>Choose a recipe image</DialogTitle>
+          <DialogTitle>Rezeptbild wählen</DialogTitle>
           <DialogDescription>
-            Search picks for <span className="font-medium text-foreground">{title}</span>.
+            Suchergebnisse für <span className="font-medium text-foreground">{title}</span>.
           </DialogDescription>
         </DialogHeader>
 
@@ -45,7 +45,7 @@ export function ImageSelectionModal({
           {loading ? (
             <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/40 p-8 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Searching for matching images...
+              Passende Bilder werden gesucht...
             </div>
           ) : candidates.length > 0 ? (
             <div className="grid gap-3 sm:grid-cols-2">
@@ -60,27 +60,29 @@ export function ImageSelectionModal({
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={candidate.thumbnailUrl || candidate.url}
-                      alt={candidate.alt || 'Recipe image candidate'}
+                      alt={candidate.alt || 'Rezeptbild'}
                       className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.02]"
                     />
                   </div>
                   <div className="space-y-1 px-3 py-2 text-xs text-muted-foreground">
-                    <div className="line-clamp-1 text-sm font-medium text-foreground">{candidate.alt || 'Recipe image'}</div>
-                    <div className="capitalize">Source: {candidate.source}</div>
-                    {candidate.creditName ? <div>Photo by {candidate.creditName}</div> : null}
+                    <div className="line-clamp-1 text-sm font-medium text-foreground">
+                      {candidate.alt || 'Rezeptbild'}
+                    </div>
+                    <div>Quelle: {candidate.source}</div>
+                    {candidate.creditName ? <div>Foto von {candidate.creditName}</div> : null}
                   </div>
                 </button>
               ))}
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-border/70 bg-muted/30 p-6 text-sm text-muted-foreground">
-              No external matches found. You can refresh the search.
+              Keine Treffer. Du kannst die Suche wiederholen.
             </div>
           )}
 
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3">
             <Button type="button" variant="outline" onClick={onRefreshSearch} disabled={loading}>
-              Refresh search
+              Erneut suchen
             </Button>
           </div>
         </div>

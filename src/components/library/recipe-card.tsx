@@ -8,51 +8,15 @@ import { FavoriteButton } from '@/components/interactions/favorite-button'
 import { Rating } from '@/components/interactions/rating'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { CATEGORY_CLASS, CATEGORY_LABELS, DIFFICULTY_LABELS, formatTotalTime } from '@/lib/recipe-meta'
 import { toRecipeImageSrc } from '@/lib/recipe-image'
-import type { Difficulty, Recipe, RecipeCategory } from '@/types'
-
-const CATEGORY_LABELS: Record<RecipeCategory, string> = {
-  starter: 'Vorspeise',
-  main: 'Hauptgericht',
-  dessert: 'Dessert',
-  side: 'Beilage',
-  breakfast: 'Frühstück',
-  snack: 'Snack',
-}
-
-const DIFFICULTY_LABELS: Record<Difficulty, string> = {
-  easy: 'Einfach',
-  medium: 'Mittel',
-  hard: 'Schwer',
-}
+import type { Recipe } from '@/types'
 
 type RecipeCardProps = {
   recipe: Recipe
   index?: number
   onFavoriteChange?: (value: boolean) => void
   onRatingChange?: (value: number | null) => void
-}
-
-const CATEGORY_CLASS: Record<Recipe['category'], string> = {
-  starter: 'bg-cyan-500/15 text-cyan-300',
-  main: 'bg-amber-500/20 text-amber-300',
-  dessert: 'bg-rose-500/15 text-rose-300',
-  side: 'bg-emerald-500/15 text-emerald-300',
-  breakfast: 'bg-yellow-500/20 text-yellow-300',
-  snack: 'bg-orange-500/20 text-orange-300',
-}
-
-function formatTotalTime(prepTime: number, cookTime: number) {
-  const total = prepTime + cookTime
-  return total > 0 ? `${total} min` : 'Keine Zeit'
-}
-
-function formatCategoryLabel(category: Recipe['category']) {
-  return CATEGORY_LABELS[category]
-}
-
-function formatDifficultyLabel(difficulty: Recipe['difficulty']) {
-  return DIFFICULTY_LABELS[difficulty]
 }
 
 export function RecipeCard({ recipe, index = 0, onFavoriteChange, onRatingChange }: RecipeCardProps) {
@@ -90,8 +54,8 @@ export function RecipeCard({ recipe, index = 0, onFavoriteChange, onRatingChange
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Badge className={CATEGORY_CLASS[recipe.category]}>{formatCategoryLabel(recipe.category)}</Badge>
-            <Badge variant="outline">{formatDifficultyLabel(recipe.difficulty)}</Badge>
+            <Badge className={CATEGORY_CLASS[recipe.category]}>{CATEGORY_LABELS[recipe.category]}</Badge>
+            <Badge variant="outline">{DIFFICULTY_LABELS[recipe.difficulty]}</Badge>
           </div>
 
           {recipe.tags.length > 0 ? (

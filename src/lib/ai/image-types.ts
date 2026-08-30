@@ -10,7 +10,7 @@ export type RecipeImageCandidate = {
 
 export type ResolvedRecipeImage = {
   imageUrl: string
-  source: 'pexels' | 'mealdb' | 'ai'
+  source: 'pexels' | 'mealdb'
   creditName?: string
   creditUrl?: string
 }

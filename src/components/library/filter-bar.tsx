@@ -4,16 +4,14 @@ import { Check, Heart, Search, Zap } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
+import {
+  CATEGORIES,
+  CATEGORY_CHIP_CLASS,
+  CATEGORY_LABELS,
+  DIFFICULTIES,
+  DIFFICULTY_LABELS,
+} from '@/lib/recipe-meta'
 import type { Difficulty, RecipeCategory } from '@/types'
-
-const CATEGORY_ITEMS: Array<{ value: RecipeCategory; label: string; color: string }> = [
-  { value: 'starter', label: 'Vorspeise', color: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30' },
-  { value: 'main', label: 'Hauptgericht', color: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
-  { value: 'dessert', label: 'Dessert', color: 'bg-rose-500/15 text-rose-300 border-rose-500/30' },
-  { value: 'side', label: 'Beilage', color: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
-  { value: 'breakfast', label: 'Frühstück', color: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' },
-  { value: 'snack', label: 'Snack', color: 'bg-orange-500/20 text-orange-300 border-orange-500/30' },
-]
 
 const TAG_COLORS = [
   'bg-purple-500/15 text-purple-300 border-purple-500/30',
@@ -26,12 +24,6 @@ const TAG_COLORS = [
 function getTagColor(index: number) {
   return TAG_COLORS[index % TAG_COLORS.length]
 }
-
-const DIFFICULTY_ITEMS: Array<{ value: Difficulty; label: string }> = [
-  { value: 'easy', label: 'Leicht' },
-  { value: 'medium', label: 'Mittel' },
-  { value: 'hard', label: 'Schwer' },
-]
 
 interface FilterBarProps {
   search: string
@@ -98,21 +90,21 @@ export function FilterBar({
           </span>
         </button>
 
-        {CATEGORY_ITEMS.map((item) => {
-          const active = isCategoryActive(item.value)
+        {CATEGORIES.map((category) => {
+          const active = isCategoryActive(category)
           return (
             <button
-              key={item.value}
-              onClick={() => onCategoryChange(active ? null : item.value)}
+              key={category}
+              onClick={() => onCategoryChange(active ? null : category)}
               className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium border transition-colors ${
                 active
-                  ? `${item.color} ring-1 ring-inset ring-white/20`
+                  ? `${CATEGORY_CHIP_CLASS[category]} ring-1 ring-inset ring-white/20`
                   : 'bg-zinc-800/50 text-zinc-300 border-zinc-700 hover:bg-zinc-800'
               }`}
             >
               <span className="flex items-center gap-1.5">
                 {active ? <Check className="h-3.5 w-3.5" /> : null}
-                {item.label}
+                {CATEGORY_LABELS[category]}
               </span>
             </button>
           )
@@ -132,12 +124,12 @@ export function FilterBar({
           </span>
         </button>
 
-        {DIFFICULTY_ITEMS.map((item) => {
-          const active = activeDifficulty === item.value
+        {DIFFICULTIES.map((difficulty) => {
+          const active = activeDifficulty === difficulty
           return (
             <button
-              key={item.value}
-              onClick={() => onDifficultyChange(active ? null : item.value)}
+              key={difficulty}
+              onClick={() => onDifficultyChange(active ? null : difficulty)}
               className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium border transition-colors ${
                 active
                   ? 'bg-primary/20 text-primary border-primary/50'
@@ -146,7 +138,7 @@ export function FilterBar({
             >
               <span className="flex items-center gap-1.5">
                 {active ? <Check className="h-3.5 w-3.5" /> : null}
-                {item.label}
+                {DIFFICULTY_LABELS[difficulty]}
               </span>
             </button>
           )

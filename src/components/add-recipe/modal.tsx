@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -9,15 +9,14 @@ import {
   extractFromImageAction,
   extractFromUrlAction,
   findRecipeImageAction,
-  searchRecipeImageCandidatesAction,
 } from '@/app/actions/extract-recipe'
 import { saveRecipe } from '@/app/actions/add-recipe'
-import { ImageSelectionModal } from '@/components/add-recipe/image-selection-modal'
 import { ImageUpload } from '@/components/add-recipe/image-upload'
 import { ManualForm } from '@/components/add-recipe/manual-form'
 import { RecipePreview, type EditableRecipePreview } from '@/components/add-recipe/preview'
 import { StreamingProgress, type Stage } from '@/components/add-recipe/streaming-progress'
 import { UrlInput } from '@/components/add-recipe/url-input'
+import { parseRecipeFieldsForSave } from '@/components/recipe/recipe-fields'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -28,7 +27,6 @@ import {
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { isCanonicalRecipeImageUrl } from '@/lib/recipe-image'
-import type { RecipeImageCandidate } from '@/lib/ai/image-types'
 import type { ParsedRecipe, Recipe } from '@/types'
 
 type ModalPhase = 'input' | 'parsing' | 'preview' | 'saving'
@@ -58,17 +56,27 @@ function buildEditableState(recipe: ExtractedRecipePayload): EditableRecipePrevi
     title: recipe.title,
     category: recipe.category,
     difficulty: recipe.difficulty,
+    prepTime: recipe.prep_time,
+    cookTime: recipe.cook_time,
     servings: recipe.servings,
+    ingredientsText: recipe.ingredients.join('\n'),
+    instructionsText: recipe.instructions,
+    notes: '',
+    tags: recipe.tags ?? [],
     imageUrl: recipe.image_url ?? null,
     sourceUrl: recipe.source_url ?? null,
     sourceType: recipe.source_type,
-    tags: recipe.tags ?? [],
-    ingredientsText: recipe.ingredients.join('\n'),
-    instructionsText: recipe.instructions,
   }
 }
 
-export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, initialMode = 'image', allTags = [] }: AddRecipeModalProps) {
+export function AddRecipeModal({
+  open,
+  onOpenChange,
+  onRecipeSaved,
+  initialUrl,
+  initialMode = 'image',
+  allTags = [],
+}: AddRecipeModalProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'image' | 'url' | 'manual'>(initialMode)
   const [phase, setPhase] = useState<ModalPhase>('input')
@@ -78,28 +86,18 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
   const [extractedRecipe, setExtractedRecipe] = useState<ExtractedRecipePayload | null>(null)
   const [previewState, setPreviewState] = useState<EditableRecipePreview | null>(null)
   const [replacementImageFile, setReplacementImageFile] = useState<File | null>(null)
-  const [replacementImagePreviewUrl, setReplacementImagePreviewUrl] = useState<string | null>(null)
   const [imageMeta, setImageMeta] = useState<ImageMeta | null>(null)
-  const [isFindingImage, setIsFindingImage] = useState(false)
-  const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false)
-  const [imageCandidates, setImageCandidates] = useState<RecipeImageCandidate[]>([])
-  const [isLoadingCandidates, setIsLoadingCandidates] = useState(false)
   const [isManualSaving, setIsManualSaving] = useState(false)
 
   useEffect(() => {
-    if (!replacementImagePreviewUrl) return
-    return () => {
-      URL.revokeObjectURL(replacementImagePreviewUrl)
+    if (!open) {
+      return
     }
-  }, [replacementImagePreviewUrl])
 
-  useEffect(() => {
-    if (open) {
-      setActiveTab(initialMode)
-      if (initialUrl) {
-        setUrlInput(initialUrl)
-        toast.success('URL from clipboard detected', { duration: 2000 })
-      }
+    setActiveTab(initialMode)
+    if (initialUrl) {
+      setUrlInput(initialUrl)
+      toast.success('URL aus der Zwischenablage erkannt', { duration: 2000 })
     }
   }, [open, initialUrl, initialMode])
 
@@ -112,37 +110,29 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
     setPreviewState(null)
     setReplacementImageFile(null)
     setImageMeta(null)
-    setIsFindingImage(false)
-    setIsSelectionModalOpen(false)
-    setImageCandidates([])
-    setIsLoadingCandidates(false)
     setIsManualSaving(false)
-    if (replacementImagePreviewUrl) {
-      URL.revokeObjectURL(replacementImagePreviewUrl)
-    }
-    setReplacementImagePreviewUrl(null)
   }
 
   async function handleExtractFromUrl() {
     const url = urlInput.trim()
     if (!url) {
-      toast.error('Please enter a URL first.')
+      toast.error('Bitte zuerst eine URL eingeben.')
       return
     }
 
     if (!/^https?:\/\//i.test(url)) {
-      toast.error('URL must start with http:// or https://')
+      toast.error('URL muss mit http:// oder https:// beginnen.')
       return
     }
 
     setPhase('parsing')
     setProgressStage('fetching')
-    setStreamText('Fetching page content...')
+    setStreamText('Seite wird geladen...')
 
     try {
       const recipe = await extractFromUrlAction(url)
       setProgressStage('structuring')
-      setStreamText('Parsing and structuring fields...')
+      setStreamText('Felder werden strukturiert...')
 
       const withImage = await runAutoImageFallback(recipe)
 
@@ -151,7 +141,7 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
       setProgressStage('complete')
       setPhase('preview')
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to extract from URL.'
+      const message = error instanceof Error ? error.message : 'Extrahieren von der URL fehlgeschlagen.'
       setProgressStage('error')
       toast.error(message)
       setPhase('input')
@@ -161,12 +151,12 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
   async function handleExtractFromImage(imageBase64: string) {
     setPhase('parsing')
     setProgressStage('parsing')
-    setStreamText('Analyzing recipe image...')
+    setStreamText('Rezeptbild wird analysiert...')
 
     try {
       const recipe = await extractFromImageAction(imageBase64)
       setProgressStage('structuring')
-      setStreamText('Structuring ingredients and instructions...')
+      setStreamText('Zutaten und Anleitung werden strukturiert...')
 
       const withImage = await runAutoImageFallback(recipe)
 
@@ -175,54 +165,11 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
       setProgressStage('complete')
       setPhase('preview')
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to extract from image.'
+      const message = error instanceof Error ? error.message : 'Extrahieren vom Bild fehlgeschlagen.'
       setProgressStage('error')
       toast.error(message)
       setPhase('input')
     }
-  }
-
-  async function handleReplaceImage(file: File) {
-    if (!previewState) return
-
-    if (replacementImagePreviewUrl) {
-      URL.revokeObjectURL(replacementImagePreviewUrl)
-    }
-
-    const objectUrl = URL.createObjectURL(file)
-    setReplacementImageFile(file)
-    setReplacementImagePreviewUrl(objectUrl)
-    setImageMeta(null)
-    setPreviewState({
-      ...previewState,
-      imageUrl: objectUrl,
-    })
-  }
-
-  function applyResolvedImage(imageUrl: string, meta: ImageMeta | null = null) {
-    if (!previewState) {
-      return
-    }
-
-    if (replacementImagePreviewUrl) {
-      URL.revokeObjectURL(replacementImagePreviewUrl)
-      setReplacementImagePreviewUrl(null)
-    }
-
-    setReplacementImageFile(null)
-    setExtractedRecipe((current) =>
-      current
-        ? {
-            ...current,
-            image_url: imageUrl,
-          }
-        : current
-    )
-    setImageMeta(meta)
-    setPreviewState({
-      ...previewState,
-      imageUrl,
-    })
   }
 
   async function runAutoImageFallback(recipe: ExtractedRecipePayload) {
@@ -232,7 +179,7 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
 
     try {
       setProgressStage('finding_image')
-      setStreamText('No source image found. Looking up matching photos...')
+      setStreamText('Kein Quellbild. Passende Fotos werden gesucht...')
 
       const resolved = await findRecipeImageAction({
         title: recipe.title,
@@ -249,15 +196,6 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
         creditUrl: resolved.creditUrl,
       })
 
-      setExtractedRecipe((current) =>
-        current
-          ? {
-              ...current,
-              image_url: resolved.imageUrl,
-            }
-          : current
-      )
-
       return {
         ...recipe,
         image_url: resolved.imageUrl,
@@ -267,101 +205,45 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
     }
   }
 
-  async function loadImageCandidates() {
-    if (!previewState || !extractedRecipe) {
-      return [] as RecipeImageCandidate[]
-    }
-
-    setIsLoadingCandidates(true)
-    try {
-      const candidates = await searchRecipeImageCandidatesAction(previewState.title, previewState.category)
-      setImageCandidates(candidates)
-      return candidates
-    } catch {
-      setImageCandidates([])
-      toast.error('Failed to search image providers right now.')
-      return [] as RecipeImageCandidate[]
-    } finally {
-      setIsLoadingCandidates(false)
-    }
-  }
-
-  function handleSelectImageCandidate(candidate: RecipeImageCandidate) {
-    applyResolvedImage(candidate.url, {
-      creditName: candidate.creditName,
-      creditUrl: candidate.creditUrl,
-    })
-    setIsSelectionModalOpen(false)
-    toast.success('Image updated.')
-  }
-
-  async function handleFindImageManual() {
-    if (!previewState || !extractedRecipe) {
+  async function handleSave() {
+    if (!extractedRecipe || !previewState) {
+      toast.error('Kein Rezept zum Speichern.')
       return
     }
 
-    setIsFindingImage(true)
+    let parsed: ReturnType<typeof parseRecipeFieldsForSave>
     try {
-      const candidates = await loadImageCandidates()
-      setIsSelectionModalOpen(true)
-      if (!previewState.imageUrl && candidates.length === 0) {
-        toast.info('No external matches yet. You can generate an AI image in the picker.')
-      }
-    } finally {
-      setIsFindingImage(false)
-    }
-  }
-
-  async function handleSave() {
-    if (!extractedRecipe || !previewState) {
-      toast.error('No recipe to save.')
+      parsed = parseRecipeFieldsForSave(previewState)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Ungültiger Zahlenwert.'
+      toast.error(message)
       return
     }
 
     setPhase('saving')
 
     try {
-      const ingredients = (previewState.ingredientsText || '')
-        .split('\n')
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0)
-      const instructions = (previewState.instructionsText || '')
-        .split('\n')
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0)
-        .join('\n')
-
-      if (ingredients.length === 0) {
-        toast.error('At least one ingredient is required.')
-        setPhase('preview')
-        return
-      }
-      if (!instructions) {
-        toast.error('Instructions are required.')
-        setPhase('preview')
-        return
-      }
-
-      const previewUrl = replacementImageFile ? null : previewState.imageUrl
+      const previewUrl = replacementImageFile ? null : parsed.imageUrl
       const isRemote = Boolean(previewUrl && /^https?:\/\//i.test(previewUrl))
       const canonicalImageUrl = previewUrl && isCanonicalRecipeImageUrl(previewUrl) ? previewUrl.split(/[?#]/)[0] : null
       const intendedImage = Boolean(replacementImageFile || isRemote || canonicalImageUrl)
 
       const saved = await saveRecipe(
         {
-          title: previewState.title,
-          ingredients,
-          instructions,
-          prepTime: extractedRecipe.prep_time,
-          cookTime: extractedRecipe.cook_time,
-          servings: previewState.servings,
-          category: previewState.category,
-          difficulty: previewState.difficulty,
+          title: parsed.title,
+          ingredients: parsed.ingredients,
+          instructions: parsed.instructions,
+          prepTime: parsed.prepTime,
+          cookTime: parsed.cookTime,
+          servings: parsed.servings,
+          category: parsed.category,
+          difficulty: parsed.difficulty,
           imageUrl: canonicalImageUrl,
           remoteImageUrl: isRemote ? previewUrl : null,
           sourceUrl: previewState.sourceUrl,
           sourceType: previewState.sourceType,
-          tags: previewState.tags,
+          tags: parsed.tags,
+          notes: parsed.notes,
         },
         replacementImageFile
       )
@@ -371,19 +253,22 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
       if (intendedImage && !saved.image_url) {
         toast.error('Rezept gespeichert, Bild konnte nicht geladen werden.')
       } else {
-        toast.success('Recipe saved to your library.')
+        toast.success('Rezept gespeichert.')
       }
       onOpenChange(false)
       resetState()
       router.push(`/library/${saved.id}`)
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to save recipe.'
+      const message = error instanceof Error ? error.message : 'Speichern fehlgeschlagen.'
       toast.error(message)
       setPhase('preview')
     }
   }
 
-  async function handleSaveManual(recipe: import('@/components/add-recipe/manual-form').ManualRecipeInput, imageFile: File | null) {
+  async function handleSaveManual(
+    recipe: import('@/components/add-recipe/manual-form').ManualRecipeInput,
+    imageFile: File | null
+  ) {
     setIsManualSaving(true)
 
     try {
@@ -405,6 +290,7 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
           sourceUrl: null,
           sourceType: 'manual',
           tags: recipe.tags,
+          notes: recipe.notes,
         },
         imageFile
       )
@@ -420,17 +306,12 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
       resetState()
       router.push(`/library/${saved.id}`)
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to save recipe.'
+      const message = error instanceof Error ? error.message : 'Speichern fehlgeschlagen.'
       toast.error(message)
     } finally {
       setIsManualSaving(false)
     }
   }
-
-  const previewImageUrl = useMemo(
-    () => replacementImagePreviewUrl ?? previewState?.imageUrl ?? extractedRecipe?.image_url ?? null,
-    [replacementImagePreviewUrl, previewState?.imageUrl, extractedRecipe?.image_url]
-  )
 
   return (
     <Dialog
@@ -444,9 +325,9 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
     >
       <DialogContent className="w-full max-w-4xl p-0 sm:max-w-4xl">
         <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 pr-12 sm:px-6 sm:pt-6">
-          <DialogTitle>Add recipe</DialogTitle>
+          <DialogTitle>Rezept hinzufügen</DialogTitle>
           <DialogDescription>
-            Upload a photo or paste a URL. AI extracts the recipe structure automatically.
+            Lade ein Foto hoch oder füge eine URL ein. Die KI extrahiert das Rezept automatisch.
           </DialogDescription>
         </DialogHeader>
 
@@ -467,11 +348,7 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
               </TabsContent>
 
               <TabsContent value="url" className="pt-4">
-                <UrlInput
-                  value={urlInput}
-                  onValueChange={setUrlInput}
-                  onExtract={handleExtractFromUrl}
-                />
+                <UrlInput value={urlInput} onValueChange={setUrlInput} onExtract={handleExtractFromUrl} />
               </TabsContent>
 
               <TabsContent value="manual" className="pt-4">
@@ -493,28 +370,25 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
           {phase === 'preview' && extractedRecipe && previewState && (
             <RecipePreview
               parsedRecipe={extractedRecipe}
-              value={{
-                ...previewState,
-                imageUrl: previewImageUrl,
-              }}
-              isFindingImage={isFindingImage}
+              value={previewState}
+              disabled={false}
               imageCreditName={imageMeta?.creditName ?? null}
               imageCreditUrl={imageMeta?.creditUrl ?? null}
+              allTags={allTags}
               onChange={setPreviewState}
               onSave={handleSave}
               onCancel={() => {
                 resetState()
                 onOpenChange(false)
               }}
-              onReplaceImage={handleReplaceImage}
-              onFindImage={handleFindImageManual}
+              onImageFileChange={setReplacementImageFile}
             />
           )}
 
           {phase === 'saving' && (
             <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/40 p-8 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Saving recipe...
+              Rezept wird gespeichert...
             </div>
           )}
 
@@ -528,27 +402,11 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
                   resetState()
                 }}
               >
-                Cancel
+                Abbrechen
               </Button>
             </div>
           )}
         </div>
-
-        {phase === 'preview' && previewState && (
-          <ImageSelectionModal
-            open={isSelectionModalOpen}
-            loading={isLoadingCandidates}
-            title={previewState.title}
-            candidates={imageCandidates}
-            onOpenChange={setIsSelectionModalOpen}
-            onSelectCandidate={(candidate) => {
-              handleSelectImageCandidate(candidate)
-            }}
-            onRefreshSearch={() => {
-              void loadImageCandidates()
-            }}
-          />
-        )}
       </DialogContent>
     </Dialog>
   )

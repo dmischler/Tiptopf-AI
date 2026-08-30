@@ -16,13 +16,12 @@ import { assertExtractRateLimit } from '@/lib/extract-rate-limit'
 import { UnsafeUrlError } from '@/lib/http/safe-fetch'
 import { downloadImageToLocalStorage } from '@/lib/local/images'
 import { getSettings, patchRecipe } from '@/lib/local/store'
+import { categorySchema, recipeIdSchema } from '@/lib/recipe-schema'
 import { formatSafeError } from '@/lib/safe-error'
 import type { ParsedRecipe, RecipeCategory } from '@/types'
 
-const categorySchema = z.enum(['starter', 'main', 'dessert', 'side', 'breakfast', 'snack'])
 const titleSchema = z.string().trim().min(1).max(180)
 const imageUrlSchema = z.string().url().max(2048)
-const recipeIdSchema = z.string().uuid()
 const extractUrlSchema = z.string().url().max(2048)
 
 const ALLOWED_EXTRACT_IMAGE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
