@@ -7,15 +7,28 @@ import { toast } from 'sonner'
 import { exportStoreAction, importStoreAction } from '@/app/actions/settings'
 import { Button } from '@/components/ui/button'
 
+const MAX_IMPORT_BYTES = 5 * 1024 * 1024
+
 export function BackupRestoreSection() {
   const [isExporting, setIsExporting] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
+  const [exportIncludeSecrets, setExportIncludeSecrets] = useState(false)
+  const [importIncludeSecrets, setImportIncludeSecrets] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function handleExport() {
+    if (exportIncludeSecrets) {
+      const confirmed = window.confirm(
+        'Achtung: Dieses Backup enthält deine API-Keys im Klartext. Speichere die Datei nicht ungesichert. Fortfahren?'
+      )
+      if (!confirmed) {
+        return
+      }
+    }
+
     setIsExporting(true)
     try {
-      const json = await exportStoreAction()
+      const json = await exportStoreAction({ includeSecrets: exportIncludeSecrets })
       const blob = new Blob([json], { type: 'application/json;charset=utf-8' })
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
@@ -40,10 +53,24 @@ export function BackupRestoreSection() {
       return
     }
 
+    if (file.size > MAX_IMPORT_BYTES) {
+      toast.error('Backup ist zu groß (max. 5 MB).')
+      return
+    }
+
+    const confirmed = window.confirm('Dies ersetzt alle Rezepte. Fortfahren?')
+    if (!confirmed) {
+      return
+    }
+
     setIsImporting(true)
     try {
       const text = await file.text()
-      await importStoreAction(text)
+      if (text.length > MAX_IMPORT_BYTES) {
+        toast.error('Backup ist zu groß (max. 5 MB).')
+        return
+      }
+      await importStoreAction(text, { includeSecrets: importIncludeSecrets })
       toast.success('Backup erfolgreich wiederhergestellt. Seite wird neu geladen...')
       window.location.reload()
     } catch (error) {
@@ -58,8 +85,21 @@ export function BackupRestoreSection() {
     <section className="space-y-4">
       <h2 className="text-xl font-semibold tracking-tight">Daten-Backup</h2>
       <p className="text-sm text-muted-foreground">
-        Erstelle ein Backup deiner gesamten Rezeptbibliothek oder stelle ein früheres Backup wieder her.
+        Erstelle ein Backup deiner Rezeptbibliothek oder stelle ein früheres Backup wieder her.
+        Standardmäßig enthalten Backups keine API-Keys.
       </p>
+
+      <label className="flex min-h-[44px] items-start gap-2 text-sm text-muted-foreground">
+        <input
+          type="checkbox"
+          className="mt-1 size-4 accent-primary"
+          checked={exportIncludeSecrets}
+          onChange={(event) => setExportIncludeSecrets(event.target.checked)}
+        />
+        <span>
+          Backup inklusive API-Keys. Achtung: Die Datei enthält dann deine Keys im Klartext.
+        </span>
+      </label>
 
       <div className="flex flex-wrap gap-3">
         <Button
@@ -87,12 +127,24 @@ export function BackupRestoreSection() {
               event.currentTarget.value = ''
             }}
           />
-          <span className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-background/70 px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/60 disabled:opacity-50">
+          <span className="inline-flex h-9 min-h-[44px] cursor-pointer items-center gap-2 rounded-md border border-border bg-background/70 px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/60 disabled:opacity-50">
             <Upload className="h-4 w-4" />
             {isImporting ? 'Importiere...' : 'Backup wiederherstellen'}
           </span>
         </label>
       </div>
+
+      <label className="flex min-h-[44px] items-start gap-2 text-sm text-muted-foreground">
+        <input
+          type="checkbox"
+          className="mt-1 size-4 accent-primary"
+          checked={importIncludeSecrets}
+          onChange={(event) => setImportIncludeSecrets(event.target.checked)}
+        />
+        <span>
+          Keys aus Backup übernehmen. Ohne diesen Haken bleiben deine aktuellen API-Keys erhalten.
+        </span>
+      </label>
     </section>
   )
 }

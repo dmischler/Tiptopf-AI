@@ -38,7 +38,9 @@ npm run dev
 
 ## Optional environment variables
 
-- `NEXT_PUBLIC_SITE_URL` — useful when behind a reverse proxy
+- `NEXT_PUBLIC_SITE_URL` — public origin (Tailscale Serve / MagicDNS / reverse proxy). Rebuild after changing it.
+- `ACCESS_PIN` — optional shared PIN; empty disables the `/gate` prompt
+- `ALLOW_HTTP_FETCH` — set `1` to allow `http://` recipe fetches (https-only by default)
 
 ## Local data layout
 

@@ -3,14 +3,35 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
     restart: unless-stopped
+    # Bind modes — see docs/local-pi-deployment.md
+    #
+    # Mode A (recommended): Tailscale Serve / localhost only.
+    # LAN guests cannot hit port 3000. Requires `tailscale serve --bg 3000`
+    # (or equivalent) so the tailnet hostname reaches 127.0.0.1:3000.
+    # Changing to this bind without Serve looks like “the app is down”
+    # from other devices. Inside the container HOSTNAME remains 0.0.0.0.
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
+    # Mode B: publish on all host interfaces (LAN + Tailscale + public if
+    # the Pi has a public IP). Only use this if a host firewall restricts
+    # port 3000 to tailscale0. Do not publish 0.0.0.0 on a house LAN with guests.
+    # ports:
+    #   - "3000:3000"
     volumes:
       - tiptopf-data:/app/data
+    env_file:
+      - path: .env.docker
+        required: false
     environment:
       - DATA_DIR=/app/data
-      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-}
+      - HOSTNAME=0.0.0.0
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/library"]
       interval: 30s

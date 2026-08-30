@@ -1,5 +1,3 @@
-'use server'
-
 import { generateObject } from 'ai'
 import { z } from 'zod'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
@@ -10,6 +8,7 @@ import {
   resolveGeminiModelId,
 } from '@/lib/ai/client'
 import { IMAGE_EXTRACTION_PROMPT } from '@/lib/ai/prompts'
+import { formatSafeError } from '@/lib/safe-error'
 import type { ParsedRecipe } from '@/types'
 
 const recipeSchema = z.object({
@@ -29,11 +28,16 @@ function cleanJsonResponse(raw: string) {
   return raw.replace(/^```json\s*/i, '').replace(/```$/i, '').trim()
 }
 
+const ALLOWED_IMAGE_DATA_URL_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
+
 function parseDataUrl(dataUrl: string): { mimeType: string; base64: string } | null {
-  const match = dataUrl.match(/^data:([^;]*);base64,(.+)$/)
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
   if (!match) return null
-  const mimeType = match[1]?.trim() || 'image/jpeg'
-  return { mimeType, base64: match[2] }
+  const mimeType = match[1]?.trim().toLowerCase() || ''
+  if (!ALLOWED_IMAGE_DATA_URL_TYPES.has(mimeType)) {
+    return null
+  }
+  return { mimeType: mimeType === 'image/jpg' ? 'image/jpeg' : mimeType, base64: match[2] }
 }
 
 function getFinishReasonString(finishReason: unknown): string {
@@ -134,27 +138,17 @@ export async function extractRecipeFromImage(
   ]
 
   let raw = ''
-  let usedModel = primaryModel
   let lastAttemptedModel = primaryModel
   let finishReason = ''
 
   async function tryExtract(modelName: string): Promise<boolean> {
-    console.log('AI image extraction - trying Gemini model:', modelName)
     try {
       const result = await runImageExtraction(imageDataUrl, google(modelName))
       raw = result.text
       finishReason = result.finishReason
-      console.log(
-        'AI image extraction - model:',
-        modelName,
-        'finishReason:',
-        finishReason,
-        'textLength:',
-        raw.length
-      )
       return raw.trim().length > 0
     } catch (err) {
-      console.error('AI image extraction - Gemini model failed:', modelName, err)
+      console.error('AI image extraction - Gemini model failed:', modelName, formatSafeError(err))
       return false
     }
   }
@@ -164,16 +158,12 @@ export async function extractRecipeFromImage(
     lastAttemptedModel = modelName
     success = await tryExtract(modelName)
     if (success) {
-      usedModel = modelName
       break
     }
   }
 
   if (!success) {
-    console.error(
-      'AI image extraction failed - all models returned empty. Last finishReason:',
-      finishReason
-    )
+    console.error('AI image extraction failed - all models returned empty')
     const isSafetyBlock = finishReason?.toLowerCase().includes('safety') || finishReason?.toLowerCase().includes('block')
     const modelHint = lastAttemptedModel ? ` (letzter Versuch: ${lastAttemptedModel})` : ''
     throw new Error(
@@ -182,8 +172,6 @@ export async function extractRecipeFromImage(
         : `Keine Antwort von Gemini erhalten${modelHint}. Überprüfe API-Key und Modell-Einstellungen im Profil (z. B. gemini-2.0-flash oder gemini-2.5-flash).`
     )
   }
-
-  console.log('AI image extraction - succeeded with Gemini model:', usedModel)
 
   let parsed
   try {

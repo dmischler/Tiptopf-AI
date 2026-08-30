@@ -1,3 +1,4 @@
+import { safeFetch } from '@/lib/http/safe-fetch'
 import type { Difficulty, RecipeCategory } from '@/types'
 
 type StructuredUrlRecipe = {
@@ -355,34 +356,19 @@ function extractOgImage(html: string) {
   return match ? match[1] : null
 }
 
+const PAGE_FETCH_MAX_BYTES = 2 * 1024 * 1024
+
 export async function fetchRecipeUrl(url: string, timeoutMs = 15000): Promise<FetchResult> {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  const fetched = await safeFetch(url, {
+    timeoutMs,
+    maxBytes: PAGE_FETCH_MAX_BYTES,
+    purpose: 'page',
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (compatible; Tiptopf-AI/1.0)',
+    },
+  })
 
-  let response: Response
-  try {
-    response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; Tiptopf-AI/1.0)',
-      },
-      cache: 'no-store',
-      signal: controller.signal,
-    })
-  } catch (err) {
-    clearTimeout(timeoutId)
-    if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error(`Timeout fetching URL after ${timeoutMs}ms`)
-    }
-    throw new Error(`Failed to fetch URL: ${err instanceof Error ? err.message : 'Network error'}`)
-  }
-
-  clearTimeout(timeoutId)
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`)
-  }
-
-  const html = await response.text()
+  const html = new TextDecoder('utf-8').decode(fetched.bytes)
   const jsonLdResult = extractRecipeFromJsonLd(html)
 
   if (jsonLdResult) {

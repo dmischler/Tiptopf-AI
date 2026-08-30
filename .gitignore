@@ -7,6 +7,7 @@ build/
 .env.local
 .env*.local
 *.env
+.env.docker
 .DS_Store
 *.log
 .vercel

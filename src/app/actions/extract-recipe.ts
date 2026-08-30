@@ -3,21 +3,31 @@
 import { z } from 'zod'
 
 import { revalidateApp } from '@/app/actions/_revalidate'
+import { assertAccess } from '@/lib/access-pin'
 import { extractRecipeFromText } from '@/lib/ai/extractor'
 import { searchPexelsImages } from '@/lib/ai/image-search'
 import { searchMealDbImages } from '@/lib/ai/meal-db'
 import type { RecipeCategory } from '@/types'
 import type { RecipeImageCandidate, ResolvedRecipeImage } from '@/lib/ai/image-types'
-import { resolveAiBaseUrl } from '@/lib/ai/client'
+import { assertSafeAiBaseUrl } from '@/lib/ai/assert-base-url'
+import { resolveAiBaseUrl, resolveGeminiBaseUrl } from '@/lib/ai/client'
 import { fetchRecipeUrl } from '@/lib/ai/url-fetcher'
 import { extractRecipeFromImage } from '@/lib/ai/image-handler'
+import { assertExtractRateLimit } from '@/lib/extract-rate-limit'
+import { UnsafeUrlError } from '@/lib/http/safe-fetch'
 import { downloadImageToLocalStorage } from '@/lib/local/images'
 import { getSettings, patchRecipe } from '@/lib/local/store'
+import { formatSafeError } from '@/lib/safe-error'
 
 const categorySchema = z.enum(['starter', 'main', 'dessert', 'side', 'breakfast', 'snack'])
 const titleSchema = z.string().trim().min(1).max(180)
-const imageUrlSchema = z.string().url()
+const imageUrlSchema = z.string().url().max(2048)
 const recipeIdSchema = z.string().uuid()
+const extractUrlSchema = z.string().trim().url().max(2048)
+
+const ALLOWED_EXTRACT_IMAGE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
+const MAX_EXTRACT_IMAGE_BYTES = 8 * 1024 * 1024
+const MAX_EXTRACT_DATA_URL_CHARS = 12 * 1024 * 1024
 
 const findRecipeImageInputSchema = z.object({
   title: titleSchema,
@@ -59,10 +69,58 @@ async function collectImageCandidates(
   return searchMealDbImages(title, 4)
 }
 
+async function assertConfiguredAiBaseUrl(value: string | null | undefined, resolve: (input?: string) => string | undefined) {
+  if (!value?.trim()) {
+    return
+  }
+
+  const resolved = resolve(value)
+  if (!resolved) {
+    return
+  }
+
+  try {
+    await assertSafeAiBaseUrl(resolved)
+  } catch (error) {
+    if (error instanceof UnsafeUrlError) {
+      throw new Error('Base URL nicht erlaubt')
+    }
+    throw error
+  }
+}
+
+function parseExtractImageDataUrl(imageDataUrl: string) {
+  if (typeof imageDataUrl !== 'string' || imageDataUrl.length === 0) {
+    throw new Error('Kein Bild übergeben.')
+  }
+
+  if (imageDataUrl.length > MAX_EXTRACT_DATA_URL_CHARS) {
+    throw new Error('Bild ist zu groß.')
+  }
+
+  const match = imageDataUrl.match(/^data:([^;]+);base64,([A-Za-z0-9+/=\s]+)$/i)
+  if (!match) {
+    throw new Error('Ungültiges Bildformat.')
+  }
+
+  const mime = match[1].trim().toLowerCase()
+  if (!ALLOWED_EXTRACT_IMAGE_TYPES.has(mime)) {
+    throw new Error('Nur JPG, PNG und WEBP sind erlaubt.')
+  }
+
+  const decoded = Buffer.from(match[2], 'base64')
+  if (decoded.byteLength === 0 || decoded.byteLength > MAX_EXTRACT_IMAGE_BYTES) {
+    throw new Error('Bild ist zu groß.')
+  }
+
+  return imageDataUrl
+}
+
 export async function searchRecipeImageCandidatesAction(
   title: string,
   category: RecipeCategory
 ): Promise<RecipeImageCandidate[]> {
+  await assertAccess()
   const settings = await getSettings()
   const parsedTitle = titleSchema.parse(title)
   const parsedCategory = categorySchema.parse(category)
@@ -73,15 +131,24 @@ export async function applyRecipeImageCandidateAction(
   recipeId: string,
   imageUrl: string
 ): Promise<string> {
+  await assertAccess()
   const parsedRecipeId = recipeIdSchema.parse(recipeId)
   const parsedImageUrl = imageUrlSchema.parse(imageUrl)
-  const storedUrl = await downloadImageToLocalStorage(parsedImageUrl, parsedRecipeId)
-  await patchRecipe(parsedRecipeId, { image_url: storedUrl })
-  revalidateApp()
-  return storedUrl
+  try {
+    const storedUrl = await downloadImageToLocalStorage(parsedImageUrl, parsedRecipeId)
+    await patchRecipe(parsedRecipeId, { image_url: storedUrl })
+    revalidateApp()
+    return storedUrl
+  } catch (error) {
+    if (error instanceof UnsafeUrlError) {
+      throw new Error('URL nicht erlaubt')
+    }
+    throw error
+  }
 }
 
 export async function findRecipeImageAction(input: FindRecipeImageInput): Promise<ResolvedRecipeImage | null> {
+  await assertAccess()
   const settings = await getSettings()
   const parsedInput = findRecipeImageInputSchema.parse(input)
   const candidates = await collectImageCandidates(parsedInput.title, parsedInput.category, settings.pexels_api_key)
@@ -99,19 +166,41 @@ export async function findRecipeImageAction(input: FindRecipeImageInput): Promis
 }
 
 export async function extractFromUrlAction(url: string) {
+  await assertAccess()
+  assertExtractRateLimit()
   const settings = await getSettings()
 
-  const normalizedUrl = url.trim()
-  if (!/^https?:\/\//i.test(normalizedUrl)) {
-    throw new Error('URL must start with http:// or https://')
+  const parsedUrl = extractUrlSchema.safeParse(url)
+  if (!parsedUrl.success) {
+    throw new Error('URL nicht erlaubt')
   }
 
-  let fetchResult: { content: string; imageUrl: string | null; structuredRecipe: { title: string; ingredients: string[]; instructions: string; prep_time: number | null; cook_time: number | null; servings: number | null; category: import('@/types').RecipeCategory; difficulty: import('@/types').Difficulty; confidence: number } | null }
+  const normalizedUrl = parsedUrl.data
+  await assertConfiguredAiBaseUrl(settings.opencode_base_url, resolveAiBaseUrl)
+
+  let fetchResult: {
+    content: string
+    imageUrl: string | null
+    structuredRecipe: {
+      title: string
+      ingredients: string[]
+      instructions: string
+      prep_time: number | null
+      cook_time: number | null
+      servings: number | null
+      category: import('@/types').RecipeCategory
+      difficulty: import('@/types').Difficulty
+      confidence: number
+    } | null
+  }
   try {
     fetchResult = await fetchRecipeUrl(normalizedUrl)
   } catch (err) {
-    console.error('fetchRecipeUrl error:', err)
-    throw new Error(err instanceof Error ? err.message : 'Failed to fetch URL.')
+    if (err instanceof UnsafeUrlError) {
+      throw new Error('URL nicht erlaubt')
+    }
+    console.error('fetchRecipeUrl error:', formatSafeError(err))
+    throw new Error(err instanceof Error ? err.message : 'URL konnte nicht geladen werden.')
   }
 
   const { content, imageUrl, structuredRecipe } = fetchResult
@@ -132,8 +221,8 @@ export async function extractFromUrlAction(url: string) {
         true
       )
     } catch (err) {
-      console.error('extractRecipeFromText error:', err)
-      throw new Error(err instanceof Error ? err.message : 'AI extraction failed.')
+      console.error('extractRecipeFromText error:', formatSafeError(err))
+      throw new Error(err instanceof Error ? err.message : 'AI-Extraktion fehlgeschlagen.')
     }
   }
 
@@ -147,17 +236,18 @@ export async function extractFromUrlAction(url: string) {
 }
 
 export async function extractFromImageAction(imageDataUrl: string) {
+  await assertAccess()
+  assertExtractRateLimit()
   const settings = await getSettings()
   if (!settings.gemini_api_key) {
     throw new Error('Gemini API-Key fehlt. Bitte im Profil hinterlegen.')
   }
 
-  if (!imageDataUrl) {
-    throw new Error('No image payload provided')
-  }
+  const parsedImage = parseExtractImageDataUrl(imageDataUrl)
+  await assertConfiguredAiBaseUrl(settings.gemini_base_url, (value) => resolveGeminiBaseUrl(value) ?? undefined)
 
   const recipe = await extractRecipeFromImage(
-    imageDataUrl,
+    parsedImage,
     settings.gemini_api_key,
     settings.gemini_base_url ?? undefined,
     settings.gemini_model_id ?? undefined,

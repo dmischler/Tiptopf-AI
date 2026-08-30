@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 
+import { assertAccess } from '@/lib/access-pin'
 import { readRecipeImage } from '@/lib/local/images'
 
 type RouteContext = {
@@ -9,6 +10,7 @@ type RouteContext = {
 }
 
 export async function GET(_request: Request, context: RouteContext) {
+  await assertAccess()
   const { imageName } = await context.params
 
   try {
@@ -19,6 +21,7 @@ export async function GET(_request: Request, context: RouteContext) {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=31536000',
+        'X-Content-Type-Options': 'nosniff',
       },
     })
   } catch (error) {

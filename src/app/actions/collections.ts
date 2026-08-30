@@ -3,6 +3,7 @@
 import { z } from 'zod'
 
 import { revalidateApp } from '@/app/actions/_revalidate'
+import { assertAccess } from '@/lib/access-pin'
 import {
   addRecipeToCollection,
   createCollection,
@@ -15,11 +16,13 @@ import {
 const collectionNameSchema = z.string().trim().min(1).max(100)
 
 export async function listCollectionsAction() {
+  await assertAccess()
   const collections = await listCollections()
   return collections
 }
 
 export async function createCollectionAction(name: string) {
+  await assertAccess()
   const parsedName = collectionNameSchema.parse(name)
   const collection = await createCollection(parsedName)
   revalidateApp()
@@ -27,6 +30,7 @@ export async function createCollectionAction(name: string) {
 }
 
 export async function updateCollectionAction(collectionId: string, name: string) {
+  await assertAccess()
   const parsedId = z.string().uuid().parse(collectionId)
   const parsedName = collectionNameSchema.parse(name)
   const collection = await updateCollection(parsedId, parsedName)
@@ -35,6 +39,8 @@ export async function updateCollectionAction(collectionId: string, name: string)
 }
 
 export async function deleteCollectionAction(collectionId: string) {
+  await assertAccess()
+
   const parsedId = z.string().uuid().parse(collectionId)
   await deleteCollection(parsedId)
   revalidateApp()
@@ -42,6 +48,7 @@ export async function deleteCollectionAction(collectionId: string) {
 }
 
 export async function addRecipeToCollectionAction(collectionId: string, recipeId: string) {
+  await assertAccess()
   const parsedCollectionId = z.string().uuid().parse(collectionId)
   const parsedRecipeId = z.string().uuid().parse(recipeId)
   const collection = await addRecipeToCollection(parsedCollectionId, parsedRecipeId)
@@ -50,6 +57,7 @@ export async function addRecipeToCollectionAction(collectionId: string, recipeId
 }
 
 export async function removeRecipeFromCollectionAction(collectionId: string, recipeId: string) {
+  await assertAccess()
   const parsedCollectionId = z.string().uuid().parse(collectionId)
   const parsedRecipeId = z.string().uuid().parse(recipeId)
   const collection = await removeRecipeFromCollection(parsedCollectionId, parsedRecipeId)

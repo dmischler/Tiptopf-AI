@@ -10,25 +10,28 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   DEFAULT_BASE_URL,
+  DEFAULT_GEMINI_BASE_URL,
   DEFAULT_GEMINI_FALLBACK_MODEL_ID,
   DEFAULT_GEMINI_MODEL_ID,
   DEFAULT_MODEL_ID,
 } from '@/lib/ai/client'
 import type { AppSettings } from '@/types'
 
+type SecretName = 'opencode_api_key' | 'gemini_api_key' | 'pexels_api_key'
+
 type SettingsFormProps = {
-  settings: AppSettings
+  settings: Omit<AppSettings, SecretName>
+  hasSecrets: Record<SecretName, boolean>
 }
 
 type SecretFieldProps = {
-  id: string
-  name: keyof Pick<AppSettings, 'opencode_api_key' | 'gemini_api_key' | 'pexels_api_key'>
+  id: SecretName
   label: string
-  defaultValue: string
+  hasValue: boolean
   placeholder?: string
 }
 
-function SecretInputField({ id, name, label, defaultValue, placeholder }: SecretFieldProps) {
+function SecretInputField({ id, label, hasValue, placeholder }: SecretFieldProps) {
   const [visible, setVisible] = useState(false)
 
   return (
@@ -37,10 +40,9 @@ function SecretInputField({ id, name, label, defaultValue, placeholder }: Secret
       <div className="flex gap-2">
         <Input
           id={id}
-          name={name}
+          name={id}
           type={visible ? 'text' : 'password'}
-          defaultValue={defaultValue}
-          placeholder={placeholder}
+          placeholder={hasValue ? '••••••••' : placeholder}
           className="bg-background/70"
           autoComplete="off"
         />
@@ -55,11 +57,15 @@ function SecretInputField({ id, name, label, defaultValue, placeholder }: Secret
           {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </Button>
       </div>
+      <label className="flex min-h-[44px] items-center gap-2 text-sm text-muted-foreground">
+        <input type="checkbox" name={`clear_${id}`} className="size-4 accent-primary" />
+        Key entfernen
+      </label>
     </div>
   )
 }
 
-export function SettingsForm({ settings }: SettingsFormProps) {
+export function SettingsForm({ settings, hasSecrets }: SettingsFormProps) {
   const [isPending, startTransition] = useTransition()
 
   return (
@@ -81,13 +87,16 @@ export function SettingsForm({ settings }: SettingsFormProps) {
         })
       }}
     >
+      <p className="text-sm text-muted-foreground">
+        Leer lassen behält den gespeicherten Key. Zum Löschen den Haken setzen.
+      </p>
+
       <section className="space-y-4 rounded-xl border border-border/70 bg-muted/25 p-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">OpenCode</h2>
         <SecretInputField
           id="opencode_api_key"
-          name="opencode_api_key"
           label="OpenCode API-Key"
-          defaultValue={settings.opencode_api_key ?? ''}
+          hasValue={hasSecrets.opencode_api_key}
           placeholder="sk-..."
         />
         <div className="space-y-2">
@@ -116,9 +125,8 @@ export function SettingsForm({ settings }: SettingsFormProps) {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Gemini</h2>
         <SecretInputField
           id="gemini_api_key"
-          name="gemini_api_key"
           label="Gemini API-Key"
-          defaultValue={settings.gemini_api_key ?? ''}
+          hasValue={hasSecrets.gemini_api_key}
           placeholder="AIza..."
         />
         <div className="space-y-2">
@@ -127,7 +135,7 @@ export function SettingsForm({ settings }: SettingsFormProps) {
             id="gemini_base_url"
             name="gemini_base_url"
             defaultValue={settings.gemini_base_url ?? ''}
-            placeholder="https://generativelanguage.googleapis.com/v1beta"
+            placeholder={DEFAULT_GEMINI_BASE_URL}
             className="bg-background/70"
           />
         </div>
@@ -159,9 +167,8 @@ export function SettingsForm({ settings }: SettingsFormProps) {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Pexels</h2>
         <SecretInputField
           id="pexels_api_key"
-          name="pexels_api_key"
           label="Pexels API-Key"
-          defaultValue={settings.pexels_api_key ?? ''}
+          hasValue={hasSecrets.pexels_api_key}
           placeholder="pexels_api_key"
         />
       </section>

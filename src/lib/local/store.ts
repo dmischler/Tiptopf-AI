@@ -490,10 +490,20 @@ async function snapshotLastGoodStore(targetPath: string) {
   await writeFileDurable(`${targetPath}.bak`, raw)
 }
 
+async function chmodStoreFileBestEffort(filePath: string) {
+  try {
+    await fs.chmod(filePath, 0o600)
+  } catch {
+    // Ignore on filesystems that do not support POSIX modes.
+  }
+}
+
 async function writeStore(store: LocalStore) {
   const targetPath = getStoreFilePath()
   await snapshotLastGoodStore(targetPath)
   await writeFileDurable(targetPath, JSON.stringify(store, null, 2))
+  await chmodStoreFileBestEffort(targetPath)
+  await chmodStoreFileBestEffort(`${targetPath}.bak`)
 }
 
 async function runBootImageMaintenance() {
@@ -960,9 +970,21 @@ export async function addRecipeToCollection(collectionId: string, recipeId: stri
   })
 }
 
-export async function exportStoreJson(): Promise<string> {
+const MAX_IMPORT_JSON_CHARS = 5 * 1024 * 1024
+
+export async function exportStoreJson(options?: { includeSecrets?: boolean }): Promise<string> {
   const store = await loadStore()
-  return JSON.stringify(store, null, 2)
+  const includeSecrets = options?.includeSecrets === true
+  const settings = includeSecrets
+    ? store.settings
+    : {
+        ...store.settings,
+        opencode_api_key: null,
+        gemini_api_key: null,
+        pexels_api_key: null,
+      }
+
+  return JSON.stringify({ ...store, settings }, null, 2)
 }
 
 function assertImportShape(value: unknown): asserts value is Record<string, unknown> {
@@ -975,7 +997,11 @@ function assertImportShape(value: unknown): asserts value is Record<string, unkn
   }
 }
 
-export async function importStoreJson(raw: string) {
+export async function importStoreJson(raw: string, options?: { includeSecrets?: boolean }) {
+  if (raw.length > MAX_IMPORT_JSON_CHARS) {
+    throw new Error('Backup ist zu groß (max. 5 MB).')
+  }
+
   let parsed: unknown
   try {
     parsed = JSON.parse(raw)
@@ -985,14 +1011,21 @@ export async function importStoreJson(raw: string) {
 
   assertImportShape(parsed)
   const incoming = normalizeStore(parsed)
+  const includeSecrets = options?.includeSecrets === true
 
   return runMutatingStoreOperation((store) => {
+    const existingSettings = store.settings
     store.schema_version = incoming.schema_version
     store.recipes = incoming.recipes
     store.collections = incoming.collections
     store.shoppingList = incoming.shoppingList
-    store.settings = incoming.settings
     store.profile = incoming.profile
+    store.settings = {
+      ...incoming.settings,
+      opencode_api_key: includeSecrets ? incoming.settings.opencode_api_key : existingSettings.opencode_api_key,
+      gemini_api_key: includeSecrets ? incoming.settings.gemini_api_key : existingSettings.gemini_api_key,
+      pexels_api_key: includeSecrets ? incoming.settings.pexels_api_key : existingSettings.pexels_api_key,
+    }
   })
 }
 

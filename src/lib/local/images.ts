@@ -2,6 +2,7 @@ import path from 'node:path'
 import { promises as fs } from 'node:fs'
 import sharp from 'sharp'
 
+import { safeFetch } from '@/lib/http/safe-fetch'
 import { writeFileDurable } from '@/lib/local/durable-write'
 import { getRecipeImagesDir } from '@/lib/local/paths'
 import {
@@ -15,10 +16,12 @@ import type { Recipe } from '@/types'
 export { isSafeImageName, toImageUrl }
 
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const ALLOWED_SHARP_FORMATS = new Set(['jpeg', 'png', 'webp'])
 const MAX_UPLOADED_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
 const MAX_DOWNLOADED_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
 const MAX_IMAGE_WIDTH = 1200
 const IMAGE_QUALITY = 85
+const RECIPE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const CONTENT_TYPE_BY_EXT: Record<string, string> = {
   '.jpg': 'image/jpeg',
@@ -47,10 +50,27 @@ function canonicalFileName(recipeId: string) {
   return `${recipeId}.webp`
 }
 
+function assertRecipeId(recipeId: string) {
+  if (!RECIPE_ID_RE.test(recipeId)) {
+    throw new Error('Invalid recipe id')
+  }
+}
+
 function assertSafeImageFileName(fileName: string) {
-  if (!isSafeImageName(fileName)) {
+  if (!isSafeImageName(fileName) || fileName !== path.basename(fileName)) {
     throw new Error('Invalid image name')
   }
+}
+
+function resolvePathInsideDir(dir: string, fileName: string) {
+  assertSafeImageFileName(fileName)
+  const root = path.resolve(dir)
+  const filePath = path.resolve(root, fileName)
+  const prefix = root.endsWith(path.sep) ? root : `${root}${path.sep}`
+  if (!filePath.startsWith(prefix)) {
+    throw new Error('Invalid image path')
+  }
+  return filePath
 }
 
 async function pathExists(filePath: string) {
@@ -87,7 +107,13 @@ async function removeOtherRecipeImageVariants(recipeId: string, keepFileName: st
 }
 
 async function resizeToWebp(bytes: Uint8Array): Promise<Uint8Array> {
-  const buffer = await sharp(Buffer.from(bytes))
+  const input = Buffer.from(bytes)
+  const metadata = await sharp(input, { failOn: 'truncated' }).metadata()
+  if (!metadata.format || !ALLOWED_SHARP_FORMATS.has(metadata.format)) {
+    throw new Error('Only JPG, PNG, and WEBP images are supported')
+  }
+
+  const buffer = await sharp(input)
     .resize({ width: MAX_IMAGE_WIDTH, withoutEnlargement: true })
     .webp({ quality: IMAGE_QUALITY })
     .toBuffer()
@@ -95,9 +121,9 @@ async function resizeToWebp(bytes: Uint8Array): Promise<Uint8Array> {
 }
 
 async function writeRecipeImage(recipeId: string, bytes: Uint8Array) {
+  assertRecipeId(recipeId)
   const fileName = canonicalFileName(recipeId)
-  assertSafeImageFileName(fileName)
-  const filePath = path.join(getRecipeImagesDir(), fileName)
+  const filePath = resolvePathInsideDir(getRecipeImagesDir(), fileName)
   await writeFileDurable(filePath, bytes)
   await removeOtherRecipeImageVariants(recipeId, fileName)
 
@@ -139,28 +165,20 @@ export async function saveUploadedRecipeImage(file: File, recipeId: string) {
 }
 
 export async function downloadImageToLocalStorage(imageUrl: string, recipeId: string) {
-  const response = await fetch(imageUrl, { cache: 'no-store' })
+  assertRecipeId(recipeId)
+  const fetched = await safeFetch(imageUrl, {
+    timeoutMs: 15000,
+    maxBytes: MAX_DOWNLOADED_IMAGE_SIZE_BYTES,
+    purpose: 'image',
+  })
 
-  if (!response.ok) {
-    throw new Error(`Failed to download image: ${response.status}`)
-  }
-
-  const bytes = new Uint8Array(await response.arrayBuffer())
-  if (bytes.byteLength > MAX_DOWNLOADED_IMAGE_SIZE_BYTES) {
-    throw new Error('Downloaded image exceeds 10MB limit')
-  }
-
-  const resized = await resizeToWebp(bytes)
+  const resized = await resizeToWebp(fetched.bytes)
   return writeRecipeImage(recipeId, resized)
 }
 
 export async function readRecipeImage(imageName: string) {
   const decoded = decodeURIComponent(imageName)
-  if (!isSafeImageName(decoded)) {
-    throw new Error('Invalid image name')
-  }
-
-  const filePath = path.join(getRecipeImagesDir(), decoded)
+  const filePath = resolvePathInsideDir(getRecipeImagesDir(), decoded)
   const buffer = await fs.readFile(filePath)
   const ext = path.extname(decoded).toLowerCase()
   const contentType = CONTENT_TYPE_BY_EXT[ext] ?? 'application/octet-stream'

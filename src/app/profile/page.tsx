@@ -30,11 +30,26 @@ export default async function ProfilePage() {
       <section className="space-y-2">
         <h2 className="text-xl font-semibold tracking-tight">API- und Modell-Konfiguration</h2>
         <p className="text-sm text-muted-foreground">
-          Hinterlege alle API-Keys und Modellwerte direkt hier. Leere Felder setzen den Wert zurueck.
+          Hinterlege alle API-Keys und Modellwerte direkt hier. Leere Modell- und URL-Felder fallen
+          auf die Standardwerte zurück. Leer lassen behält den gespeicherten Key. Zum Löschen den
+          Haken setzen.
         </p>
       </section>
 
-      <SettingsForm settings={settings} />
+      <SettingsForm
+        settings={{
+          opencode_base_url: settings.opencode_base_url,
+          opencode_model_id: settings.opencode_model_id,
+          gemini_base_url: settings.gemini_base_url,
+          gemini_model_id: settings.gemini_model_id,
+          gemini_fallback_model_id: settings.gemini_fallback_model_id,
+        }}
+        hasSecrets={{
+          opencode_api_key: Boolean(settings.opencode_api_key),
+          gemini_api_key: Boolean(settings.gemini_api_key),
+          pexels_api_key: Boolean(settings.pexels_api_key),
+        }}
+      />
 
       <div className="border-t border-border/70 pt-6" />
 

@@ -43,6 +43,9 @@ Notes:
 - `DATA_DIR` may be absolute or project-relative.
 - Use a persistent filesystem path for production.
 - API keys and model/base URL configuration are set inside the app at `/profile`.
+- Optional `ACCESS_PIN=` (empty = disabled). When set, the app shows `/gate` (“PIN eingeben”).
+- Optional `ALLOW_HTTP_FETCH=1` allows `http://` recipe URLs. Private, loopback, link-local, and CGNAT (`100.64.0.0/10`) destinations are always blocked.
+- If an old `.env.docker` ever contained real `OPENCODE_API_KEY` / `PEXELS_API_KEY` / Gemini keys, rotate those keys at the providers. The app does not read API keys from env.
 
 ## 2) Install and build
 
@@ -65,15 +68,18 @@ Production:
 npm run start -- --hostname 0.0.0.0 --port 3000
 ```
 
-The `0.0.0.0` bind is required so the app is reachable over Tailscale.
+The Node process still binds `0.0.0.0` inside the app. How you expose port 3000 on the host is a separate choice (see **Network bind modes** below).
 
 ## 4) Access over Tailscale
 
 Use one of:
-- `http://<tailscale-ip>:3000`
+- `http://<tailscale-ip>:3000` (only if the host publishes 3000 on the tailnet interface)
 - `http://<tailscale-magicdns-name>:3000`
+- `https://<magicdns-or-serve-hostname>` when using Tailscale Serve
 
-If using a reverse proxy/Tailscale Serve for HTTPS, point it to local port `3000`.
+If using a reverse proxy/Tailscale Serve for HTTPS, point it to `127.0.0.1:3000` (Mode A).
+
+Set `NEXT_PUBLIC_SITE_URL` to that public origin (including `https://` and the MagicDNS / Serve hostname) so server actions accept it. Rebuild after changing it.
 
 ## Runtime storage layout
 
@@ -185,6 +191,8 @@ tar -xzf tiptopf-backup.tar.gz -C /home/pi
 
 You can also download a JSON backup from **Profil → Daten-Backup** and restore it there.
 
+The default UI backup strips API keys (`opencode_api_key`, `gemini_api_key`, `pexels_api_key` are `null`). Enable “Backup inklusive API-Keys” only when you need credentials in the file. On restore, keys from the backup are ignored unless you check “Keys aus Backup übernehmen”. Importing replaces all recipes (confirm dialog). Max JSON size is 5 MB.
+
 ### Corrupt `tiptopf.json`
 
 A truncated, empty, or invalid library file is **not** replaced with an empty default store. The app fails closed and shows: *Die Bibliothek-Datei ist beschädigt…*
@@ -209,12 +217,65 @@ Then start the app and confirm `/library` loads. If the JSON is still unreadable
 
 Writes use temp file → fsync → rename → directory fsync, so a power loss should leave either the old or the new complete JSON, not a 0-byte live file.
 
+## Network bind modes
+
+Two supported ways to reach the app. The process inside still listens on `0.0.0.0:3000`.
+
+### Mode A — Tailscale Serve (recommended)
+
+Publish only on loopback, then Serve on the tailnet:
+
+```bash
+# Direct Node (systemd/npm): still bind 0.0.0.0 in the process, then firewall
+# 3000 to localhost, OR bind the HTTP server to 127.0.0.1 if you terminate via Serve.
+
+sudo tailscale serve --bg 3000
+```
+
+Docker Compose defaults to this publish:
+
+```yaml
+ports:
+  - "127.0.0.1:3000:3000"
+```
+
+Effects:
+- LAN guests cannot hit port 3000.
+- Other tailnet devices use `https://<machine>.<tailnet>.ts.net` (Serve), not `http://<tailscale-ip>:3000`.
+- **Do not switch a running Pi to `127.0.0.1` without Serve.** From the rest of the tailnet it looks like the app is down.
+
+Set `NEXT_PUBLIC_SITE_URL=https://<machine>.<tailnet>.ts.net` before `docker compose up -d --build`.
+
+### Mode B — Tailscale IP / host firewall
+
+Keep publishing on all host interfaces and restrict with the firewall:
+
+```yaml
+ports:
+  - "3000:3000"
+```
+
+Then allow TCP 3000 only on `tailscale0`, not on `eth0`/`wlan0`:
+
+```bash
+sudo nft insert rule inet filter input iifname "tailscale0" tcp dport 3000 accept
+sudo nft insert rule inet filter input tcp dport 3000 drop
+```
+
+(Adjust to your nftables/ufw layout.) Do **not** publish `0.0.0.0:3000` on a house LAN with guests unless the firewall is in place.
+
 ## Security notes
 
-- App does not enforce login in Option A.
-- Restrict access using Tailscale ACLs/users/devices.
-- API keys are stored in `DATA_DIR/tiptopf.json` (currently unencrypted).
+- App does not enforce user accounts. Anyone who can complete TCP to the process is the owner.
+- Restrict access using Tailscale ACLs/users/devices, bind mode A or B, and optional `ACCESS_PIN`.
+- `ACCESS_PIN` is env-only (not stored in `tiptopf.json`). Empty = off. Cookie name: `tiptopf_pin`.
+- API keys are stored in `DATA_DIR/tiptopf.json` (currently unencrypted). The file is chmod `0600` after writes when the filesystem allows it.
+- Recipe backups from Profil do not include API keys unless you opt in.
+- Outbound URL/image fetch denies private, loopback, link-local, metadata, and CGNAT addresses.
+- Custom OpenCode/Gemini base URLs must not be localhost or private IPs. Defaults (`opencode.ai`, `generativelanguage.googleapis.com`) are allowlisted.
 - Restrict file access on host and keep `DATA_DIR` private.
+- Do not deploy `Dockerfile.dev` on the Pi. Production uses `Dockerfile` (`USER nextjs`).
+- CSP is not shipped (Next inline scripts). Clickjacking/nosniff/referrer/permissions headers are set.
 
 ## Troubleshooting
 
@@ -231,9 +292,9 @@ Writes use temp file → fsync → rename → directory fsync, so a power loss s
 - Verify route: `/api/images/<file-name>` returns 200.
 
 ### Cannot reach from another device
-- Ensure app is bound to `0.0.0.0`.
+- Mode A: confirm `tailscale serve` is active and you are using the Serve/MagicDNS HTTPS URL, not LAN `:3000`.
+- Mode B: ensure the host firewall allows 3000 on `tailscale0` and the compose ports mapping is `"3000:3000"`.
 - Check Tailscale status on both devices.
-- Verify firewall allows chosen port.
 
 ### View logs (direct install)
 
@@ -277,18 +338,42 @@ cp .env.docker.example .env.docker
 ```
 
 No API keys are required in `.env.docker`; configure them (including OpenCode model settings) in `/profile` after startup.
-See the "AI Model Configuration (OpenCode)" section below for details on Big Pickle and the OpenCode Go subscription.
+See the "AI Model Configuration (OpenCode)" section above for details on Big Pickle and the OpenCode Go subscription.
+
+Optional in `.env.docker`:
+- `ACCESS_PIN=` — shared PIN; empty disables `/gate`
+- `ALLOW_HTTP_FETCH=` — set `1` to allow `http://` recipe fetches
+- `NEXT_PUBLIC_SITE_URL=` — public origin (Serve/MagicDNS hostname). Needed so server actions allow that host.
+
+If an older `.env.docker` contained provider API keys, rotate those keys. They are unused at runtime.
+
+Compose injects `.env.docker` into the container. For **build-arg** substitution (`NEXT_PUBLIC_SITE_URL` → `allowedOrigins`), run:
+
+```bash
+docker compose --env-file .env.docker up -d --build
+```
 
 ### 2) Build and start
 
 ```bash
-docker compose up -d --build
+docker compose --env-file .env.docker up -d --build
 ```
+
+Default publish is **Mode A**: `127.0.0.1:3000:3000` plus `cap_drop: ALL` and `no-new-privileges`. The container process still uses `HOSTNAME=0.0.0.0` and `USER nextjs`.
+
+On the Pi, enable Serve so the tailnet can reach the app:
+
+```bash
+sudo tailscale serve --bg 3000
+```
+
+To keep the old “port 3000 on all interfaces” behavior, use **Mode B** in `docker-compose.yml` (commented `3000:3000`) and firewall 3000 to `tailscale0`. Switching to `127.0.0.1` without Serve will make the app unreachable from other devices.
 
 ### 3) Access the app
 
-- Local: `http://localhost:3000`
-- Over Tailscale: `http://<tailscale-ip>:3000`
+- On the Pi: `http://127.0.0.1:3000`
+- Mode A + Serve: `https://<machine>.<tailnet>.ts.net`
+- Mode B: `http://<tailscale-ip>:3000` (not from the house LAN unless you opened it)
 
 ### Runtime storage layout
 
@@ -372,7 +457,9 @@ Common issues:
 
 ### Security notes
 
-- App runs as non-root user inside the container
+- App runs as non-root user `nextjs` inside the container (`Dockerfile` `USER nextjs`)
+- Compose drops all capabilities and sets `no-new-privileges`
+- Do not deploy `Dockerfile.dev` on the Pi
 - API keys are configured and stored via `/profile` in persisted app data
-- Restrict access using Tailscale ACLs/users/devices
-- Do not expose port 3000 publicly
+- Restrict access using Tailscale ACLs, bind Mode A or B, and optional `ACCESS_PIN`
+- Do not expose port 3000 on the public internet or an untrusted house LAN

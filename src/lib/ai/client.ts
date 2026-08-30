@@ -3,6 +3,13 @@ export const DEFAULT_BASE_URL = 'https://opencode.ai/zen/v1'
 export const DEFAULT_MODEL_ID = 'big-pickle'
 export const DEFAULT_GEMINI_MODEL_ID = 'gemini-2.5-flash'
 export const DEFAULT_GEMINI_FALLBACK_MODEL_ID = 'gemini-2.0-flash'
+export const DEFAULT_GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta'
+
+export const TRUSTED_AI_HOSTS = new Set([
+  'opencode.ai',
+  'api.opencode.ai',
+  'generativelanguage.googleapis.com',
+])
 
 /**
  * Legacy model ID mappings.

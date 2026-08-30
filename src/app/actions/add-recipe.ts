@@ -3,6 +3,8 @@
 import { z } from 'zod'
 
 import { revalidateApp } from '@/app/actions/_revalidate'
+import { assertAccess } from '@/lib/access-pin'
+import { UnsafeUrlError } from '@/lib/http/safe-fetch'
 import { downloadImageToLocalStorage, saveUploadedRecipeImage } from '@/lib/local/images'
 import { createRecipe, patchRecipe } from '@/lib/local/store'
 import {
@@ -37,6 +39,7 @@ export async function saveRecipe(
   input: z.infer<typeof saveRecipeSchema>,
   imageFile?: File | null
 ) {
+  await assertAccess()
   const parsed = saveRecipeSchema.parse(input)
   const remoteImageUrl =
     typeof parsed.remoteImageUrl === 'string' && /^https?:\/\//i.test(parsed.remoteImageUrl)
@@ -71,7 +74,11 @@ export async function saveRecipe(
       recipe = await patchRecipe(recipe.id, { image_url: canonicalUrl })
     }
   } catch (error) {
-    console.error('Failed to persist recipe image:', error)
+    if (error instanceof UnsafeUrlError) {
+      console.error('Failed to persist recipe image: URL nicht erlaubt')
+    } else {
+      console.error('Failed to persist recipe image')
+    }
   }
 
   revalidateApp()
@@ -79,23 +86,24 @@ export async function saveRecipe(
 }
 
 export async function uploadRecipeImage(formData: FormData): Promise<string> {
+  await assertAccess()
   const recipeId = formData.get('recipeId')
   const file = formData.get('image')
 
   if (typeof recipeId !== 'string' || !z.string().uuid().safeParse(recipeId).success) {
-    throw new Error('Invalid recipe id')
+    throw new Error('Ungültige Rezept-ID')
   }
 
   if (!(file instanceof File)) {
-    throw new Error('Image file is required')
+    throw new Error('Bilddatei fehlt')
   }
 
   if (!ALLOWED_REPLACE_IMAGE_TYPES.has(file.type)) {
-    throw new Error('Only JPG, PNG, and WEBP images are supported')
+    throw new Error('Nur JPG, PNG und WEBP sind erlaubt.')
   }
 
   if (file.size > MAX_REPLACE_IMAGE_SIZE_BYTES) {
-    throw new Error('Image must be 5MB or smaller')
+    throw new Error('Bild darf höchstens 5 MB groß sein.')
   }
 
   const imageUrl = await saveUploadedRecipeImage(file, recipeId)

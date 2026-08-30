@@ -3,6 +3,7 @@
 import { z } from 'zod'
 
 import { revalidateApp } from '@/app/actions/_revalidate'
+import { assertAccess } from '@/lib/access-pin'
 import { purgeTrashedRecipeImage, restoreTrashedRecipeImage } from '@/lib/local/images'
 import {
   deleteRecipe,
@@ -59,6 +60,7 @@ const restoreRecipeSchema = z.object({
 })
 
 export async function toggleFavorite(recipeId: string, isFavorite: boolean) {
+  await assertAccess()
   const parsedRecipeId = recipeIdSchema.parse(recipeId)
   const parsedFavorite = favoriteSchema.parse(isFavorite)
   const data = await updateRecipeFavorite(parsedRecipeId, parsedFavorite)
@@ -75,6 +77,7 @@ export async function toggleFavorite(recipeId: string, isFavorite: boolean) {
 }
 
 export async function setRating(recipeId: string, rating: number) {
+  await assertAccess()
   const parsedRecipeId = recipeIdSchema.parse(recipeId)
   const parsedRating = ratingSchema.parse(rating)
   const data = await updateRecipeRating(parsedRecipeId, parsedRating === 0 ? null : parsedRating)
@@ -91,6 +94,7 @@ export async function setRating(recipeId: string, rating: number) {
 }
 
 export async function editRecipe(recipeId: string, input: z.infer<typeof editRecipeSchema>) {
+  await assertAccess()
   const parsedRecipeId = recipeIdSchema.parse(recipeId)
   const parsedInput = editRecipeSchema.parse(input)
   const normalizedInput: Parameters<typeof updateRecipe>[1] = {}
@@ -153,6 +157,7 @@ export async function editRecipe(recipeId: string, input: z.infer<typeof editRec
 }
 
 export async function setRecipeImage(recipeId: string, imageUrl: string | null) {
+  await assertAccess()
   const parsedRecipeId = recipeIdSchema.parse(recipeId)
   const parsedImageUrl = storedRecipeImageUrlSchema.parse(imageUrl)
   const data = await patchRecipe(parsedRecipeId, { image_url: parsedImageUrl })
@@ -162,6 +167,7 @@ export async function setRecipeImage(recipeId: string, imageUrl: string | null) 
 }
 
 export async function deleteRecipeAction(recipeId: string) {
+  await assertAccess()
   const parsedRecipeId = recipeIdSchema.parse(recipeId)
   await deleteRecipe(parsedRecipeId)
 
@@ -172,12 +178,14 @@ export async function deleteRecipeAction(recipeId: string) {
 }
 
 export async function purgeTrashedRecipeImageAction(recipeId: string) {
+  await assertAccess()
   const parsedRecipeId = recipeIdSchema.parse(recipeId)
   await purgeTrashedRecipeImage(parsedRecipeId)
   return { recipeId: parsedRecipeId }
 }
 
 export async function restoreRecipe(input: z.infer<typeof restoreRecipeSchema>) {
+  await assertAccess()
   const parsedInput = restoreRecipeSchema.parse(input)
   const hadLocalImage = Boolean(parseApiImageFileName(parsedInput.image_url))
   const canonicalUrl = canonicalRecipeImageUrl(parsedInput.id)
@@ -215,6 +223,7 @@ export async function restoreRecipe(input: z.infer<typeof restoreRecipeSchema>) 
 }
 
 export async function listRecipesAction() {
+  await assertAccess()
   const recipes = await listRecipes()
   return recipes
 }

@@ -5,6 +5,7 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import type { ParsedRecipe } from '@/types'
 import { resolveAiBaseUrl, resolveAiModelId } from '@/lib/ai/client'
 import { IMAGE_EXTRACTION_PROMPT, URL_EXTRACTION_PROMPT } from '@/lib/ai/prompts'
+import { formatSafeError } from '@/lib/safe-error'
 
 const recipeSchema = z.object({
   title: z.string().min(1),
@@ -69,22 +70,20 @@ async function runExtraction(
     })
     raw = result.text
   } catch (err) {
-    console.error('generateText error:', err)
+    console.error('generateText error:', formatSafeError(err))
     throw err
   }
 
   const cleaned = cleanJsonResponse(raw)
   if (!cleaned) {
-    console.error('AI extraction failed - empty response. Full raw:', raw)
+    console.error('AI extraction failed - empty response')
     throw new Error('Empty response from AI. Check API key and model.')
   }
   try {
     const parsed = recipeSchema.parse(JSON.parse(cleaned))
     return parsed
   } catch (parseError) {
-    console.error('JSON parse error:', parseError)
-    console.error('Raw response:', raw)
-    console.error('Cleaned response:', cleaned)
+    console.error('JSON parse error:', formatSafeError(parseError))
     throw new Error(`Failed to parse AI response: ${parseError instanceof Error ? parseError.message : 'Invalid JSON'}`)
   }
 }
