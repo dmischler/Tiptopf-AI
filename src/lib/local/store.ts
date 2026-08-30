@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
+import path from 'node:path'
 
 import type {
   AppSettings,
@@ -12,7 +13,9 @@ import type {
   ShoppingListItem,
 } from '@/types'
 
-import { getDataDir, getStoreFilePath } from '@/lib/local/paths'
+import { writeFileDurable } from '@/lib/local/durable-write'
+import { StoreCorruptError } from '@/lib/local/errors'
+import { getStoreFilePath } from '@/lib/local/paths'
 import { normalizeTags } from '@/lib/utils'
 import { reorderShoppingList } from '@/lib/shopping'
 
@@ -51,6 +54,8 @@ type UpdateRecipeInput = Partial<
 >
 
 let writeQueue: Promise<void> = Promise.resolve()
+// Prevents first-boot ENOENT from re-entering the queue while a mutation is running.
+let mutationRunning = false
 
 function nowIso() {
   return new Date().toISOString()
@@ -88,10 +93,6 @@ function createDefaultStore(): LocalStore {
     profile: createDefaultProfile(),
     settings: createDefaultSettings(),
   }
-}
-
-async function ensureDataDir() {
-  await fs.mkdir(getDataDir(), { recursive: true })
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -170,7 +171,12 @@ function normalizeRecipe(value: unknown): Recipe | null {
     return null
   }
 
-  const id = typeof value.id === 'string' && value.id.trim() ? value.id : randomUUID()
+  if (typeof value.id !== 'string' || !value.id.trim()) {
+    console.error('Skipping recipe with missing id')
+    return null
+  }
+
+  const id = value.id
   const createdAt = toIsoOrNow(value.created_at)
   const updatedAt = toIsoOrNow(value.updated_at)
 
@@ -249,7 +255,12 @@ function normalizeCollection(value: unknown): Collection | null {
     return null
   }
 
-  const id = typeof value.id === 'string' && value.id.trim() ? value.id : randomUUID()
+  if (typeof value.id !== 'string' || !value.id.trim()) {
+    console.error('Skipping collection with missing id')
+    return null
+  }
+
+  const id = value.id
   const createdAt = toIsoOrNow(value.created_at)
   const updatedAt = toIsoOrNow(value.updated_at)
 
@@ -271,7 +282,12 @@ function normalizeShoppingListItem(value: unknown): ShoppingListItem | null {
     return null
   }
 
-  const id = typeof value.id === 'string' && value.id.trim() ? value.id : randomUUID()
+  if (typeof value.id !== 'string' || !value.id.trim()) {
+    console.error('Skipping shopping list item with missing id')
+    return null
+  }
+
+  const id = value.id
   const addedAt = toIsoOrNow(value.addedAt ?? value.added_at)
 
   const text = typeof value.text === 'string' ? value.text.trim() : ''
@@ -318,39 +334,143 @@ function normalizeStore(value: unknown): LocalStore {
   }
 }
 
+function isEnoent(error: unknown): boolean {
+  return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT')
+}
+
+async function listCorruptStorePaths(storePath: string): Promise<string[]> {
+  const directory = path.dirname(storePath)
+  const prefix = `${path.basename(storePath)}.corrupt.`
+
+  try {
+    const entries = await fs.readdir(directory)
+    return entries
+      .filter((name) => name.startsWith(prefix))
+      .map((name) => path.join(directory, name))
+      .sort()
+  } catch {
+    return []
+  }
+}
+
+async function getExistingBakPath(storePath: string): Promise<string | undefined> {
+  const bakPath = `${storePath}.bak`
+  try {
+    await fs.access(bakPath)
+    return bakPath
+  } catch {
+    return undefined
+  }
+}
+
+async function quarantineCorruptStore(storePath: string): Promise<string | undefined> {
+  const dest = `${storePath}.corrupt.${new Date().toISOString()}`
+
+  try {
+    await fs.rename(storePath, dest)
+    console.error('Store file is corrupt; quarantined to', dest)
+    return dest
+  } catch (renameError) {
+    try {
+      await fs.copyFile(storePath, dest)
+      console.error('Store file is corrupt; copied to', dest, '(rename failed)', renameError)
+      return dest
+    } catch (copyError) {
+      console.error('Store file is corrupt; quarantine failed', copyError)
+      return undefined
+    }
+  }
+}
+
+async function throwCorruptStore(storePath: string, cause?: unknown): Promise<never> {
+  const backupPath = await quarantineCorruptStore(storePath)
+  throw new StoreCorruptError(backupPath, cause ? { cause } : undefined)
+}
+
+async function parseLiveStore(raw: string, storePath: string): Promise<LocalStore> {
+  if (!raw.trim()) {
+    await throwCorruptStore(storePath)
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      await throwCorruptStore(storePath, error)
+    }
+    throw error
+  }
+
+  if (!isObject(parsed) || !Array.isArray(parsed.recipes)) {
+    await throwCorruptStore(storePath)
+  }
+
+  return normalizeStore(parsed)
+}
+
+async function snapshotLastGoodStore(targetPath: string) {
+  let raw: string
+  try {
+    raw = await fs.readFile(targetPath, 'utf8')
+  } catch {
+    return
+  }
+
+  if (!raw.trim()) {
+    return
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!isObject(parsed) || !Array.isArray(parsed.recipes)) {
+      return
+    }
+  } catch {
+    return
+  }
+
+  await writeFileDurable(`${targetPath}.bak`, raw)
+}
+
 async function writeStore(store: LocalStore) {
-  await ensureDataDir()
   const targetPath = getStoreFilePath()
-  const tempPath = `${targetPath}.tmp.${randomUUID()}`
-  await fs.writeFile(tempPath, JSON.stringify(store, null, 2), 'utf8')
-  await fs.rename(tempPath, targetPath)
+  await snapshotLastGoodStore(targetPath)
+  await writeFileDurable(targetPath, JSON.stringify(store, null, 2))
+}
+
+async function ensureStoreExists(): Promise<LocalStore> {
+  return runMutatingStoreOperation((store) => store)
+}
+
+async function handleMissingStore(storePath: string): Promise<LocalStore> {
+  const bakPath = await getExistingBakPath(storePath)
+  const corruptPaths = await listCorruptStorePaths(storePath)
+
+  if (bakPath || corruptPaths.length > 0) {
+    throw new StoreCorruptError(bakPath ?? corruptPaths[corruptPaths.length - 1])
+  }
+
+  if (mutationRunning) {
+    return createDefaultStore()
+  }
+
+  return ensureStoreExists()
 }
 
 async function readStore(): Promise<LocalStore> {
-  await ensureDataDir()
   const storePath = getStoreFilePath()
 
   try {
     const raw = await fs.readFile(storePath, 'utf8')
-    return normalizeStore(JSON.parse(raw))
+    return parseLiveStore(raw, storePath)
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      const initial = createDefaultStore()
-      await writeStore(initial)
-      return initial
+    if (error instanceof StoreCorruptError) {
+      throw error
     }
 
-    if (error instanceof SyntaxError) {
-      console.error('Store file contains invalid JSON. Creating backup and resetting to default:', error)
-      try {
-        const backupPath = `${storePath}.backup.${Date.now()}`
-        await fs.rename(storePath, backupPath)
-      } catch {
-        // Ignore backup failures
-      }
-      const initial = createDefaultStore()
-      await writeStore(initial)
-      return initial
+    if (isEnoent(error)) {
+      return handleMissingStore(storePath)
     }
 
     throw error
@@ -361,15 +481,22 @@ async function runMutatingStoreOperation<T>(
   operation: (store: LocalStore) => T | Promise<T>
 ): Promise<T> {
   const next = writeQueue.then(async () => {
-    const store = await readStore()
-    const result = await operation(store)
-    await writeStore(store)
-    return result
+    mutationRunning = true
+    try {
+      const store = await readStore()
+      const result = await operation(store)
+      await writeStore(store)
+      return result
+    } finally {
+      mutationRunning = false
+    }
   })
 
   writeQueue = next.then(
     () => undefined,
-    () => undefined
+    (error: unknown) => {
+      console.error('Store mutation failed:', error)
+    }
   )
 
   return next
@@ -638,6 +765,16 @@ export async function exportStoreJson(): Promise<string> {
   return JSON.stringify(store, null, 2)
 }
 
+function assertImportShape(value: unknown): asserts value is Record<string, unknown> {
+  if (!isObject(value)) {
+    throw new Error('Ungültiges Store-Format.')
+  }
+
+  if (!Array.isArray(value.recipes) || !Array.isArray(value.collections)) {
+    throw new Error('Store muss Rezepte und Sammlungen enthalten.')
+  }
+}
+
 export async function importStoreJson(raw: string) {
   let parsed: unknown
   try {
@@ -646,16 +783,16 @@ export async function importStoreJson(raw: string) {
     throw new Error('Ungültiges JSON Format.')
   }
 
-  if (!isObject(parsed)) {
-    throw new Error('Ungültiges Store-Format.')
-  }
+  assertImportShape(parsed)
+  const incoming = normalizeStore(parsed)
 
-  if (!Array.isArray(parsed.recipes) || !Array.isArray(parsed.collections)) {
-    throw new Error('Store muss Rezepte und Sammlungen enthalten.')
-  }
-
-  const normalized = normalizeStore(parsed)
-  await writeStore(normalized)
+  return runMutatingStoreOperation((store) => {
+    store.recipes = incoming.recipes
+    store.collections = incoming.collections
+    store.shoppingList = incoming.shoppingList
+    store.settings = incoming.settings
+    store.profile = incoming.profile
+  })
 }
 
 export async function removeRecipeFromCollection(collectionId: string, recipeId: string) {

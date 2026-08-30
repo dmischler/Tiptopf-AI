@@ -2,6 +2,7 @@ import path from 'node:path'
 import { promises as fs } from 'node:fs'
 import sharp from 'sharp'
 
+import { writeFileDurable } from '@/lib/local/durable-write'
 import { getRecipeImagesDir } from '@/lib/local/paths'
 
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
@@ -40,19 +41,24 @@ function toImageUrl(fileName: string) {
   return `/api/images/${encodeURIComponent(fileName)}`
 }
 
-async function ensureRecipeImagesDir() {
-  await fs.mkdir(getRecipeImagesDir(), { recursive: true })
-}
+async function removeOtherRecipeImageVariants(recipeId: string, keepFileName: string) {
+  const imagesDir = getRecipeImagesDir()
+  let entries: string[]
+  try {
+    entries = await fs.readdir(imagesDir)
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+      return
+    }
+    throw error
+  }
 
-async function removeRecipeImageVariants(recipeId: string) {
-  await ensureRecipeImagesDir()
-  const entries = await fs.readdir(getRecipeImagesDir())
   const prefix = `${recipeId}.`
 
   await Promise.all(
     entries
-      .filter((name) => name.startsWith(prefix))
-      .map((name) => fs.rm(path.join(getRecipeImagesDir(), name), { force: true }))
+      .filter((name) => name.startsWith(prefix) && name !== keepFileName)
+      .map((name) => fs.rm(path.join(imagesDir, name), { force: true }))
   )
 }
 
@@ -95,12 +101,10 @@ async function resizeToWebp(bytes: Uint8Array): Promise<Uint8Array> {
 }
 
 async function writeRecipeImage(recipeId: string, bytes: Uint8Array, ext: string) {
-  await ensureRecipeImagesDir()
-  await removeRecipeImageVariants(recipeId)
-
   const fileName = `${recipeId}.${ext}`
   const filePath = path.join(getRecipeImagesDir(), fileName)
-  await fs.writeFile(filePath, bytes)
+  await writeFileDurable(filePath, bytes)
+  await removeOtherRecipeImageVariants(recipeId, fileName)
 
   return toImageUrl(fileName)
 }

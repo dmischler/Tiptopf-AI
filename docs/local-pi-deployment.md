@@ -82,11 +82,17 @@ With `DATA_DIR=/home/pi/tiptopf-data`:
 ```text
 /home/pi/tiptopf-data/
   tiptopf.json
+  tiptopf.json.bak
+  tiptopf.json.corrupt.<iso>
   recipe-images/
     <recipe-id>.jpg
     <recipe-id>.png
     <recipe-id>.webp
 ```
+
+Leftover `tiptopf.json.tmp.<uuid>` or `recipe-images/<name>.tmp.<uuid>` files can appear after a crash. They are ignored on boot and are safe to delete.
+
+**One process only:** run a single Tiptopf-AI process per `DATA_DIR`. The in-process write queue does not coordinate across processes. Two Node processes (or two containers) on the same data directory can still interleave writes.
 
 ## Data model
 
@@ -170,6 +176,32 @@ Restore:
 tar -xzf tiptopf-backup.tar.gz -C /home/pi
 ```
 
+You can also download a JSON backup from **Profil → Daten-Backup** and restore it there.
+
+### Corrupt `tiptopf.json`
+
+A truncated, empty, or invalid library file is **not** replaced with an empty default store. The app fails closed and shows: *Die Bibliothek-Datei ist beschädigt…*
+
+On detect:
+
+- The bad file is renamed (or copied if rename fails) to `tiptopf.json.corrupt.<iso-timestamp>`.
+- The previous successful write is kept as a single rolling `tiptopf.json.bak` (written before each durable replace).
+- No new empty `tiptopf.json` is created automatically. If the live file is missing but `.bak` or `.corrupt.*` files exist, the app still refuses to first-boot empty.
+
+Restore (stop the app first):
+
+```bash
+# Prefer last-good snapshot
+cp /home/pi/tiptopf-data/tiptopf.json.bak /home/pi/tiptopf-data/tiptopf.json
+
+# Or inspect a quarantined copy, then copy back if it is actually valid
+ls -lt /home/pi/tiptopf-data/tiptopf.json.corrupt.*
+```
+
+Then start the app and confirm `/library` loads. If the JSON is still unreadable, restore from a Profil backup or the `tar` archive instead.
+
+Writes use temp file → fsync → rename → directory fsync, so a power loss should leave either the old or the new complete JSON, not a 0-byte live file.
+
 ## Security notes
 
 - App does not enforce login in Option A.
@@ -181,6 +213,11 @@ tar -xzf tiptopf-backup.tar.gz -C /home/pi
 
 ### App starts but no data is saved
 - Confirm `DATA_DIR` is set and writable by the app process.
+
+### UI says the library file is damaged
+- Do not delete `tiptopf.json.bak` or `tiptopf.json.corrupt.*` first.
+- Restore from `.bak` (see **Corrupt `tiptopf.json`**).
+- Confirm only one app process is using `DATA_DIR`.
 
 ### Images do not load
 - Confirm files exist in `DATA_DIR/recipe-images`.
@@ -254,9 +291,13 @@ Data lives in a Docker named volume:
 tiptopf-data/ (named volume, managed by Docker)
   └── data/
       ├── tiptopf.json
+      ├── tiptopf.json.bak
+      ├── tiptopf.json.corrupt.<iso>
       └── recipe-images/
         <recipe-id>.jpg|png|webp
 ```
+
+Run **one** container (one process) against this volume. Do not mount the same `DATA_DIR` into a second app instance.
 
 ### Backup and restore
 
@@ -274,6 +315,14 @@ docker compose cp ./tiptopf-backup.tar.gz app:/tmp/backup.tar.gz && \
   docker compose exec app tar -xzf /tmp/backup.tar.gz -C /app/data && \
   docker compose exec app rm /tmp/backup.tar.gz
 ```
+
+If the UI reports a damaged library, restore the last-good file inside the volume (stop or exec while the app is idle):
+
+```bash
+docker compose exec app cp /app/data/tiptopf.json.bak /app/data/tiptopf.json
+```
+
+A truncated `tiptopf.json` is quarantined as `tiptopf.json.corrupt.<iso>` and is never auto-replaced with an empty store. See **Corrupt `tiptopf.json`** above.
 
 ### Update
 
