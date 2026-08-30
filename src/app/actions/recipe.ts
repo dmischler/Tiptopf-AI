@@ -8,7 +8,6 @@ import { purgeTrashedRecipeImage, restoreTrashedRecipeImage } from '@/lib/local/
 import {
   deleteRecipe,
   listRecipes,
-  LOCAL_PROFILE_ID,
   patchRecipe,
   updateRecipe,
   updateRecipeFavorite,
@@ -193,7 +192,6 @@ export async function restoreRecipe(input: z.infer<typeof restoreRecipeSchema>) 
 
   const restored = await upsertRecipe({
     id: parsedInput.id,
-    user_id: LOCAL_PROFILE_ID,
     title: parsedInput.title,
     ingredients: parsedInput.ingredients,
     instructions: parsedInput.instructions,

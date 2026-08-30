@@ -130,24 +130,6 @@ async function writeRecipeImage(recipeId: string, bytes: Uint8Array) {
   return toImageUrl(fileName)
 }
 
-export async function saveRecipeImageBytes(
-  bytes: Uint8Array,
-  recipeId: string,
-  mimeType: string | null = null
-) {
-  if (bytes.byteLength > MAX_DOWNLOADED_IMAGE_SIZE_BYTES) {
-    throw new Error('Image exceeds 10MB limit')
-  }
-
-  const normalizedMime = toNormalizedMime(mimeType)
-  if (!ALLOWED_UPLOADED_IMAGE_MIME_TYPES.has(normalizedMime)) {
-    throw new Error('Only JPG, PNG, and WEBP images are supported')
-  }
-
-  const resized = await resizeToWebp(bytes)
-  return writeRecipeImage(recipeId, resized)
-}
-
 export async function saveUploadedRecipeImage(file: File, recipeId: string) {
   const mime = toNormalizedMime(file.type)
 

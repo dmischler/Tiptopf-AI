@@ -1,198 +1,171 @@
 # VISION.md
 
 **Project Name:** Tiptopf-AI  
-**Tagline:** Your beautiful, AI-powered Pinterest-style recipe library — upload a photo or URL and watch it transform into a searchable, sortable, dark-mode collection of recipes.
+**Tagline:** A dark, German, AI-powered household recipe library that lives on your Raspberry Pi.
 
-**Version:** 1.0 (MVP)  
-**Date:** April 17, 2026  
-**Author:** Dominic Mischler (with Grok collaboration)  
-**Status:** Ready to build
+**Runtime:** Single-user local / Raspberry Pi · JSON on disk · Tailscale as the network ACL  
+**UI language:** German (**du**)  
+**Status:** Live local-Pi app. Current work: `tasks/POST_REVIEW_HARDENING_PLAN.md`
 
-## 1. Vision & Project Overview
+## 1. Vision
 
-Tiptopf-AI is a modern, multi-user web application that lets anyone instantly turn a phone photo of a recipe or a recipe website URL into a beautifully formatted recipe card.  
+Tiptopf-AI turns a phone photo, a recipe URL, or a typed draft into a structured German recipe card. The household browses, cooks, and shops from one library.
 
-The entire library lives in a **dark-mode Pinterest-style masonry grid** — visually stunning, fast, and delightful to browse. Users can search, filter by category (starter, main, dessert, etc.), sort, mark favorites, and rate recipes.  
+It is **not** a multi-user SaaS. There is no in-app login. Whoever can reach the process (Tailscale / host firewall, optional `ACCESS_PIN`) is the owner. Recipes, collections, shopping list, and API settings live in `DATA_DIR/tiptopf.json`. Images live at `DATA_DIR/recipe-images/{recipeId}.webp`.
 
-**Core promise:**  
-Zero manual data entry. AI does the heavy lifting. You keep full ownership of your data. Everything stays private per user.
+**Core promise:** AI does the typing. The household owns the files. Nothing depends on a hosted database.
 
-**Target users:**  
-- Home cooks who collect recipes from magazines, family notes, or websites  
-- Families or small groups who want to share a common library  
-- Anyone tired of scattered screenshots and bookmarks
+**Target users:** Home cooks and families sharing one Pi.
 
-## 2. Core Goals (MVP)
+## 2. Goals
 
-- Deliver a **production-ready, beautiful app** in 2–3 weekends of development time  
-- Support **image upload** (phone camera) **or** **URL paste** as the only two input methods  
-- Fully automatic AI parsing using **your OpenCode Go subscription (MiniMax M2.7)**  
-- Store everything in a free-tier Supabase database (zero hosting cost beyond your existing AI subscription)  
-- Deploy instantly on **Vercel**  
-- Provide a delightful dark Pinterest UX with masonry cards  
-- Support multi-user authentication (email + password) with per-user private libraries  
-- Keep the codebase clean, extensible, and beginner-friendly even for someone comfortable with Python
+- Run on a Raspberry Pi (or any Docker host), reached over Tailscale
+- German UI, dark amber theme only
+- Add from camera, URL, or a manual form
+- A recipe is a **page** (`/library/[id]`), not an overlay
+- Library as a CSS grid of cards (not masonry-css)
+- Search, filter, sort, favorites, ratings, tags, notes, collections, shopping list
+- API keys on `/profile` (unencrypted at rest; default JSON backup strips them)
 
-## 3. MVP Features (Exactly What We Will Build)
+## 3. Product surface
 
-### Authentication & Profiles
-- Email + password login via Supabase Auth  
-- Protected routes (only logged-in users see their library)  
-- Profile settings page where user can add their OpenCode Go API key (and base URL) once — stored encrypted
+### Add recipe
 
-### Add Recipe Flow
-- Floating "+" button → modal with two tabs:
-  1. **Upload Image** (from phone/camera)  
-  2. **Paste URL** (recipe website)
-- AI automatically extracts:
-  - Title
-  - Ingredients (as clean list)
-  - Instructions / steps
-  - Prep time + Cook time
-  - Servings
-  - Category (starter, main, dessert, side, breakfast, snack, etc.)
-  - Difficulty level (easy, medium, hard)
-- Progress bar with streaming updates from the AI
-- **Image handling rules** (exactly as requested):
-  - Phone image: **temporary only** (used for OCR/text extraction, then discarded — never stored long-term)
-  - URL recipes: automatically extract the main recipe photo if present
-  - Fallback options: user can upload a replacement image **or** click "Generate Image" button (placeholder for now; future image-gen integration)
-- One-click "Save to Library"
+- Expandable FAB: Zufallsrezept, Manuell, URL, Bild
+- URL extract always goes through OpenCode so the stored recipe is German and metric
+- Image extract uses Gemini
+- Saved hero image is local `{recipeId}.webp` after save
+- Preview / edit, then save
 
-### Library / Feed
-- Dark-mode Pinterest masonry grid (responsive, beautiful cards)
-- Each card shows:
-  - Hero image
-  - Title
-  - Category badge
-  - Prep + Cook time
-  - Difficulty badge
-  - Average rating (1–5 stars)
-  - Favorite heart icon
-- Search bar (title + ingredients)
-- Filters: Category, Favorites only
-- Sorting: Newest, Oldest, Prep time (shortest first), Rating (highest first)
-- Click card → full-screen recipe view (clean, printable layout)
+### Library
 
-### Interactions
-- Mark as favorite (heart)
-- Rate recipe (1–5 stars)
-- All data is private per user
+- `/library` — CSS grid of cards
+- `/library/[id]` — cook-readable recipe page (print works; hardware back closes it)
+- `/library/[id]/edit` — same fields as add
+- Search, category, difficulty, favorites, time filter, sort
 
-## 4. Explicitly Out of Scope for MVP (v2)
+### Collections & shopping
 
-- Manual editing of AI-parsed recipes  
-- Meal planner / calendar  
-- Nutrition information  
-- Cuisine tags / custom tags  
-- Personal notes / comments  
-- Sharing recipes publicly or with specific users  
-- Advanced image generation (will be added as a nice button that calls a separate model)
+- `/collections`, `/collections/[id]`
+- `/einkaufsliste`
 
-## 5. User Flows (High-Level)
+### Profile
 
-1. **New user** → Sign up → Profile → Add OpenCode Go key → Start adding recipes  
-2. **Add recipe** → Upload or paste → Watch AI parse → Review summary → Save  
-3. **Browse library** → Scroll beautiful masonry → Filter/Search → Favorite/Rate  
-4. **View recipe** → Full details with clean typography and print button
+- Title, API/model settings (OpenCode, Gemini, Pexels), backup/restore
+- No dummy email or user id
 
-## 6. Technical Architecture
-Frontend (Next.js 15 App Router)
-↓ (Server Actions / API Routes)
-AI Service Layer (Vercel AI SDK + OpenCode Go / MiniMax M2.7)
-↓
-Supabase (PostgreSQL + Auth + Storage)
-↓
-Vercel Hosting (Edge + Serverless)
+## 4. Out of scope (this round)
 
-**Key design decisions:**
-- Next.js 15 + TypeScript + Tailwind + shadcn/ui → fastest path to beautiful UI
-- Supabase for auth + DB + storage → completely free, excellent DX, row-level security
-- Vercel AI SDK → clean streaming + tool-calling support for MiniMax endpoint
-- No backend server to maintain
+- Multi-user accounts / per-user libraries
+- SQLite (JSON stays the store until the backlog)
+- Encrypted keys at rest
+- Light theme
+- True masonry layout
+- Meal planner, nutrition, public sharing
 
-**Why Next.js instead of pure Python?**  
-Even though you're comfortable with Python, Vercel's native Next.js experience gives us instant deployment, built-in image optimization, streaming AI responses, and a much nicer frontend story. The AI parsing logic is isolated and easy to understand.
+See `tasks/post-review/11-backlog.md`.
 
-## 7. Tech Stack (Final)
+## 5. User flows
 
-| Layer              | Technology                              | Reason |
-|--------------------|-----------------------------------------|--------|
-| Framework          | Next.js 15 (App Router) + TypeScript   | Vercel-native, streaming, fast |
-| Styling            | Tailwind CSS + shadcn/ui + dark mode   | Pinterest look in hours |
-| Auth & Database    | Supabase (Postgres + Auth + Storage)   | Free tier, secure, real-time |
-| AI SDK             | Vercel AI SDK (`@ai-sdk/openai` compatible) | Works perfectly with OpenCode Go endpoint |
-| Masonry Grid       | Tailwind CSS Grid + `masonry-css` or pure CSS | True Pinterest feel |
-| Image Optimization | Next.js `<Image>` + Supabase Storage   | Fast loading |
-| Deployment         | Vercel (Hobby plan)                    | One-click deploys |
+1. Open the Pi over Tailscale → `/library` (optional PIN at `/gate`)
+2. `/profile` → paste OpenCode (and Gemini) keys once
+3. Add a recipe from photo or URL → review the German card → save
+4. Open `/library/[id]` to cook; scale portions; send ingredients to the shopping list
+5. Backup JSON from Profil (keys stripped unless you opt in)
 
-## 8. Database Schema (Supabase)
+## 6. Architecture
 
-**Table: `recipes`**
-- `id` (uuid, pk)
-- `user_id` (uuid, fk → auth.users)
-- `title` (text)
-- `ingredients` (jsonb or text[])
-- `instructions` (text)
-- `prep_time` (int, minutes)
-- `cook_time` (int, minutes)
-- `servings` (int)
-- `category` (text) — e.g. "main", "dessert"
-- `difficulty` (text) — "easy" | "medium" | "hard"
-- `rating` (numeric 1-5)
-- `is_favorite` (boolean)
-- `image_url` (text) — Supabase storage URL or external
-- `source_url` (text, optional)
-- `created_at` (timestamptz)
-- `updated_at` (timestamptz)
+```text
+Next.js App Router (Node on the Pi)
+  → Server Actions
+  → AI layer (OpenCode Zen / Go for text + URL; Gemini for images)
+  → Local JSON store + {id}.webp files in DATA_DIR
+  → Tailscale (Serve or host firewall) as ACL
+```
 
-Row Level Security: users can only read/write their own rows.
+**Key decisions:**
 
-## 9. AI Integration Details
+- Next.js + TypeScript + Tailwind + shadcn/ui
+- One process per `DATA_DIR`
+- Durable writes (temp → fsync → rename); corrupt JSON fails closed
+- No in-app auth; optional `ACCESS_PIN`
+- Default extract model: `big-pickle` on OpenCode Zen
 
-- **Provider:** OpenCode Go endpoint + MiniMax M2.7 (user provides API key)
-- **Prompt strategy:** Carefully engineered system prompt that returns strict JSON with all required fields + confidence scores
-- **Image uploads:** Client-side or edge OCR → text → M2.7 for structuring (phone image discarded after processing)
-- **URL handling:** Server-side fetch → extract main content + hero image URL → send to M2.7
-- **Streaming:** User sees live token-by-token parsing for delight
+## 7. Tech stack
 
-## 10. Design & UX Guidelines
+| Layer | Technology | Reason |
+|---|---|---|
+| Framework | Next.js App Router + TypeScript | One process, server actions |
+| Styling | Tailwind + shadcn/ui, dark only | Warm amber kitchen UI |
+| Persistence | `DATA_DIR/tiptopf.json` + recipe-images | No hosted database |
+| AI | Vercel AI SDK, OpenCode + Gemini | User-supplied keys in `/profile` |
+| Library layout | CSS grid | Simple until a true masonry pass |
+| Access | Tailscale + optional PIN | Household ACL |
+| Deploy | Node on the Pi or Docker | `docs/local-pi-deployment.md` |
 
-- **Theme:** Dark mode by default with warm amber accents, user can toggle to light mode
-- **Theme storage:** localStorage only (device-specific, syncs per-device)
-- **Layout:** Masonry grid using masonry-css library for true Pinterest feel
-- **Typography:** Clean, modern sans-serif; generous whitespace
-- **Cards:** Rounded corners, subtle hover lift, category colored badge, time + difficulty icons
-- **Mobile-first:** Works perfectly on phone (you'll add recipes from your camera)
-- **Categories:** Fixed dropdown (starter, main, dessert, side, breakfast, snack)
+## 8. Data model (`tiptopf.json`)
 
-## 10b. Security & Auth Decisions
+`schema_version`: **3** (missing is treated as 1; 2 was image identity `{id}.webp`; 3 drops leftover `user_id` / dummy profile).
 
-- **API key storage:** Client-side encrypted with user-derived key (PBKDF2 + AES-GCM)
-- **Email verification:** Required on signup
-- **Password recovery:** Full email-based reset flow implemented
-- **Auth flow:** Supabase Auth with email + password
+**recipes[]**
 
-## 11. Deployment & Cost
+- `id` (uuid)
+- `title`, `ingredients[]`, `instructions`
+- `prep_time`, `cook_time`, `servings`
+- `category`, `difficulty`
+- `rating`, `is_favorite`
+- `image_url` (`/api/images/{id}.webp` or `null`)
+- `source_url`, `source_type` (`image` \| `url` \| `manual`)
+- `tags[]`, `notes`
+- `created_at`, `updated_at`
 
-- **Hosting:** Vercel (free)
-- **Database/Storage:** Supabase free tier (more than enough for personal + small group use)
-- **AI Cost:** Your existing OpenCode Go subscription only
-- **Total monthly cost at MVP scale:** $0
+No `user_id`. Older files may still contain it; load ignores it, writes omit it.
 
-## 12. Roadmap
+Also: `collections[]`, `shoppingList[]` (camelCase: `addedAt`, `sourceRecipeTitle`, `sourceServings`), `settings` (OpenCode / Gemini / Pexels). Default export sets API keys to `null`.
 
-**MVP (v1.0)** — What this document describes  
-**v1.1** — Manual editing, AI image generation button, basic sharing  
-**v2.0** — Meal planner, nutrition, tags, notes, public collections
+Older backups may include `profile` (`local-device` / `local@tiptopf.local`); import ignores it.
+
+## 9. AI
+
+- OpenCode: URL and text extraction. JSON-LD is model **input**, not the stored recipe
+- Gemini: photo extraction
+- Stored output: German, metric
+- Keys live in settings, not environment variables
+
+## 10. Design & UX
+
+- Dark only, warm amber accents
+- German UI, address the user as **du**
+- CSS grid library (not masonry-css)
+- Recipe **pages**, not a full-screen overlay
+- Categories: starter, main, dessert, side, breakfast, snack
+- Difficulty labels: Einfach / Mittel / Schwer
+- Mobile-first kitchen use; pinch-zoom stays disabled (`maximumScale: 1`)
+
+## 11. Security
+
+- No user accounts. Completing TCP to the process means owner
+- Restrict with Tailscale ACLs, bind mode, and optional `ACCESS_PIN`
+- Keys sit unencrypted in `tiptopf.json` (`chmod 0600` when the filesystem allows)
+- Recipe backups strip keys unless you opt in
+- Outbound URL/image fetch denies private, loopback, link-local, and CGNAT hosts
+- Custom OpenCode/Gemini base URLs must not be localhost or private IPs
+
+## 12. Deployment
+
+- Hosting: Raspberry Pi or Docker on the LAN / tailnet
+- AI cost: the household’s OpenCode / Gemini usage
+- Ops: `docs/local-pi-deployment.md`
 
 ## 13. Implementation
 
-See `tasks/` directory for phased implementation plan.
+Current plan: `tasks/POST_REVIEW_HARDENING_PLAN.md`  
+Historical: `tasks/IMPLEMENTATION.md`, `tasks/completed/LOCAL_PI_OPTION_A_PLAN.md`
 
-## 14. Success Criteria
+## 14. Success criteria
 
-- I can add a recipe from a phone photo or URL in under 15 seconds  
-- The masonry grid looks genuinely beautiful and fun to scroll  
-- Everything feels fast and polished  
-- Zero ongoing cost beyond my AI subscription
+- A photo or URL becomes a German recipe without manual typing
+- The library is pleasant to scroll on phone and desktop
+- Power loss cannot silently empty the library
+- Hardware back leaves a recipe page
+- Household data stays on the Pi

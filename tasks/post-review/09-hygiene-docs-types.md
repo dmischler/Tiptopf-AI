@@ -1,6 +1,6 @@
 # Phase 09 — Hygiene: types, dead code, docs
 
-**Status:** NOT STARTED  
+**Status:** COMPLETED  
 **Depends on:** 04–08 should be mostly done so docs describe the real app  
 **Goal:** One architecture in the repo. Types, folders, and docs match local Pi single-user mode.
 
