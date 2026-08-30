@@ -1,6 +1,6 @@
 # Phase 10 — Tests that lock the new invariants
 
-**Status:** NOT STARTED  
+**Status:** COMPLETED  
 **Depends on:** 01–09 behavior in place (write tests against the new contracts, not the old bugs)  
 **Goal:** Automated coverage for the failures the review found. Not a general testing religion.
 

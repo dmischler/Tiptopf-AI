@@ -53,7 +53,7 @@ function isRecipeType(type: unknown): boolean {
   return types.some((entry) => typeof entry === 'string' && entry.toLowerCase() === 'recipe')
 }
 
-function resolveMaybeUrl(raw: string | null, base: string): string | null {
+export function resolveMaybeUrl(raw: string | null, base: string): string | null {
   if (!raw) return null
   try {
     const resolved = new URL(raw.trim(), base)
@@ -400,18 +400,7 @@ function extractOgImage(html: string) {
 
 const PAGE_FETCH_MAX_BYTES = 2 * 1024 * 1024
 
-export async function fetchRecipeUrl(url: string, timeoutMs = 15000): Promise<FetchResult> {
-  const fetched = await safeFetch(url, {
-    timeoutMs,
-    maxBytes: PAGE_FETCH_MAX_BYTES,
-    purpose: 'page',
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; Tiptopf-AI/1.0)',
-    },
-  })
-
-  const html = new TextDecoder('utf-8').decode(fetched.bytes)
-  const pageUrl = fetched.finalUrl || url
+export function parseRecipeHtml(html: string, pageUrl: string): FetchResult {
   const jsonLdResult = extractRecipeFromJsonLd(html)
   const imageUrl = resolveMaybeUrl(jsonLdResult?.imageUrl ?? extractOgImage(html), pageUrl)
 
@@ -428,4 +417,19 @@ export async function fetchRecipeUrl(url: string, timeoutMs = 15000): Promise<Fe
     imageUrl,
     structuredRecipe: null,
   }
+}
+
+export async function fetchRecipeUrl(url: string, timeoutMs = 15000): Promise<FetchResult> {
+  const fetched = await safeFetch(url, {
+    timeoutMs,
+    maxBytes: PAGE_FETCH_MAX_BYTES,
+    purpose: 'page',
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (compatible; Tiptopf-AI/1.0)',
+    },
+  })
+
+  const html = new TextDecoder('utf-8').decode(fetched.bytes)
+  const pageUrl = fetched.finalUrl || url
+  return parseRecipeHtml(html, pageUrl)
 }

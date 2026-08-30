@@ -1,14 +1,21 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test'
+
+import { E2E_DATA_DIR, writeSeedStore } from './e2e/helpers/seed'
+
+writeSeedStore()
+
+const e2ePort = 3100
+const e2eOrigin = `http://127.0.0.1:${e2ePort}`
 
 export default defineConfig({
   testDir: './e2e',
-  fullyParallel: true,
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: 1,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: e2eOrigin,
     trace: 'on-first-retry',
   },
   projects: [
@@ -18,8 +25,16 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
+    command: `npx next dev --port ${e2ePort} --hostname 127.0.0.1`,
+    url: e2eOrigin,
+    reuseExistingServer: false,
+    timeout: 120_000,
+    env: {
+      ...process.env,
+      DATA_DIR: E2E_DATA_DIR,
+      ACCESS_PIN: '',
+      ALLOW_HTTP_FETCH: '',
+      PORT: String(e2ePort),
+    },
   },
-});
+})

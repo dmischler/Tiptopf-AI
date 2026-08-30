@@ -72,7 +72,11 @@ Run **one** process per `DATA_DIR`.
 ```bash
 npm run build
 npm run lint
+npm test
+npm run e2e
 ```
+
+Run `npm test && npm run e2e` locally. There is no GitHub Actions workflow for this.
 
 ## Deployment
 
