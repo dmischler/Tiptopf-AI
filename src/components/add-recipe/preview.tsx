@@ -110,6 +110,15 @@ export function RecipePreview({
 
   return (
     <div className="space-y-5">
+      {parsedRecipe.untranslated ? (
+        <div
+          role="status"
+          className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"
+        >
+          Nicht übersetzt — API-Key im Profil fehlt.
+        </div>
+      ) : null}
+
       <div className="grid gap-4 rounded-xl border border-border/70 bg-muted/30 p-4 md:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="preview-title">Titel</Label>
