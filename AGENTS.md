@@ -43,6 +43,7 @@
 - Use `grep`/`glob` to discover before opening large files
 
 ## Critical References
-- `tasks/LOCAL_PI_OPTION_A_PLAN.md` — migration implementation plan
+- `tasks/POST_REVIEW_HARDENING_PLAN.md` — current hardening plan (phases in `tasks/post-review/`)
+- `tasks/completed/LOCAL_PI_OPTION_A_PLAN.md` — completed local-Pi migration
 - `docs/local-pi-deployment.md` — deployment and operations guide
 - `docs/project_status.md` — version/change log

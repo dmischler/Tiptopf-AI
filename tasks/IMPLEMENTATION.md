@@ -1,7 +1,11 @@
 # Tiptopf-AI Implementation Plan (v1.0 MVP)
 
-> NOTE: This document reflects the earlier Supabase-based MVP phases.
-> For the current local-only Raspberry Pi architecture (Option A), use `tasks/LOCAL_PI_OPTION_A_PLAN.md`.
+> **Current plan:** [`tasks/POST_REVIEW_HARDENING_PLAN.md`](POST_REVIEW_HARDENING_PLAN.md)  
+> Detailed phases: [`tasks/post-review/`](post-review/)  
+> Product constraint: pinch-zoom stays disabled (`maximumScale: 1`); readability is fixed with type scale and 44px targets, not by enabling zoom.
+>
+> This document is the **historical** Supabase MVP phase list. Do not implement from it.
+> Local-only Raspberry Pi migration (Option A) is complete: `tasks/completed/LOCAL_PI_OPTION_A_PLAN.md`.
 
 ## Quick Start
 ```bash

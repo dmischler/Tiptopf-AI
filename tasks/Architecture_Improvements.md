@@ -1,5 +1,7 @@
 # Frontend Implementation Addendum – Phase 1, 2 & 3 (Tiptopf-AI)
 
+> **Historical.** Current work is [`POST_REVIEW_HARDENING_PLAN.md`](POST_REVIEW_HARDENING_PLAN.md).
+>
 > **Status: COMPLETED** ✅ (2026-04-26)
 
 > **Phase 2 Addendum (2026-04-26): COMPLETED** ✅
