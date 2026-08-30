@@ -30,7 +30,7 @@ import {
   applyRecipeImageCandidateAction,
   searchRecipeImageCandidatesAction,
 } from '@/app/actions/extract-recipe'
-import { editRecipe, setRecipeImage } from '@/app/actions/recipe'
+import { editRecipe } from '@/app/actions/recipe'
 import { ImageSelectionModal } from '@/components/add-recipe/image-selection-modal'
 import { FavoriteButton } from '@/components/interactions/favorite-button'
 import { Rating } from '@/components/interactions/rating'
@@ -47,6 +47,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { RecipeImageCandidate } from '@/lib/ai/image-types'
+import { toRecipeImageSrc } from '@/lib/recipe-image'
 import type { Collection, Difficulty, Recipe, RecipeCategory } from '@/types'
 
 type RecipeDetailProps = {
@@ -404,7 +405,11 @@ export function RecipeDetail({
   const effectiveServings = adjustedServings > 0 ? adjustedServings : baseServings
   const scaleRatio = effectiveServings !== baseServings && baseServings > 0 ? effectiveServings / baseServings : 1
 
-  const currentImageUrl = replacementImagePreviewUrl ?? draft.imageUrl
+  const viewImageUrl = toRecipeImageSrc(currentRecipe)
+  const currentImageUrl = toRecipeImageSrc({
+    image_url: replacementImagePreviewUrl ?? draft.imageUrl,
+    updated_at: currentRecipe.updated_at,
+  })
   const normalizedTagInput = draft.tagInput.trim().toLowerCase()
   const tagSuggestions =
     normalizedTagInput.length === 0
@@ -484,10 +489,15 @@ export function RecipeDetail({
 
   async function handleSelectImageCandidate(candidate: RecipeImageCandidate) {
     try {
-      const persistedUrl = await applyRecipeImageCandidateAction(candidate.url)
+      const persistedUrl = await applyRecipeImageCandidateAction(currentRecipe.id, candidate.url)
       applyResolvedImage(persistedUrl, {
         creditName: candidate.creditName,
         creditUrl: candidate.creditUrl,
+      })
+      onRecipeUpdated?.({
+        ...currentRecipe,
+        image_url: persistedUrl,
+        updated_at: new Date().toISOString(),
       })
       setIsSelectionModalOpen(false)
       toast.success('Image updated.')
@@ -592,13 +602,11 @@ export function RecipeDetail({
         imageFormData.append('recipeId', currentRecipe.id)
         imageFormData.append('image', replacementImageFile)
         const uploadedImageUrl = await uploadRecipeImage(imageFormData)
-        updated = await setRecipeImage(currentRecipe.id, uploadedImageUrl)
-      } else if (
-        currentDraft.imageUrl &&
-        currentDraft.imageUrl !== currentRecipe.image_url &&
-        !currentDraft.imageUrl.startsWith('blob:')
-      ) {
-        updated = await setRecipeImage(currentRecipe.id, currentDraft.imageUrl)
+        updated = {
+          ...updated,
+          image_url: uploadedImageUrl,
+          updated_at: new Date().toISOString(),
+        }
       }
 
       onRecipeUpdated?.(updated as Recipe)
@@ -770,10 +778,10 @@ export function RecipeDetail({
                   <div className="h-1.5 w-9 rounded-full bg-muted-foreground/40" />
                 </div>
               )}
-              {currentRecipe.image_url ? (
+              {viewImageUrl ? (
                 <div className="relative h-40 w-full shrink-0 sm:h-48 touch-none select-none" {...dragHandlers}>
                   <Image
-                    src={currentRecipe.image_url}
+                    src={viewImageUrl}
                     alt={currentRecipe.title}
                     fill
                     className="object-cover pointer-events-none"
@@ -1482,7 +1490,7 @@ export function RecipeDetail({
           <DialogHeader className="border-b border-border/70 px-5 pb-4 pt-5 pr-12">
             <DialogTitle>Rezept löschen?</DialogTitle>
             <DialogDescription>
-              Sind Sie sicher, dass Sie dieses Rezept löschen möchten? Dies kann nicht rückgängig gemacht werden.
+              Rezept in den Papierkorb. Du kannst es kurz rückgängig machen.
             </DialogDescription>
           </DialogHeader>
 

@@ -2,6 +2,7 @@
 
 import { z } from 'zod'
 
+import { revalidateApp } from '@/app/actions/_revalidate'
 import { extractRecipeFromText } from '@/lib/ai/extractor'
 import { searchPexelsImages } from '@/lib/ai/image-search'
 import { searchMealDbImages } from '@/lib/ai/meal-db'
@@ -11,11 +12,12 @@ import { resolveAiBaseUrl } from '@/lib/ai/client'
 import { fetchRecipeUrl } from '@/lib/ai/url-fetcher'
 import { extractRecipeFromImage } from '@/lib/ai/image-handler'
 import { downloadImageToLocalStorage } from '@/lib/local/images'
-import { getSettings } from '@/lib/local/store'
+import { getSettings, patchRecipe } from '@/lib/local/store'
 
 const categorySchema = z.enum(['starter', 'main', 'dessert', 'side', 'breakfast', 'snack'])
 const titleSchema = z.string().trim().min(1).max(180)
 const imageUrlSchema = z.string().url()
+const recipeIdSchema = z.string().uuid()
 
 const findRecipeImageInputSchema = z.object({
   title: titleSchema,
@@ -67,31 +69,33 @@ export async function searchRecipeImageCandidatesAction(
   return collectImageCandidates(parsedTitle, parsedCategory, settings.pexels_api_key)
 }
 
-export async function applyRecipeImageCandidateAction(imageUrl: string): Promise<string> {
+export async function applyRecipeImageCandidateAction(
+  recipeId: string,
+  imageUrl: string
+): Promise<string> {
+  const parsedRecipeId = recipeIdSchema.parse(recipeId)
   const parsedImageUrl = imageUrlSchema.parse(imageUrl)
-  return downloadImageToLocalStorage(parsedImageUrl, crypto.randomUUID())
+  const storedUrl = await downloadImageToLocalStorage(parsedImageUrl, parsedRecipeId)
+  await patchRecipe(parsedRecipeId, { image_url: storedUrl })
+  revalidateApp()
+  return storedUrl
 }
 
 export async function findRecipeImageAction(input: FindRecipeImageInput): Promise<ResolvedRecipeImage | null> {
   const settings = await getSettings()
   const parsedInput = findRecipeImageInputSchema.parse(input)
   const candidates = await collectImageCandidates(parsedInput.title, parsedInput.category, settings.pexels_api_key)
-
-  for (const candidate of candidates) {
-    try {
-      const imageUrl = await downloadImageToLocalStorage(candidate.url, crypto.randomUUID())
-      return {
-        imageUrl,
-        source: candidate.source,
-        creditName: candidate.creditName,
-        creditUrl: candidate.creditUrl,
-      }
-    } catch {
-      // Try next candidate
-    }
+  const candidate = candidates[0]
+  if (!candidate) {
+    return null
   }
 
-  return null
+  return {
+    imageUrl: candidate.url,
+    source: candidate.source,
+    creditName: candidate.creditName,
+    creditUrl: candidate.creditUrl,
+  }
 }
 
 export async function extractFromUrlAction(url: string) {
@@ -133,19 +137,10 @@ export async function extractFromUrlAction(url: string) {
     }
   }
 
-  let storedImageUrl: string | null = null
-  if (imageUrl) {
-    try {
-      storedImageUrl = await downloadImageToLocalStorage(imageUrl, crypto.randomUUID())
-    } catch (err) {
-      console.error('downloadImageToLocalStorage error:', err)
-      storedImageUrl = null
-    }
-  }
-
   return {
     ...recipe,
-    image_url: storedImageUrl,
+    image_url: imageUrl,
+    remote_image_url: imageUrl,
     source_url: normalizedUrl,
     source_type: 'url' as const,
   }

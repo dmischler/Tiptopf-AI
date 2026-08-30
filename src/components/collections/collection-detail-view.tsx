@@ -23,6 +23,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { MasonryGrid, MasonryItem } from '@/components/library/masonry-grid'
 import { buildCollectionMarkdown, collectionMarkdownFilename } from '@/lib/export'
+import { toRecipeImageSrc } from '@/lib/recipe-image'
 import type { Collection, Recipe } from '@/types'
 
 interface CollectionDetailViewProps {
@@ -250,7 +251,9 @@ export function CollectionDetailView({ collection, allRecipes }: CollectionDetai
               </p>
             ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 max-h-[50vh] overflow-y-auto">
-                {filteredAvailableRecipes.map((recipe) => (
+                {filteredAvailableRecipes.map((recipe) => {
+                  const imageSrc = toRecipeImageSrc(recipe)
+                  return (
                   <button
                     key={recipe.id}
                     onClick={() => {
@@ -260,11 +263,11 @@ export function CollectionDetailView({ collection, allRecipes }: CollectionDetai
                     }}
                     className="flex items-center gap-3 rounded-lg border border-border/70 bg-muted/25 p-3 text-left transition-colors hover:bg-muted/50"
                   >
-                    {recipe.image_url ? (
+                    {imageSrc ? (
                       <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={recipe.image_url}
+                          src={imageSrc}
                           alt={recipe.title}
                           className="h-full w-full object-cover"
                         />
@@ -281,7 +284,8 @@ export function CollectionDetailView({ collection, allRecipes }: CollectionDetai
                       </p>
                     </div>
                   </button>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>

@@ -5,13 +5,12 @@ import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import {
-  applyRecipeImageCandidateAction,
   extractFromImageAction,
   extractFromUrlAction,
   findRecipeImageAction,
   searchRecipeImageCandidatesAction,
 } from '@/app/actions/extract-recipe'
-import { saveRecipe, uploadRecipeImage } from '@/app/actions/add-recipe'
+import { saveRecipe } from '@/app/actions/add-recipe'
 import { ImageSelectionModal } from '@/components/add-recipe/image-selection-modal'
 import { ImageUpload } from '@/components/add-recipe/image-upload'
 import { ManualForm } from '@/components/add-recipe/manual-form'
@@ -27,8 +26,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import type { ParsedRecipe, Recipe } from '@/types'
+import { isCanonicalRecipeImageUrl } from '@/lib/recipe-image'
 import type { RecipeImageCandidate } from '@/lib/ai/image-types'
+import type { ParsedRecipe, Recipe } from '@/types'
 
 type ModalPhase = 'input' | 'parsing' | 'preview' | 'saving'
 
@@ -284,18 +284,13 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
     }
   }
 
-  async function handleSelectImageCandidate(candidate: RecipeImageCandidate) {
-    try {
-      const persistedUrl = await applyRecipeImageCandidateAction(candidate.url)
-      applyResolvedImage(persistedUrl, {
-        creditName: candidate.creditName,
-        creditUrl: candidate.creditUrl,
-      })
-      setIsSelectionModalOpen(false)
-      toast.success('Image updated.')
-    } catch {
-      toast.error('Failed to apply selected image.')
-    }
+  function handleSelectImageCandidate(candidate: RecipeImageCandidate) {
+    applyResolvedImage(candidate.url, {
+      creditName: candidate.creditName,
+      creditUrl: candidate.creditUrl,
+    })
+    setIsSelectionModalOpen(false)
+    toast.success('Image updated.')
   }
 
   async function handleFindImageManual() {
@@ -345,40 +340,37 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
         return
       }
 
-      const saved = await saveRecipe({
-        title: previewState.title,
-        ingredients,
-        instructions,
-        prepTime: extractedRecipe.prep_time,
-        cookTime: extractedRecipe.cook_time,
-        servings: previewState.servings,
-        category: previewState.category,
-        difficulty: previewState.difficulty,
-        imageUrl: replacementImageFile ? null : previewState.imageUrl,
-        sourceUrl: previewState.sourceUrl,
-        sourceType: previewState.sourceType,
-        tags: previewState.tags,
-      })
+      const previewUrl = replacementImageFile ? null : previewState.imageUrl
+      const isRemote = Boolean(previewUrl && /^https?:\/\//i.test(previewUrl))
+      const canonicalImageUrl = previewUrl && isCanonicalRecipeImageUrl(previewUrl) ? previewUrl.split(/[?#]/)[0] : null
+      const intendedImage = Boolean(replacementImageFile || isRemote || canonicalImageUrl)
 
-      let persistedImageUrl = saved.image_url as string | null
+      const saved = await saveRecipe(
+        {
+          title: previewState.title,
+          ingredients,
+          instructions,
+          prepTime: extractedRecipe.prep_time,
+          cookTime: extractedRecipe.cook_time,
+          servings: previewState.servings,
+          category: previewState.category,
+          difficulty: previewState.difficulty,
+          imageUrl: canonicalImageUrl,
+          remoteImageUrl: isRemote ? previewUrl : null,
+          sourceUrl: previewState.sourceUrl,
+          sourceType: previewState.sourceType,
+          tags: previewState.tags,
+        },
+        replacementImageFile
+      )
 
-      if (replacementImageFile) {
-        try {
-          const imageFormData = new FormData()
-          imageFormData.append('recipeId', saved.id)
-          imageFormData.append('image', replacementImageFile)
-          persistedImageUrl = await uploadRecipeImage(imageFormData)
-        } catch {
-          toast.error('Recipe saved, but replacing the image failed.')
-        }
+      onRecipeSaved?.(saved as Recipe)
+
+      if (intendedImage && !saved.image_url) {
+        toast.error('Rezept gespeichert, Bild konnte nicht geladen werden.')
+      } else {
+        toast.success('Recipe saved to your library.')
       }
-
-      onRecipeSaved?.({
-        ...(saved as Recipe),
-        image_url: persistedImageUrl,
-      })
-
-      toast.success('Recipe saved to your library.')
       onOpenChange(false)
       resetState()
     } catch (error) {
@@ -392,40 +384,35 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
     setIsManualSaving(true)
 
     try {
-      const saved = await saveRecipe({
-        title: recipe.title,
-        ingredients: recipe.ingredients,
-        instructions: recipe.instructions,
-        prepTime: recipe.prepTime,
-        cookTime: recipe.cookTime,
-        servings: recipe.servings,
-        category: recipe.category,
-        difficulty: recipe.difficulty,
-        imageUrl: recipe.imageUrl,
-        sourceUrl: null,
-        sourceType: 'manual',
-        tags: recipe.tags,
-      })
+      const isRemote = Boolean(recipe.imageUrl && /^https?:\/\//i.test(recipe.imageUrl))
+      const intendedImage = Boolean(imageFile || isRemote)
 
-      let persistedImageUrl = saved.image_url as string | null
+      const saved = await saveRecipe(
+        {
+          title: recipe.title,
+          ingredients: recipe.ingredients,
+          instructions: recipe.instructions,
+          prepTime: recipe.prepTime,
+          cookTime: recipe.cookTime,
+          servings: recipe.servings,
+          category: recipe.category,
+          difficulty: recipe.difficulty,
+          imageUrl: null,
+          remoteImageUrl: isRemote ? recipe.imageUrl : null,
+          sourceUrl: null,
+          sourceType: 'manual',
+          tags: recipe.tags,
+        },
+        imageFile
+      )
 
-      if (imageFile) {
-        try {
-          const imageFormData = new FormData()
-          imageFormData.append('recipeId', saved.id)
-          imageFormData.append('image', imageFile)
-          persistedImageUrl = await uploadRecipeImage(imageFormData)
-        } catch {
-          toast.error('Rezept gespeichert, aber das Bild konnte nicht hochgeladen werden.')
-        }
+      onRecipeSaved?.(saved as Recipe)
+
+      if (intendedImage && !saved.image_url) {
+        toast.error('Rezept gespeichert, Bild konnte nicht geladen werden.')
+      } else {
+        toast.success('Rezept gespeichert.')
       }
-
-      onRecipeSaved?.({
-        ...(saved as Recipe),
-        image_url: persistedImageUrl,
-      })
-
-      toast.success('Rezept gespeichert.')
       onOpenChange(false)
       resetState()
     } catch (error) {
@@ -551,7 +538,7 @@ export function AddRecipeModal({ open, onOpenChange, onRecipeSaved, initialUrl, 
             candidates={imageCandidates}
             onOpenChange={setIsSelectionModalOpen}
             onSelectCandidate={(candidate) => {
-              void handleSelectImageCandidate(candidate)
+              handleSelectImageCandidate(candidate)
             }}
             onRefreshSearch={() => {
               void loadImageCandidates()

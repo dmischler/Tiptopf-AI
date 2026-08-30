@@ -4,6 +4,15 @@ import sharp from 'sharp'
 
 import { writeFileDurable } from '@/lib/local/durable-write'
 import { getRecipeImagesDir } from '@/lib/local/paths'
+import {
+  canonicalRecipeImageUrl,
+  isSafeImageName,
+  parseApiImageFileName,
+  toImageUrl,
+} from '@/lib/recipe-image'
+import type { Recipe } from '@/types'
+
+export { isSafeImageName, toImageUrl }
 
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const MAX_UPLOADED_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
@@ -18,11 +27,8 @@ const CONTENT_TYPE_BY_EXT: Record<string, string> = {
   '.webp': 'image/webp',
 }
 
-const EXT_BY_CONTENT_TYPE: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/jpg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
+function isEnoent(error: unknown) {
+  return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT')
 }
 
 function toNormalizedMime(value: string | null) {
@@ -33,12 +39,30 @@ function toNormalizedMime(value: string | null) {
   return value.split(';')[0].trim().toLowerCase()
 }
 
-function isSafeImageName(value: string) {
-  return /^[A-Za-z0-9._-]+$/.test(value) && !value.includes('..')
+function getTrashDir() {
+  return path.join(getRecipeImagesDir(), '.trash')
 }
 
-function toImageUrl(fileName: string) {
-  return `/api/images/${encodeURIComponent(fileName)}`
+function canonicalFileName(recipeId: string) {
+  return `${recipeId}.webp`
+}
+
+function assertSafeImageFileName(fileName: string) {
+  if (!isSafeImageName(fileName)) {
+    throw new Error('Invalid image name')
+  }
+}
+
+async function pathExists(filePath: string) {
+  try {
+    await fs.access(filePath)
+    return true
+  } catch (error) {
+    if (isEnoent(error)) {
+      return false
+    }
+    throw error
+  }
 }
 
 async function removeOtherRecipeImageVariants(recipeId: string, keepFileName: string) {
@@ -47,7 +71,7 @@ async function removeOtherRecipeImageVariants(recipeId: string, keepFileName: st
   try {
     entries = await fs.readdir(imagesDir)
   } catch (error) {
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+    if (isEnoent(error)) {
       return
     }
     throw error
@@ -62,36 +86,6 @@ async function removeOtherRecipeImageVariants(recipeId: string, keepFileName: st
   )
 }
 
-function extensionFromUrl(url: string) {
-  const pathname = new URL(url).pathname.toLowerCase()
-
-  if (pathname.endsWith('.png')) {
-    return 'png'
-  }
-
-  if (pathname.endsWith('.webp')) {
-    return 'webp'
-  }
-
-  return 'jpg'
-}
-
-function extensionFromMime(mime: string, fallbackUrl?: string) {
-  if (EXT_BY_CONTENT_TYPE[mime]) {
-    return EXT_BY_CONTENT_TYPE[mime]
-  }
-
-  if (fallbackUrl) {
-    try {
-      return extensionFromUrl(fallbackUrl)
-    } catch {
-      return 'jpg'
-    }
-  }
-
-  return 'jpg'
-}
-
 async function resizeToWebp(bytes: Uint8Array): Promise<Uint8Array> {
   const buffer = await sharp(Buffer.from(bytes))
     .resize({ width: MAX_IMAGE_WIDTH, withoutEnlargement: true })
@@ -100,8 +94,9 @@ async function resizeToWebp(bytes: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(buffer)
 }
 
-async function writeRecipeImage(recipeId: string, bytes: Uint8Array, ext: string) {
-  const fileName = `${recipeId}.${ext}`
+async function writeRecipeImage(recipeId: string, bytes: Uint8Array) {
+  const fileName = canonicalFileName(recipeId)
+  assertSafeImageFileName(fileName)
   const filePath = path.join(getRecipeImagesDir(), fileName)
   await writeFileDurable(filePath, bytes)
   await removeOtherRecipeImageVariants(recipeId, fileName)
@@ -124,7 +119,7 @@ export async function saveRecipeImageBytes(
   }
 
   const resized = await resizeToWebp(bytes)
-  return writeRecipeImage(recipeId, resized, 'webp')
+  return writeRecipeImage(recipeId, resized)
 }
 
 export async function saveUploadedRecipeImage(file: File, recipeId: string) {
@@ -140,7 +135,7 @@ export async function saveUploadedRecipeImage(file: File, recipeId: string) {
 
   const bytes = new Uint8Array(await file.arrayBuffer())
   const resized = await resizeToWebp(bytes)
-  return writeRecipeImage(recipeId, resized, 'webp')
+  return writeRecipeImage(recipeId, resized)
 }
 
 export async function downloadImageToLocalStorage(imageUrl: string, recipeId: string) {
@@ -156,7 +151,7 @@ export async function downloadImageToLocalStorage(imageUrl: string, recipeId: st
   }
 
   const resized = await resizeToWebp(bytes)
-  return writeRecipeImage(recipeId, resized, 'webp')
+  return writeRecipeImage(recipeId, resized)
 }
 
 export async function readRecipeImage(imageName: string) {
@@ -174,4 +169,161 @@ export async function readRecipeImage(imageName: string) {
     buffer,
     contentType,
   }
+}
+
+function collectRecipeImageNames(recipe: Recipe) {
+  const names = new Set<string>([
+    canonicalFileName(recipe.id),
+    `${recipe.id}.jpg`,
+    `${recipe.id}.jpeg`,
+    `${recipe.id}.png`,
+  ])
+
+  const fromUrl = parseApiImageFileName(recipe.image_url)
+  if (fromUrl) {
+    names.add(fromUrl)
+  }
+
+  return [...names].filter((name) => isSafeImageName(name))
+}
+
+export async function deleteRecipeImages(recipe: Recipe) {
+  const imagesDir = getRecipeImagesDir()
+  let entries: string[]
+  try {
+    entries = await fs.readdir(imagesDir)
+  } catch (error) {
+    if (isEnoent(error)) {
+      return
+    }
+    throw error
+  }
+
+  const prefix = `${recipe.id}.`
+  const extraName = parseApiImageFileName(recipe.image_url)
+  const toDelete = entries.filter((name) => {
+    if (name.startsWith(prefix)) {
+      return true
+    }
+    return Boolean(extraName && name === extraName)
+  })
+
+  await Promise.all(toDelete.map((name) => fs.rm(path.join(imagesDir, name), { force: true })))
+}
+
+async function placeWebpInTrash(recipeId: string, sourcePath: string, sourceName: string) {
+  const trashDir = getTrashDir()
+  await fs.mkdir(trashDir, { recursive: true })
+  const dest = path.join(trashDir, canonicalFileName(recipeId))
+  assertSafeImageFileName(canonicalFileName(recipeId))
+
+  if (sourceName.toLowerCase().endsWith('.webp')) {
+    await fs.rm(dest, { force: true })
+    await fs.rename(sourcePath, dest)
+    return
+  }
+
+  const bytes = await fs.readFile(sourcePath)
+  const resized = await resizeToWebp(new Uint8Array(bytes))
+  await writeFileDurable(dest, resized)
+  await fs.rm(sourcePath, { force: true })
+}
+
+export async function trashRecipeImages(recipe: Recipe) {
+  const imagesDir = getRecipeImagesDir()
+  const names = collectRecipeImageNames(recipe)
+  let placed = false
+
+  for (const name of names) {
+    const sourcePath = path.join(imagesDir, name)
+    if (!(await pathExists(sourcePath))) {
+      continue
+    }
+
+    if (!placed) {
+      await placeWebpInTrash(recipe.id, sourcePath, name)
+      placed = true
+    } else {
+      await fs.rm(sourcePath, { force: true })
+    }
+  }
+}
+
+export async function restoreTrashedRecipeImage(recipeId: string): Promise<boolean> {
+  const fileName = canonicalFileName(recipeId)
+  assertSafeImageFileName(fileName)
+
+  const imagesDir = getRecipeImagesDir()
+  const trashPath = path.join(getTrashDir(), fileName)
+  const dest = path.join(imagesDir, fileName)
+
+  if (!(await pathExists(trashPath))) {
+    return pathExists(dest)
+  }
+
+  await fs.mkdir(imagesDir, { recursive: true })
+  await fs.rm(dest, { force: true })
+  await fs.rename(trashPath, dest)
+  await removeOtherRecipeImageVariants(recipeId, fileName)
+  return true
+}
+
+export async function purgeTrashedRecipeImage(recipeId: string) {
+  const fileName = canonicalFileName(recipeId)
+  assertSafeImageFileName(fileName)
+  await fs.rm(path.join(getTrashDir(), fileName), { force: true })
+}
+
+export async function purgeAllTrashedRecipeImages() {
+  const trashDir = getTrashDir()
+  let entries: string[]
+  try {
+    entries = await fs.readdir(trashDir)
+  } catch (error) {
+    if (isEnoent(error)) {
+      return
+    }
+    throw error
+  }
+
+  await Promise.all(entries.map((name) => fs.rm(path.join(trashDir, name), { force: true, recursive: true })))
+}
+
+export async function migrateRecipeImageFile(recipe: Recipe): Promise<string | null> {
+  const canonicalName = canonicalFileName(recipe.id)
+  const canonicalUrl = canonicalRecipeImageUrl(recipe.id)
+  const fileName = parseApiImageFileName(recipe.image_url)
+
+  if (!fileName) {
+    return null
+  }
+
+  if (fileName === canonicalName) {
+    return canonicalUrl
+  }
+
+  const imagesDir = getRecipeImagesDir()
+  const oldPath = path.join(imagesDir, fileName)
+  const newPath = path.join(imagesDir, canonicalName)
+
+  if (!(await pathExists(oldPath))) {
+    return null
+  }
+
+  if (fileName.toLowerCase().endsWith('.webp')) {
+    if (oldPath !== newPath) {
+      await fs.rm(newPath, { force: true })
+      await fs.rename(oldPath, newPath)
+    }
+  } else {
+    const bytes = await fs.readFile(oldPath)
+    const resized = await resizeToWebp(new Uint8Array(bytes))
+    await writeFileDurable(newPath, resized)
+    if (oldPath !== newPath) {
+      await fs.rm(oldPath, { force: true })
+    }
+  }
+
+  await removeOtherRecipeImageVariants(recipe.id, canonicalName)
+  return canonicalUrl
 }

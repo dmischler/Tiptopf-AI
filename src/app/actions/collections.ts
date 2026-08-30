@@ -1,8 +1,8 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
+import { revalidateApp } from '@/app/actions/_revalidate'
 import {
   addRecipeToCollection,
   createCollection,
@@ -22,7 +22,7 @@ export async function listCollectionsAction() {
 export async function createCollectionAction(name: string) {
   const parsedName = collectionNameSchema.parse(name)
   const collection = await createCollection(parsedName)
-  revalidatePath('/collections')
+  revalidateApp()
   return collection
 }
 
@@ -30,14 +30,14 @@ export async function updateCollectionAction(collectionId: string, name: string)
   const parsedId = z.string().uuid().parse(collectionId)
   const parsedName = collectionNameSchema.parse(name)
   const collection = await updateCollection(parsedId, parsedName)
-  revalidatePath('/collections')
+  revalidateApp()
   return collection
 }
 
 export async function deleteCollectionAction(collectionId: string) {
   const parsedId = z.string().uuid().parse(collectionId)
   await deleteCollection(parsedId)
-  revalidatePath('/collections')
+  revalidateApp()
   return { collectionId: parsedId }
 }
 
@@ -45,7 +45,7 @@ export async function addRecipeToCollectionAction(collectionId: string, recipeId
   const parsedCollectionId = z.string().uuid().parse(collectionId)
   const parsedRecipeId = z.string().uuid().parse(recipeId)
   const collection = await addRecipeToCollection(parsedCollectionId, parsedRecipeId)
-  revalidatePath('/collections')
+  revalidateApp()
   return collection
 }
 
@@ -53,6 +53,6 @@ export async function removeRecipeFromCollectionAction(collectionId: string, rec
   const parsedCollectionId = z.string().uuid().parse(collectionId)
   const parsedRecipeId = z.string().uuid().parse(recipeId)
   const collection = await removeRecipeFromCollection(parsedCollectionId, parsedRecipeId)
-  revalidatePath('/collections')
+  revalidateApp()
   return collection
 }

@@ -3,10 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Image as ImageIcon, Loader2, UploadCloud, X } from 'lucide-react'
 
-import {
-  applyRecipeImageCandidateAction,
-  searchRecipeImageCandidatesAction,
-} from '@/app/actions/extract-recipe'
+import { searchRecipeImageCandidatesAction } from '@/app/actions/extract-recipe'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -22,7 +19,7 @@ import type { Difficulty, RecipeCategory } from '@/types'
 import type { RecipeImageCandidate } from '@/lib/ai/image-types'
 
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
-const MAX_BYTES = 10 * 1024 * 1024
+const MAX_BYTES = 5 * 1024 * 1024
 
 export type ManualRecipeInput = {
   title: string
@@ -42,15 +39,6 @@ type ManualFormProps = {
   onCancel: () => void
   isSaving: boolean
   allTags?: string[]
-}
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result || ''))
-    reader.onerror = () => reject(new Error('Failed to read image file'))
-    reader.readAsDataURL(file)
-  })
 }
 
 export function ManualForm({ onSave, onCancel, isSaving, allTags = [] }: ManualFormProps) {
@@ -116,9 +104,9 @@ export function ManualForm({ onSave, onCancel, isSaving, allTags = [] }: ManualF
       URL.revokeObjectURL(imagePreviewUrl)
     }
 
-    const dataUrl = await readFileAsDataUrl(file)
+    const objectUrl = URL.createObjectURL(file)
     setImageFile(file)
-    setImagePreviewUrl(dataUrl)
+    setImagePreviewUrl(objectUrl)
     setResolvedImageUrl(null)
   }
 
@@ -147,19 +135,14 @@ export function ManualForm({ onSave, onCancel, isSaving, allTags = [] }: ManualF
     }
   }
 
-  async function handleSelectCandidate(candidate: RecipeImageCandidate) {
-    try {
-      const persistedUrl = await applyRecipeImageCandidateAction(candidate.url)
-      if (imagePreviewUrl) {
-        URL.revokeObjectURL(imagePreviewUrl)
-      }
-      setImageFile(null)
-      setImagePreviewUrl(null)
-      setResolvedImageUrl(persistedUrl)
-      setIsSelectionOpen(false)
-    } catch {
-      // silently fail
+  function handleSelectCandidate(candidate: RecipeImageCandidate) {
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl)
     }
+    setImageFile(null)
+    setImagePreviewUrl(null)
+    setResolvedImageUrl(candidate.url)
+    setIsSelectionOpen(false)
   }
 
   async function handleSubmit() {
@@ -176,7 +159,7 @@ export function ManualForm({ onSave, onCancel, isSaving, allTags = [] }: ManualF
       category,
       difficulty,
       tags,
-      imageUrl: resolvedImageUrl ?? imagePreviewUrl ?? null,
+      imageUrl: imageFile ? null : resolvedImageUrl,
     }
 
     await onSave(recipe, imageFile)
@@ -384,7 +367,7 @@ export function ManualForm({ onSave, onCancel, isSaving, allTags = [] }: ManualF
             >
               <UploadCloud className="mx-auto mb-2 h-7 w-7 text-muted-foreground" />
               <p className="text-sm font-medium text-foreground">Bild hierher ziehen</p>
-              <p className="mt-1 text-xs text-muted-foreground">JPG, PNG, WEBP bis 10MB</p>
+              <p className="mt-1 text-xs text-muted-foreground">JPG, PNG, WEBP bis 5MB</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -449,7 +432,7 @@ export function ManualForm({ onSave, onCancel, isSaving, allTags = [] }: ManualF
         title={title.trim() || 'Rezept'}
         candidates={imageCandidates}
         onOpenChange={setIsSelectionOpen}
-        onSelectCandidate={(candidate) => void handleSelectCandidate(candidate)}
+        onSelectCandidate={(candidate) => handleSelectCandidate(candidate)}
         onRefreshSearch={() => void handleSearchImage()}
       />
     </div>

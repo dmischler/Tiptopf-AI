@@ -85,9 +85,9 @@ With `DATA_DIR=/home/pi/tiptopf-data`:
   tiptopf.json.bak
   tiptopf.json.corrupt.<iso>
   recipe-images/
-    <recipe-id>.jpg
-    <recipe-id>.png
-    <recipe-id>.webp
+    {recipeId}.webp
+    .trash/
+      {recipeId}.webp
 ```
 
 Leftover `tiptopf.json.tmp.<uuid>` or `recipe-images/<name>.tmp.<uuid>` files can appear after a crash. They are ignored on boot and are safe to delete.
@@ -97,6 +97,7 @@ Leftover `tiptopf.json.tmp.<uuid>` or `recipe-images/<name>.tmp.<uuid>` files ca
 ## Data model
 
 `tiptopf.json` contains:
+- `schema_version` (current: `2`; missing is treated as `1`)
 - `recipes[]` matching the existing `Recipe` shape
 - `profile` with:
   - `id` (`local-device`)
@@ -157,10 +158,16 @@ To switch back to the free tier, simply clear the Base URL field (or set it to `
 
 ## Image handling
 
+- Contract: `recipe.image_url` is `/api/images/{recipeId}.webp` or `null`
+- File on disk: `DATA_DIR/recipe-images/{recipeId}.webp`
 - Uploaded replacement images are validated (JPG/PNG/WEBP, up to 5 MB)
-- URL images are downloaded and persisted locally
-- Images are served by `GET /api/images/[imageName]`
-- Existing image variants for a recipe are replaced when writing a new one
+- Remote/Pexels URLs stay as candidates until the recipe is saved; bytes are written only when `recipe.id` is known
+- Images are served by `GET /api/images/[imageName]` (query string is ignored)
+- Clients may append `?v={updated_at}` to bust caches after an in-place replace
+- Existing `{recipeId}.*` variants are deleted after a durable write of `{recipeId}.webp`
+- On first boot of schema 1 stores, leftover random UUID files (`/api/images/{other}.jpg` etc.) are renamed or re-encoded to `{recipeId}.webp`
+- Deleted recipes: the image is renamed to `recipe-images/.trash/{recipeId}.webp`. Undo within ~30s moves it back. After the undo window or the next process boot, `.trash/` is emptied
+- `GET /api/images/` never serves `.trash/` (names with `/` are rejected)
 
 ## Backup and restore
 
@@ -294,7 +301,9 @@ tiptopf-data/ (named volume, managed by Docker)
       ├── tiptopf.json.bak
       ├── tiptopf.json.corrupt.<iso>
       └── recipe-images/
-        <recipe-id>.jpg|png|webp
+          ├── {recipeId}.webp
+          └── .trash/
+              └── {recipeId}.webp
 ```
 
 Run **one** container (one process) against this volume. Do not mount the same `DATA_DIR` into a second app instance.

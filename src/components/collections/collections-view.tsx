@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { MasonryGrid, MasonryItem } from '@/components/library/masonry-grid'
+import { toRecipeImageSrc } from '@/lib/recipe-image'
 import type { Collection, Recipe } from '@/types'
 
 interface CollectionsViewProps {
@@ -44,7 +45,7 @@ export function CollectionsView({ collections, recipes }: CollectionsViewProps) 
     const firstRecipeId = collection.recipe_ids[0]
     if (!firstRecipeId) return null
     const recipe = recipes.find((r) => r.id === firstRecipeId)
-    return recipe?.image_url ?? null
+    return recipe ? toRecipeImageSrc(recipe) : null
   }
 
   async function handleCreateCollection() {

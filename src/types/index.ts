@@ -61,6 +61,7 @@ export interface ParsedRecipe {
   difficulty: Difficulty;
   confidence: number;
   image_url?: string | null;
+  remote_image_url?: string | null;
   source_url?: string | null;
   source_type: 'image' | 'url';
   tags?: string[];

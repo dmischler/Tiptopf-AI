@@ -75,7 +75,9 @@ export function RecipePreview({
   onReplaceImage,
   onFindImage,
 }: RecipePreviewProps) {
-  const isRemoteImage = Boolean(value.imageUrl && /^https?:\/\//i.test(value.imageUrl))
+  const isRemoteImage = Boolean(
+    value.imageUrl && (/^https?:\/\//i.test(value.imageUrl) || value.imageUrl.startsWith('blob:'))
+  )
 
   function update(next: Partial<EditableRecipePreview>) {
     onChange({

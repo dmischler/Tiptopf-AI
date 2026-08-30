@@ -1,17 +1,22 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
+import { revalidateApp } from '@/app/actions/_revalidate'
+import { purgeTrashedRecipeImage, restoreTrashedRecipeImage } from '@/lib/local/images'
 import {
-  createRecipe,
   deleteRecipe,
   listRecipes,
+  LOCAL_PROFILE_ID,
+  patchRecipe,
   updateRecipe,
   updateRecipeFavorite,
-  updateRecipeImage,
   updateRecipeRating,
+  upsertRecipe,
 } from '@/lib/local/store'
+import { canonicalRecipeImageUrl, parseApiImageFileName } from '@/lib/recipe-image'
+import { storedRecipeImageUrlSchema } from '@/lib/recipe-schema'
+import type { Recipe } from '@/types'
 
 const recipeIdSchema = z.string().uuid()
 const favoriteSchema = z.boolean()
@@ -49,6 +54,8 @@ const restoreRecipeSchema = z.object({
   source_type: z.enum(['image', 'url', 'manual']),
   tags: z.array(z.string()).optional(),
   notes: z.string().optional(),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional(),
 })
 
 export async function toggleFavorite(recipeId: string, isFavorite: boolean) {
@@ -60,7 +67,7 @@ export async function toggleFavorite(recipeId: string, isFavorite: boolean) {
     throw new Error('Recipe not found')
   }
 
-  revalidatePath('/library')
+  revalidateApp()
   return {
     recipeId: parsedRecipeId,
     isFavorite: parsedFavorite,
@@ -76,7 +83,7 @@ export async function setRating(recipeId: string, rating: number) {
     throw new Error('Recipe not found')
   }
 
-  revalidatePath('/library')
+  revalidateApp()
   return {
     recipeId: parsedRecipeId,
     rating: parsedRating === 0 ? null : parsedRating,
@@ -141,16 +148,16 @@ export async function editRecipe(recipeId: string, input: z.infer<typeof editRec
 
   const data = await updateRecipe(parsedRecipeId, normalizedInput)
 
-  revalidatePath('/library')
+  revalidateApp()
   return data
 }
 
-export async function setRecipeImage(recipeId: string, imageUrl: string) {
+export async function setRecipeImage(recipeId: string, imageUrl: string | null) {
   const parsedRecipeId = recipeIdSchema.parse(recipeId)
-  const parsedImageUrl = z.string().trim().min(1).parse(imageUrl)
-  const data = await updateRecipeImage(parsedRecipeId, parsedImageUrl)
+  const parsedImageUrl = storedRecipeImageUrlSchema.parse(imageUrl)
+  const data = await patchRecipe(parsedRecipeId, { image_url: parsedImageUrl })
 
-  revalidatePath('/library')
+  revalidateApp()
   return data
 }
 
@@ -158,73 +165,52 @@ export async function deleteRecipeAction(recipeId: string) {
   const parsedRecipeId = recipeIdSchema.parse(recipeId)
   await deleteRecipe(parsedRecipeId)
 
-  revalidatePath('/library')
+  revalidateApp()
   return {
     recipeId: parsedRecipeId,
   }
 }
 
+export async function purgeTrashedRecipeImageAction(recipeId: string) {
+  const parsedRecipeId = recipeIdSchema.parse(recipeId)
+  await purgeTrashedRecipeImage(parsedRecipeId)
+  return { recipeId: parsedRecipeId }
+}
+
 export async function restoreRecipe(input: z.infer<typeof restoreRecipeSchema>) {
   const parsedInput = restoreRecipeSchema.parse(input)
+  const hadLocalImage = Boolean(parseApiImageFileName(parsedInput.image_url))
+  const canonicalUrl = canonicalRecipeImageUrl(parsedInput.id)
 
-  let restored: Awaited<ReturnType<typeof updateRecipe>>
+  const restored = await upsertRecipe({
+    id: parsedInput.id,
+    user_id: LOCAL_PROFILE_ID,
+    title: parsedInput.title,
+    ingredients: parsedInput.ingredients,
+    instructions: parsedInput.instructions,
+    prep_time: parsedInput.prep_time,
+    cook_time: parsedInput.cook_time,
+    servings: parsedInput.servings,
+    category: parsedInput.category,
+    difficulty: parsedInput.difficulty,
+    rating: parsedInput.rating,
+    is_favorite: parsedInput.is_favorite,
+    image_url: hadLocalImage ? canonicalUrl : null,
+    source_url: parsedInput.source_url,
+    source_type: parsedInput.source_type,
+    tags: parsedInput.tags ?? [],
+    notes: parsedInput.notes ?? '',
+    created_at: parsedInput.created_at ?? new Date().toISOString(),
+    updated_at: parsedInput.updated_at ?? new Date().toISOString(),
+  } satisfies Recipe)
 
   try {
-    restored = await updateRecipe(parsedInput.id, {
-      title: parsedInput.title,
-      ingredients: parsedInput.ingredients,
-      instructions: parsedInput.instructions,
-      prep_time: parsedInput.prep_time,
-      cook_time: parsedInput.cook_time,
-      servings: parsedInput.servings,
-      category: parsedInput.category,
-      difficulty: parsedInput.difficulty,
-      source_url: parsedInput.source_url,
-      source_type: parsedInput.source_type,
-      tags: parsedInput.tags,
-      notes: parsedInput.notes ?? '',
-    })
+    await restoreTrashedRecipeImage(parsedInput.id)
   } catch (error) {
-    if (!(error instanceof Error) || error.message !== 'Recipe not found') {
-      throw error
-    }
-
-    restored = await createRecipe({
-      title: parsedInput.title,
-      ingredients: parsedInput.ingredients,
-      instructions: parsedInput.instructions,
-      prep_time: parsedInput.prep_time,
-      cook_time: parsedInput.cook_time,
-      servings: parsedInput.servings,
-      category: parsedInput.category,
-      difficulty: parsedInput.difficulty,
-      image_url: parsedInput.image_url,
-      source_url: parsedInput.source_url,
-      source_type: parsedInput.source_type,
-      tags: parsedInput.tags,
-      notes: parsedInput.notes ?? '',
-    })
+    console.error('Failed to restore recipe image from trash:', error)
   }
 
-  if (parsedInput.image_url && restored.image_url !== parsedInput.image_url) {
-    restored = await updateRecipeImage(restored.id, parsedInput.image_url)
-  }
-
-  if (parsedInput.is_favorite) {
-    const favoriteUpdated = await updateRecipeFavorite(restored.id, true)
-    if (favoriteUpdated) {
-      restored = favoriteUpdated
-    }
-  }
-
-  if (parsedInput.rating !== null) {
-    const ratingUpdated = await updateRecipeRating(restored.id, parsedInput.rating)
-    if (ratingUpdated) {
-      restored = ratingUpdated
-    }
-  }
-
-  revalidatePath('/library')
+  revalidateApp()
   return restored
 }
 

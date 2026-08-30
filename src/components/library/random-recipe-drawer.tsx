@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { toRecipeImageSrc } from '@/lib/recipe-image'
 import type { Recipe } from '@/types'
 
 const REPETITIONS = 5
@@ -161,6 +162,7 @@ export function RandomRecipeDrawer({
                 {items.map((recipe, index) => {
                   const isExactTarget = index === exactTargetIndex
                   const isPopping = phase === 'popping' || phase === 'done'
+                  const imageSrc = toRecipeImageSrc(recipe)
 
                   return (
                     <div
@@ -173,9 +175,9 @@ export function RandomRecipeDrawer({
                       ].join(' ')}
                       style={{ width: ITEM_WIDTH, height: ITEM_WIDTH }}
                     >
-                      {recipe.image_url ? (
+                      {imageSrc ? (
                         <Image
-                          src={recipe.image_url}
+                          src={imageSrc}
                           alt={recipe.title}
                           fill
                           className="object-cover"

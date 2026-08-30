@@ -15,20 +15,31 @@ import type {
 
 import { writeFileDurable } from '@/lib/local/durable-write'
 import { StoreCorruptError } from '@/lib/local/errors'
+import {
+  migrateRecipeImageFile,
+  purgeAllTrashedRecipeImages,
+  trashRecipeImages,
+} from '@/lib/local/images'
 import { getStoreFilePath } from '@/lib/local/paths'
-import { normalizeTags } from '@/lib/utils'
+import { canonicalRecipeImageUrl, parseApiImageFileName } from '@/lib/recipe-image'
 import { reorderShoppingList } from '@/lib/shopping'
+import { normalizeTags } from '@/lib/utils'
 
 export const LOCAL_PROFILE_ID = 'local-device'
 const LOCAL_PROFILE_EMAIL = 'local@tiptopf.local'
+export const CURRENT_SCHEMA_VERSION = 2
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 type LocalStore = {
+  schema_version: number
   recipes: Recipe[]
   collections: Collection[]
   shoppingList: ShoppingListItem[]
   profile: Profile
   settings: AppSettings
 }
+
+export type RecipePatch = Partial<Omit<Recipe, 'id' | 'user_id' | 'created_at'>>
 
 type CreateRecipeInput = {
   title: string
@@ -46,16 +57,22 @@ type CreateRecipeInput = {
   notes?: string
 }
 
-type UpdateRecipeInput = Partial<
-  Omit<
-    Recipe,
-    'id' | 'user_id' | 'created_at' | 'updated_at' | 'rating' | 'is_favorite' | 'image_url'
-  >
->
+type UpdateRecipeInput = RecipePatch
+
+type CreateRecipeOptions = {
+  id?: string
+  createdAt?: string
+  index?: number
+}
+
+type UpsertRecipeOptions = {
+  index?: number
+}
 
 let writeQueue: Promise<void> = Promise.resolve()
 // Prevents first-boot ENOENT from re-entering the queue while a mutation is running.
 let mutationRunning = false
+let trashPurgedThisProcess = false
 
 function nowIso() {
   return new Date().toISOString()
@@ -87,12 +104,41 @@ function createDefaultSettings(): AppSettings {
 
 function createDefaultStore(): LocalStore {
   return {
+    schema_version: CURRENT_SCHEMA_VERSION,
     recipes: [],
     collections: [],
     shoppingList: [],
     profile: createDefaultProfile(),
     settings: createDefaultSettings(),
   }
+}
+
+function isUuid(value: unknown): value is string {
+  return typeof value === 'string' && UUID_RE.test(value)
+}
+
+function sanitizeStoredImageUrl(value: unknown): string | null {
+  const fileName = parseApiImageFileName(typeof value === 'string' ? value : null)
+  if (!fileName) {
+    return null
+  }
+
+  return `/api/images/${fileName}`
+}
+
+function uniqueIds(values: string[]) {
+  const seen = new Set<string>()
+  const result: string[] = []
+
+  for (const value of values) {
+    if (seen.has(value)) {
+      continue
+    }
+    seen.add(value)
+    result.push(value)
+  }
+
+  return result
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -202,7 +248,7 @@ function normalizeRecipe(value: unknown): Recipe | null {
         ? null
         : Math.max(0, Math.min(5, Number(value.rating) || 0)),
     is_favorite: Boolean(value.is_favorite),
-    image_url: toStringOrNull(value.image_url),
+    image_url: sanitizeStoredImageUrl(value.image_url),
     source_url: toStringOrNull(value.source_url),
     source_type: normalizeSourceType(value.source_type),
     tags,
@@ -264,9 +310,11 @@ function normalizeCollection(value: unknown): Collection | null {
   const createdAt = toIsoOrNow(value.created_at)
   const updatedAt = toIsoOrNow(value.updated_at)
 
-  const recipeIds = Array.isArray(value.recipe_ids)
-    ? value.recipe_ids.map((item) => String(item)).filter((item) => item.trim().length > 0)
-    : []
+  const recipeIds = uniqueIds(
+    Array.isArray(value.recipe_ids)
+      ? value.recipe_ids.map((item) => String(item)).filter((item) => item.trim().length > 0)
+      : []
+  )
 
   return {
     id,
@@ -308,6 +356,14 @@ function normalizeShoppingListItem(value: unknown): ShoppingListItem | null {
   }
 }
 
+function normalizeSchemaVersion(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.max(1, Math.trunc(value))
+  }
+
+  return 1
+}
+
 function normalizeStore(value: unknown): LocalStore {
   if (!isObject(value)) {
     return createDefaultStore()
@@ -326,6 +382,7 @@ function normalizeStore(value: unknown): LocalStore {
     : []
 
   return {
+    schema_version: normalizeSchemaVersion(value.schema_version),
     recipes,
     collections,
     shoppingList,
@@ -439,6 +496,56 @@ async function writeStore(store: LocalStore) {
   await writeFileDurable(targetPath, JSON.stringify(store, null, 2))
 }
 
+async function runBootImageMaintenance() {
+  if (trashPurgedThisProcess) {
+    return
+  }
+
+  trashPurgedThisProcess = true
+  try {
+    await purgeAllTrashedRecipeImages()
+  } catch (error) {
+    console.error('Failed to purge leftover recipe image trash:', error)
+  }
+}
+
+async function migrateStoreMedia(store: LocalStore) {
+  for (let index = 0; index < store.recipes.length; index += 1) {
+    const recipe = store.recipes[index]
+    const fileName = parseApiImageFileName(recipe.image_url)
+    if (!fileName) {
+      if (recipe.image_url) {
+        store.recipes[index] = { ...recipe, image_url: null }
+      }
+      continue
+    }
+
+    if (fileName === `${recipe.id}.webp`) {
+      const canonicalUrl = canonicalRecipeImageUrl(recipe.id)
+      if (recipe.image_url !== canonicalUrl) {
+        store.recipes[index] = { ...recipe, image_url: canonicalUrl }
+      }
+      continue
+    }
+
+    try {
+      const nextUrl = await migrateRecipeImageFile(recipe)
+      store.recipes[index] = { ...recipe, image_url: nextUrl }
+    } catch (error) {
+      console.error('Failed to migrate recipe image', recipe.id, error)
+    }
+  }
+}
+
+async function ensureStoreSchema(store: LocalStore) {
+  if (store.schema_version >= CURRENT_SCHEMA_VERSION) {
+    return
+  }
+
+  await migrateStoreMedia(store)
+  store.schema_version = CURRENT_SCHEMA_VERSION
+}
+
 async function ensureStoreExists(): Promise<LocalStore> {
   return runMutatingStoreOperation((store) => store)
 }
@@ -483,8 +590,11 @@ async function runMutatingStoreOperation<T>(
   const next = writeQueue.then(async () => {
     mutationRunning = true
     try {
+      await runBootImageMaintenance()
       const store = await readStore()
+      await ensureStoreSchema(store)
       const result = await operation(store)
+      await ensureStoreSchema(store)
       await writeStore(store)
       return result
     } finally {
@@ -502,16 +612,87 @@ async function runMutatingStoreOperation<T>(
   return next
 }
 
-export async function listRecipes() {
+async function ensureStoreReady() {
+  await runBootImageMaintenance()
   const store = await readStore()
+  if (store.schema_version < CURRENT_SCHEMA_VERSION) {
+    await runMutatingStoreOperation(() => undefined)
+  }
+}
+
+async function loadStore() {
+  await ensureStoreReady()
+  return readStore()
+}
+
+export async function listRecipes() {
+  const store = await loadStore()
   return [...store.recipes]
 }
 
-export async function createRecipe(input: CreateRecipeInput) {
+function findRecipeIndex(recipes: Recipe[], recipeId: string) {
+  return recipes.findIndex((recipe) => recipe.id === recipeId)
+}
+
+function insertRecipeAt(recipes: Recipe[], recipe: Recipe, index: number | undefined) {
+  if (typeof index === 'number' && Number.isFinite(index) && index >= 0) {
+    recipes.splice(Math.min(Math.trunc(index), recipes.length), 0, recipe)
+    return
+  }
+
+  recipes.unshift(recipe)
+}
+
+function applyRecipePatchAtIndex(store: LocalStore, index: number, patch: RecipePatch): Recipe {
+  const current = store.recipes[index]
+  const updated: Recipe = {
+    ...current,
+    ...patch,
+    id: current.id,
+    user_id: LOCAL_PROFILE_ID,
+    created_at: current.created_at,
+    updated_at: nowIso(),
+  }
+
+  if (patch.tags !== undefined) {
+    updated.tags = normalizeTags(patch.tags)
+  }
+
+  if (patch.image_url !== undefined) {
+    updated.image_url = sanitizeStoredImageUrl(patch.image_url)
+  }
+
+  store.recipes[index] = updated
+  return updated
+}
+
+export async function patchRecipe(recipeId: string, patch: RecipePatch): Promise<Recipe> {
+  return runMutatingStoreOperation((store) => {
+    const index = findRecipeIndex(store.recipes, recipeId)
+    if (index < 0) {
+      throw new Error('Recipe not found')
+    }
+
+    return applyRecipePatchAtIndex(store, index, patch)
+  })
+}
+
+export async function createRecipe(input: CreateRecipeInput, options?: CreateRecipeOptions) {
   return runMutatingStoreOperation((store) => {
     const now = nowIso()
+    const id = isUuid(options?.id) ? options.id : randomUUID()
+    if (findRecipeIndex(store.recipes, id) >= 0) {
+      throw new Error('Recipe already exists')
+    }
+
+    const createdAt =
+      typeof options?.createdAt === 'string' && !Number.isNaN(new Date(options.createdAt).getTime())
+        ? options.createdAt
+        : now
+    const canonicalUrl = canonicalRecipeImageUrl(id)
+
     const recipe: Recipe = {
-      id: randomUUID(),
+      id,
       user_id: LOCAL_PROFILE_ID,
       title: input.title,
       ingredients: input.ingredients,
@@ -523,70 +704,99 @@ export async function createRecipe(input: CreateRecipeInput) {
       difficulty: input.difficulty,
       rating: null,
       is_favorite: false,
-      image_url: input.image_url,
+      image_url: input.image_url === canonicalUrl ? canonicalUrl : null,
       source_url: input.source_url,
       source_type: input.source_type,
       tags: normalizeTags(input.tags),
       notes: input.notes ?? '',
-      created_at: now,
+      created_at: createdAt,
       updated_at: now,
     }
 
-    store.recipes.unshift(recipe)
+    insertRecipeAt(store.recipes, recipe, options?.index)
     return recipe
   })
 }
 
-function findRecipeIndex(recipes: Recipe[], recipeId: string) {
-  return recipes.findIndex((recipe) => recipe.id === recipeId)
+export async function upsertRecipe(recipe: Recipe, options?: UpsertRecipeOptions): Promise<Recipe> {
+  return runMutatingStoreOperation((store) => {
+    const now = nowIso()
+    if (!isUuid(recipe.id)) {
+      throw new Error('Recipe id must be a UUID')
+    }
+
+    const createdAt =
+      typeof recipe.created_at === 'string' && !Number.isNaN(new Date(recipe.created_at).getTime())
+        ? recipe.created_at
+        : now
+    const updatedAt =
+      typeof recipe.updated_at === 'string' && !Number.isNaN(new Date(recipe.updated_at).getTime())
+        ? recipe.updated_at
+        : now
+
+    const next: Recipe = {
+      ...recipe,
+      id: recipe.id,
+      user_id: LOCAL_PROFILE_ID,
+      tags: normalizeTags(recipe.tags),
+      notes: recipe.notes ?? '',
+      image_url: sanitizeStoredImageUrl(recipe.image_url),
+      created_at: createdAt,
+      updated_at: updatedAt,
+    }
+
+    const index = findRecipeIndex(store.recipes, next.id)
+    if (index >= 0) {
+      next.created_at = recipe.created_at ? createdAt : store.recipes[index].created_at
+      store.recipes[index] = next
+      return next
+    }
+
+    insertRecipeAt(store.recipes, next, options?.index)
+    return next
+  })
 }
 
 export async function updateRecipe(recipeId: string, input: UpdateRecipeInput) {
-  return runMutatingStoreOperation((store) => {
-    const index = findRecipeIndex(store.recipes, recipeId)
-    if (index < 0) {
-      throw new Error('Recipe not found')
-    }
-
-    const updated: Recipe = {
-      ...store.recipes[index],
-      ...input,
-      updated_at: nowIso(),
-    }
-
-    store.recipes[index] = updated
-    return updated
-  })
+  return patchRecipe(recipeId, input)
 }
 
 export async function deleteRecipe(recipeId: string) {
-  return runMutatingStoreOperation((store) => {
+  const removed = await runMutatingStoreOperation((store) => {
     const index = findRecipeIndex(store.recipes, recipeId)
     if (index < 0) {
       throw new Error('Recipe not found')
     }
 
-    const [removed] = store.recipes.splice(index, 1)
-    return removed
+    const [removedRecipe] = store.recipes.splice(index, 1)
+    const now = nowIso()
+    store.collections = store.collections.map((collection) => {
+      const nextIds = collection.recipe_ids.filter((id) => id !== recipeId)
+      if (nextIds.length === collection.recipe_ids.length) {
+        return collection
+      }
+
+      return {
+        ...collection,
+        recipe_ids: nextIds,
+        updated_at: now,
+      }
+    })
+
+    return removedRecipe
   })
+
+  try {
+    await trashRecipeImages(removed)
+  } catch (error) {
+    console.error('Failed to trash recipe images:', error)
+  }
+
+  return removed
 }
 
-export async function updateRecipeImage(recipeId: string, imageUrl: string) {
-  return runMutatingStoreOperation((store) => {
-    const index = findRecipeIndex(store.recipes, recipeId)
-    if (index < 0) {
-      throw new Error('Recipe not found')
-    }
-
-    const updated: Recipe = {
-      ...store.recipes[index],
-      image_url: imageUrl,
-      updated_at: nowIso(),
-    }
-
-    store.recipes[index] = updated
-    return updated
-  })
+export async function updateRecipeImage(recipeId: string, imageUrl: string | null) {
+  return patchRecipe(recipeId, { image_url: imageUrl })
 }
 
 export async function updateRecipeFavorite(recipeId: string, isFavorite: boolean) {
@@ -596,14 +806,7 @@ export async function updateRecipeFavorite(recipeId: string, isFavorite: boolean
       return null
     }
 
-    const updated: Recipe = {
-      ...store.recipes[index],
-      is_favorite: isFavorite,
-      updated_at: nowIso(),
-    }
-
-    store.recipes[index] = updated
-    return updated
+    return applyRecipePatchAtIndex(store, index, { is_favorite: isFavorite })
   })
 }
 
@@ -614,24 +817,17 @@ export async function updateRecipeRating(recipeId: string, rating: number | null
       return null
     }
 
-    const updated: Recipe = {
-      ...store.recipes[index],
-      rating,
-      updated_at: nowIso(),
-    }
-
-    store.recipes[index] = updated
-    return updated
+    return applyRecipePatchAtIndex(store, index, { rating })
   })
 }
 
 export async function getProfile() {
-  const store = await readStore()
+  const store = await loadStore()
   return store.profile
 }
 
 export async function getSettings() {
-  const store = await readStore()
+  const store = await loadStore()
   return { ...store.settings }
 }
 
@@ -682,12 +878,12 @@ export async function updateSettings(input: Partial<AppSettings> & Record<string
 // Collections
 
 export async function listCollections() {
-  const store = await readStore()
+  const store = await loadStore()
   return [...store.collections]
 }
 
 export async function getCollection(collectionId: string) {
-  const store = await readStore()
+  const store = await loadStore()
   return store.collections.find((c) => c.id === collectionId) ?? null
 }
 
@@ -739,6 +935,10 @@ export async function deleteCollection(collectionId: string) {
 
 export async function addRecipeToCollection(collectionId: string, recipeId: string) {
   return runMutatingStoreOperation((store) => {
+    if (findRecipeIndex(store.recipes, recipeId) < 0) {
+      throw new Error('Recipe not found')
+    }
+
     const index = store.collections.findIndex((c) => c.id === collectionId)
     if (index < 0) {
       throw new Error('Collection not found')
@@ -751,7 +951,7 @@ export async function addRecipeToCollection(collectionId: string, recipeId: stri
 
     const updated: Collection = {
       ...collection,
-      recipe_ids: [...collection.recipe_ids, recipeId],
+      recipe_ids: uniqueIds([...collection.recipe_ids, recipeId]),
       updated_at: nowIso(),
     }
 
@@ -761,7 +961,7 @@ export async function addRecipeToCollection(collectionId: string, recipeId: stri
 }
 
 export async function exportStoreJson(): Promise<string> {
-  const store = await readStore()
+  const store = await loadStore()
   return JSON.stringify(store, null, 2)
 }
 
@@ -787,6 +987,7 @@ export async function importStoreJson(raw: string) {
   const incoming = normalizeStore(parsed)
 
   return runMutatingStoreOperation((store) => {
+    store.schema_version = incoming.schema_version
     store.recipes = incoming.recipes
     store.collections = incoming.collections
     store.shoppingList = incoming.shoppingList
@@ -817,7 +1018,7 @@ export async function removeRecipeFromCollection(collectionId: string, recipeId:
 // Shopping List
 
 export async function getShoppingList() {
-  const store = await readStore()
+  const store = await loadStore()
   return [...store.shoppingList]
 }
 

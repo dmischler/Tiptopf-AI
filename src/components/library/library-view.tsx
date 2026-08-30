@@ -4,7 +4,12 @@ import { Dices, SearchX } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
-import { deleteRecipeAction, listRecipesAction, restoreRecipe } from '@/app/actions/recipe'
+import {
+  deleteRecipeAction,
+  listRecipesAction,
+  purgeTrashedRecipeImageAction,
+  restoreRecipe,
+} from '@/app/actions/recipe'
 import { listCollectionsAction } from '@/app/actions/collections'
 
 import { AddRecipeModal } from '@/components/add-recipe/modal'
@@ -211,7 +216,7 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
         setRecipes((current) => {
           const index = current.findIndex((item) => item.id === pending.recipe.id)
           if (index < 0) {
-            return [restored as Recipe, ...current.filter((item) => item.id !== restored.id)]
+            return insertRecipeAt(current, restored as Recipe, pending.index)
           }
 
           const next = [...current]
@@ -235,8 +240,8 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
     if (previousPending) {
       clearTimeout(previousPending.timeoutId)
       pendingDeletionRef.current = null
-      void deleteRecipeAction(previousPending.recipe.id).catch(() => {
-        /* already gone or race — ignore */
+      void purgeTrashedRecipeImageAction(previousPending.recipe.id).catch(() => {
+        /* already purged or race — ignore */
       })
     }
 
@@ -255,6 +260,7 @@ export function LibraryView({ initialRecipes, initialCollections = [] }: Library
         const timeoutId = setTimeout(() => {
           if (pendingDeletionRef.current?.recipe.id === recipe.id) {
             pendingDeletionRef.current = null
+            void purgeTrashedRecipeImageAction(recipe.id).catch(() => undefined)
           }
         }, 30_000)
 

@@ -7,6 +7,7 @@ import { FavoriteButton } from '@/components/interactions/favorite-button'
 import { Rating } from '@/components/interactions/rating'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { toRecipeImageSrc } from '@/lib/recipe-image'
 import type { Difficulty, Recipe, RecipeCategory } from '@/types'
 
 const CATEGORY_LABELS: Record<RecipeCategory, string> = {
@@ -55,6 +56,8 @@ function formatDifficultyLabel(difficulty: Recipe['difficulty']) {
 }
 
 export function RecipeCard({ recipe, index = 0, onOpen, onFavoriteChange, onRatingChange }: RecipeCardProps) {
+  const imageSrc = toRecipeImageSrc(recipe)
+
   return (
     <Card
       className="cursor-pointer py-0 transition duration-150 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.985] active:shadow-md"
@@ -68,10 +71,10 @@ export function RecipeCard({ recipe, index = 0, onOpen, onFavoriteChange, onRati
         }
       }}
     >
-      {recipe.image_url ? (
+      {imageSrc ? (
         <div className="relative aspect-[16/10] w-full overflow-hidden sm:aspect-[4/3]">
           <Image
-            src={recipe.image_url}
+            src={imageSrc}
             alt={recipe.title}
             fill
             className="object-cover"

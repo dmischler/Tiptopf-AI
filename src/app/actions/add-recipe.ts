@@ -1,10 +1,15 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
-import { saveUploadedRecipeImage } from '@/lib/local/images'
-import { createRecipe, updateRecipeImage } from '@/lib/local/store'
+import { revalidateApp } from '@/app/actions/_revalidate'
+import { downloadImageToLocalStorage, saveUploadedRecipeImage } from '@/lib/local/images'
+import { createRecipe, patchRecipe } from '@/lib/local/store'
+import {
+  canonicalRecipeImageUrl,
+  isCanonicalRecipeImageUrl,
+} from '@/lib/recipe-image'
+import { storedRecipeImageUrlSchema } from '@/lib/recipe-schema'
 
 const categorySchema = z.enum(['starter', 'main', 'dessert', 'side', 'breakfast', 'snack'])
 const difficultySchema = z.enum(['easy', 'medium', 'hard'])
@@ -18,15 +23,27 @@ const saveRecipeSchema = z.object({
   servings: z.number().int().nullable(),
   category: categorySchema,
   difficulty: difficultySchema,
-  imageUrl: z.string().nullable(),
+  imageUrl: storedRecipeImageUrlSchema.optional(),
+  remoteImageUrl: z.string().url().nullable().optional(),
   sourceUrl: z.string().nullable(),
   sourceType: z.enum(['image', 'url', 'manual']),
   tags: z.array(z.string()).optional(),
 })
 
-export async function saveRecipe(input: z.infer<typeof saveRecipeSchema>) {
+const ALLOWED_REPLACE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const MAX_REPLACE_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
+
+export async function saveRecipe(
+  input: z.infer<typeof saveRecipeSchema>,
+  imageFile?: File | null
+) {
   const parsed = saveRecipeSchema.parse(input)
-  const recipe = await createRecipe({
+  const remoteImageUrl =
+    typeof parsed.remoteImageUrl === 'string' && /^https?:\/\//i.test(parsed.remoteImageUrl)
+      ? parsed.remoteImageUrl
+      : null
+
+  let recipe = await createRecipe({
     title: parsed.title,
     ingredients: parsed.ingredients,
     instructions: parsed.instructions,
@@ -35,24 +52,37 @@ export async function saveRecipe(input: z.infer<typeof saveRecipeSchema>) {
     servings: parsed.servings ?? 1,
     category: parsed.category,
     difficulty: parsed.difficulty,
-    image_url: parsed.imageUrl,
+    image_url: null,
     source_url: parsed.sourceUrl,
     source_type: parsed.sourceType,
     tags: parsed.tags,
   })
 
-  revalidatePath('/library')
+  const canonicalUrl = canonicalRecipeImageUrl(recipe.id)
+
+  try {
+    if (imageFile instanceof File) {
+      const imageUrl = await saveUploadedRecipeImage(imageFile, recipe.id)
+      recipe = await patchRecipe(recipe.id, { image_url: imageUrl })
+    } else if (remoteImageUrl) {
+      const imageUrl = await downloadImageToLocalStorage(remoteImageUrl, recipe.id)
+      recipe = await patchRecipe(recipe.id, { image_url: imageUrl })
+    } else if (parsed.imageUrl && isCanonicalRecipeImageUrl(parsed.imageUrl) && parsed.imageUrl === canonicalUrl) {
+      recipe = await patchRecipe(recipe.id, { image_url: canonicalUrl })
+    }
+  } catch (error) {
+    console.error('Failed to persist recipe image:', error)
+  }
+
+  revalidateApp()
   return recipe
 }
-
-const ALLOWED_REPLACE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
-const MAX_REPLACE_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
 
 export async function uploadRecipeImage(formData: FormData): Promise<string> {
   const recipeId = formData.get('recipeId')
   const file = formData.get('image')
 
-  if (typeof recipeId !== 'string' || !recipeId) {
+  if (typeof recipeId !== 'string' || !z.string().uuid().safeParse(recipeId).success) {
     throw new Error('Invalid recipe id')
   }
 
@@ -69,8 +99,8 @@ export async function uploadRecipeImage(formData: FormData): Promise<string> {
   }
 
   const imageUrl = await saveUploadedRecipeImage(file, recipeId)
-  await updateRecipeImage(recipeId, imageUrl)
+  await patchRecipe(recipeId, { image_url: imageUrl })
 
-  revalidatePath('/library')
+  revalidateApp()
   return imageUrl
 }
