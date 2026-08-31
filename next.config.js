@@ -21,6 +21,14 @@ function serverActionAllowedOrigins() {
 
 const nextConfig = {
   output: 'standalone',
+  images: {
+    localPatterns: [
+      {
+        pathname: '/api/images/**',
+        // omit search so ?v={updated_at} cache-busting is allowed
+      },
+    ],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: '20mb',
