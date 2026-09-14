@@ -53,10 +53,23 @@ function isRecipeType(type: unknown): boolean {
   return types.some((entry) => typeof entry === 'string' && entry.toLowerCase() === 'recipe')
 }
 
+export function decodeHtmlEntities(value: string) {
+  return value
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+}
+
 export function resolveMaybeUrl(raw: string | null, base: string): string | null {
   if (!raw) return null
   try {
-    const resolved = new URL(raw.trim(), base)
+    const resolved = new URL(decodeHtmlEntities(raw).trim(), base)
     if (resolved.protocol !== 'http:' && resolved.protocol !== 'https:') {
       return null
     }
@@ -70,7 +83,7 @@ export function buildModelBundle(fetchResult: FetchResult, maxChars = MODEL_TEXT
   const parts: string[] = []
 
   if (fetchResult.structuredRecipe) {
-    parts.push('Structured recipe data from the page (JSON-LD):')
+    parts.push('Structured recipe data from the page:')
     parts.push(JSON.stringify(fetchResult.structuredRecipe, null, 2))
   }
 
@@ -164,23 +177,31 @@ function parseServings(value: unknown): number | null {
 function inferCategory(text: string): RecipeCategory {
   const value = text.toLowerCase()
 
-  if (/\b(cake|cookie|dessert|sweet|chocolate|ice cream|pudding|tiramisu|pie|brownie)\b/.test(value)) {
+  if (
+    /\b(cake|cookie|dessert|sweet|chocolate|ice cream|pudding|tiramisu|pie|brownie|kuchen|keks|tarte|schokolade|süssspeise|süßspeise|nachtisch|cantuccini)\b/.test(
+      value
+    )
+  ) {
     return 'dessert'
   }
 
-  if (/\b(breakfast|brunch|pancake|waffle|granola|omelet|oatmeal|toast)\b/.test(value)) {
+  if (
+    /\b(breakfast|brunch|pancake|waffle|granola|omelet|oatmeal|toast|frühstück|fruehstueck|hafer|müsli|muesli|pfannkuchen)\b/.test(
+      value
+    )
+  ) {
     return 'breakfast'
   }
 
-  if (/\b(snack|chips|bar|cracker|dip|smoothie)\b/.test(value)) {
+  if (/\b(snack|chips|bar|cracker|dip|smoothie|häppchen|haeppchen)\b/.test(value)) {
     return 'snack'
   }
 
-  if (/\b(side|side dish|salad|slaw|fries|rice|vegetable)\b/.test(value)) {
+  if (/\b(side|side dish|salad|slaw|fries|rice|vegetable|beilage|salat|gemüse|gemuese|reis)\b/.test(value)) {
     return 'side'
   }
 
-  if (/\b(starter|appetizer|soup|bruschetta|canape)\b/.test(value)) {
+  if (/\b(starter|appetizer|soup|bruschetta|canape|vorspeise|suppe|vorspeisen)\b/.test(value)) {
     return 'starter'
   }
 
@@ -190,11 +211,11 @@ function inferCategory(text: string): RecipeCategory {
 function inferDifficulty(ingredients: string[], instructions: string, metadataText: string): Difficulty {
   const normalizedMetadata = metadataText.toLowerCase()
 
-  if (/\b(easy|quick|simple|beginner|30-minute|30 minute|one-pot)\b/.test(normalizedMetadata)) {
+  if (/\b(easy|quick|simple|beginner|30-minute|30 minute|one-pot|einfach|schnell|simpel)\b/.test(normalizedMetadata)) {
     return 'easy'
   }
 
-  if (/\b(hard|advanced|complex|challenging)\b/.test(normalizedMetadata)) {
+  if (/\b(hard|advanced|complex|challenging|schwer|aufwendig|komplex)\b/.test(normalizedMetadata)) {
     return 'hard'
   }
 
@@ -380,17 +401,14 @@ function extractPlainTextFallback(html: string) {
   const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i)
   const source = bodyMatch ? bodyMatch[1] : html
 
-  return source
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/\s+/g, ' ')
-    .trim()
+  return normalizeText(
+    decodeHtmlEntities(
+      source
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+    )
+  )
 }
 
 function extractOgImage(html: string) {
@@ -398,17 +416,124 @@ function extractOgImage(html: string) {
   return match ? match[1] : null
 }
 
+function htmlToLines(html: string): string[] {
+  const withBreaks = html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h[1-6]|tr)>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+
+  return decodeHtmlEntities(withBreaks)
+    .split(/\n+/)
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter((line) => line.length > 0)
+}
+
+function extractListItems(html: string): string[] {
+  return [...html.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)]
+    .map((match) => htmlToLines(match[1]).join(' '))
+    .filter((item) => item.length > 0)
+}
+
+function numberInstructionSteps(lines: string[]): string {
+  const alreadyNumbered = lines.every((line) => /^\d+[.)]\s+/.test(line))
+  if (alreadyNumbered) {
+    return lines.join('\n')
+  }
+
+  return lines.map((line, index) => `${index + 1}. ${line.replace(/^\d+[.)]\s+/, '')}`).join('\n')
+}
+
+const INGREDIENT_HEADING = /^(zutaten|zutat|ingredients?|ingrédients|ingredienti)$/i
+const INSTRUCTION_HEADING = /^(zubereitung|anleitung|zubereiten|instructions?|method|preparation|directions?)$/i
+const SERVINGS_LINE = /\b\d+(\s*(?:-|–|bis)\s*\d+)?\s*(portionen|personen|servings?|pce|stk)\b/i
+
+function extractHeadingBlocks(html: string): Array<{ title: string; html: string }> {
+  const headingRe = /<h([1-3])\b[^>]*>([\s\S]*?)<\/h\1>/gi
+  const matches = [...html.matchAll(headingRe)]
+  const blocks: Array<{ title: string; html: string }> = []
+
+  for (let index = 0; index < matches.length; index += 1) {
+    const match = matches[index]
+    const start = (match.index ?? 0) + match[0].length
+    const end = index + 1 < matches.length ? (matches[index + 1].index ?? html.length) : html.length
+    const title = htmlToLines(match[2]).join(' ')
+    if (!title) continue
+    blocks.push({
+      title,
+      html: html.slice(start, end),
+    })
+  }
+
+  return blocks
+}
+
+export function extractHtmlStructuredRecipe(html: string): StructuredUrlRecipe | null {
+  const source = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ').replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+  const blocks = extractHeadingBlocks(source)
+  const h1Match = source.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)
+  const title = h1Match ? htmlToLines(h1Match[1]).join(' ') : ''
+
+  const ingredientBlock = blocks.find((block) => INGREDIENT_HEADING.test(block.title))
+  const instructionBlock = blocks.find((block) => INSTRUCTION_HEADING.test(block.title))
+  if (!title || !ingredientBlock || !instructionBlock) {
+    return null
+  }
+
+  const listItems = extractListItems(ingredientBlock.html)
+  const sectionLines = htmlToLines(ingredientBlock.html)
+
+  let servings: number | null = null
+  for (const line of sectionLines) {
+    if (SERVINGS_LINE.test(line)) {
+      servings = servings ?? parseServings(line)
+    }
+  }
+
+  const ingredients = (listItems.length > 0 ? listItems : sectionLines).filter((line) => !SERVINGS_LINE.test(line))
+
+  const instructionLines = htmlToLines(instructionBlock.html).filter((line) => !SERVINGS_LINE.test(line))
+  if (ingredients.length === 0 || instructionLines.length === 0) {
+    return null
+  }
+
+  const instructions = numberInstructionSteps(instructionLines)
+  const cookMatch = instructions.match(/(\d+)\s*minuten/i)
+  const cookTime = cookMatch ? Number(cookMatch[1]) : null
+
+  const categoryText = [title, ingredients.join(' '), instructions].join(' ')
+
+  return {
+    title,
+    ingredients,
+    instructions,
+    prep_time: null,
+    cook_time: cookTime && Number.isFinite(cookTime) && cookTime > 0 ? cookTime : null,
+    servings,
+    category: inferCategory(categoryText),
+    difficulty: inferDifficulty(ingredients, instructions, categoryText),
+    confidence: 0.7,
+  }
+}
+
 const PAGE_FETCH_MAX_BYTES = 2 * 1024 * 1024
 
 export function parseRecipeHtml(html: string, pageUrl: string): FetchResult {
   const jsonLdResult = extractRecipeFromJsonLd(html)
+  const htmlRecipe = jsonLdResult?.structuredRecipe ? null : extractHtmlStructuredRecipe(html)
+  const structuredRecipe = jsonLdResult?.structuredRecipe ?? htmlRecipe
   const imageUrl = resolveMaybeUrl(jsonLdResult?.imageUrl ?? extractOgImage(html), pageUrl)
 
-  if (jsonLdResult) {
+  if (structuredRecipe) {
+    const content = jsonLdResult?.content?.trim()
+      ? jsonLdResult.content
+      : [structuredRecipe.title, structuredRecipe.ingredients.join('\n'), structuredRecipe.instructions].join('\n\n')
+
     return {
-      content: capText(jsonLdResult.content),
+      content: capText(content),
       imageUrl,
-      structuredRecipe: jsonLdResult.structuredRecipe,
+      structuredRecipe,
     }
   }
 

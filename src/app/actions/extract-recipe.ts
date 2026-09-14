@@ -4,12 +4,12 @@ import { z } from 'zod'
 
 import { revalidateApp } from '@/app/actions/_revalidate'
 import { assertAccess } from '@/lib/access-pin'
-import { extractRecipeFromText } from '@/lib/ai/extractor'
+import { extractRecipeFromText, extractRecipeFromTextWithGemini } from '@/lib/ai/extractor'
 import { searchPexelsImages } from '@/lib/ai/image-search'
 import { searchMealDbImages } from '@/lib/ai/meal-db'
 import type { RecipeImageCandidate, ResolvedRecipeImage } from '@/lib/ai/image-types'
 import { assertSafeAiBaseUrl } from '@/lib/ai/assert-base-url'
-import { resolveAiBaseUrl, resolveGeminiBaseUrl } from '@/lib/ai/client'
+import { isOpenCodeZenFreeEndpoint, resolveAiBaseUrl, resolveGeminiBaseUrl } from '@/lib/ai/client'
 import { extractRecipeFromImage } from '@/lib/ai/image-handler'
 import { buildModelBundle, fetchRecipeUrl } from '@/lib/ai/url-fetcher'
 import { assertExtractRateLimit } from '@/lib/extract-rate-limit'
@@ -203,67 +203,125 @@ export async function findRecipeImageAction(input: FindRecipeImageInput): Promis
   }
 }
 
-export async function extractFromUrlAction(url: string) {
+export type ExtractUrlSuccess = ParsedRecipe & {
+  image_url: string | null
+  remote_image_url: string | null
+  source_url: string
+  source_type: 'url'
+  untranslated: boolean
+}
+
+export type ExtractUrlActionResult = { ok: true; recipe: ExtractUrlSuccess } | { ok: false; error: string }
+
+export async function extractFromUrlAction(url: string): Promise<ExtractUrlActionResult> {
   await assertAccess()
-  assertExtractRateLimit()
 
-  const normalizedUrl = parseWithGerman(
-    extractUrlSchema,
-    typeof url === 'string' ? url.trim() : url,
-    'URL nicht erlaubt'
-  )
-
-  let settings: Awaited<ReturnType<typeof getSettings>>
-  let fetchResult: Awaited<ReturnType<typeof fetchRecipeUrl>>
   try {
-    ;[settings, fetchResult] = await Promise.all([getSettings(), fetchRecipeUrl(normalizedUrl)])
-  } catch (err) {
-    if (err instanceof UnsafeUrlError) {
-      throw new Error('URL nicht erlaubt')
+    assertExtractRateLimit()
+
+    const normalizedUrl = parseWithGerman(
+      extractUrlSchema,
+      typeof url === 'string' ? url.trim() : url,
+      'URL nicht erlaubt'
+    )
+
+    let settings: Awaited<ReturnType<typeof getSettings>>
+    let fetchResult: Awaited<ReturnType<typeof fetchRecipeUrl>>
+    try {
+      ;[settings, fetchResult] = await Promise.all([getSettings(), fetchRecipeUrl(normalizedUrl)])
+    } catch (err) {
+      if (err instanceof UnsafeUrlError) {
+        return { ok: false, error: 'URL nicht erlaubt' }
+      }
+      console.error('fetchRecipeUrl error:', formatSafeError(err))
+      return { ok: false, error: err instanceof Error ? err.message : 'URL konnte nicht geladen werden.' }
     }
-    console.error('fetchRecipeUrl error:', formatSafeError(err))
-    throw new Error(err instanceof Error ? err.message : 'URL konnte nicht geladen werden.')
-  }
 
-  await assertConfiguredAiBaseUrl(settings.opencode_base_url, resolveAiBaseUrl)
-
-  let recipe: ParsedRecipe
-  let untranslated = false
-
-  if (settings.opencode_api_key) {
     const bundle = buildModelBundle(fetchResult)
     if (!bundle.trim()) {
-      throw new Error('Auf der Seite wurde kein Rezeptinhalt gefunden.')
+      return { ok: false, error: 'Auf der Seite wurde kein Rezeptinhalt gefunden.' }
     }
 
-    try {
-      recipe = await extractRecipeFromText(
-        bundle,
-        settings.opencode_api_key,
-        resolveAiBaseUrl(settings.opencode_base_url ?? undefined),
-        settings.opencode_model_id ?? undefined
-      )
-    } catch (err) {
-      console.error('extractRecipeFromText error:', formatSafeError(err))
-      throw new Error(err instanceof Error ? err.message : 'AI-Extraktion fehlgeschlagen.')
-    }
-  } else if (fetchResult.structuredRecipe) {
-    recipe = {
-      ...fetchResult.structuredRecipe,
-      source_type: 'url',
-    }
-    untranslated = true
-  } else {
-    throw new Error('OpenCode API-Key fehlt. Bitte im Profil hinterlegen.')
-  }
+    let recipe: ParsedRecipe | null = null
+    let lastAiError: string | null = null
+    const geminiAvailable = Boolean(settings.gemini_api_key)
+    const skipOpenCodeFreeTier =
+      Boolean(settings.opencode_api_key) &&
+      isOpenCodeZenFreeEndpoint(settings.opencode_base_url ?? undefined) &&
+      geminiAvailable
 
-  return {
-    ...recipe,
-    image_url: fetchResult.imageUrl,
-    remote_image_url: fetchResult.imageUrl,
-    source_url: normalizedUrl,
-    source_type: 'url' as const,
-    untranslated,
+    if (settings.opencode_api_key && !skipOpenCodeFreeTier) {
+      try {
+        await assertConfiguredAiBaseUrl(settings.opencode_base_url, resolveAiBaseUrl)
+        recipe = await extractRecipeFromText(
+          bundle,
+          settings.opencode_api_key,
+          resolveAiBaseUrl(settings.opencode_base_url ?? undefined),
+          settings.opencode_model_id ?? undefined
+        )
+      } catch (err) {
+        console.error('extractRecipeFromText error:', formatSafeError(err))
+        lastAiError = err instanceof Error ? err.message : 'AI-Extraktion fehlgeschlagen.'
+      }
+    } else if (skipOpenCodeFreeTier) {
+      console.warn('Skipping OpenCode Zen free endpoint for URL extract; using Gemini fallback.')
+    }
+
+    if (!recipe && settings.gemini_api_key) {
+      try {
+        await assertConfiguredAiBaseUrl(settings.gemini_base_url, (value) => resolveGeminiBaseUrl(value) ?? undefined)
+        recipe = await extractRecipeFromTextWithGemini(
+          bundle,
+          settings.gemini_api_key,
+          settings.gemini_base_url ?? undefined,
+          settings.gemini_model_id ?? undefined,
+          settings.gemini_fallback_model_id ?? undefined
+        )
+      } catch (err) {
+        console.error('extractRecipeFromTextWithGemini error:', formatSafeError(err))
+        lastAiError = err instanceof Error ? err.message : 'Gemini-Extraktion fehlgeschlagen.'
+      }
+    }
+
+    let untranslated = false
+    let extractionNote: string | undefined
+
+    if (!recipe && fetchResult.structuredRecipe) {
+      recipe = {
+        ...fetchResult.structuredRecipe,
+        source_type: 'url',
+      }
+      untranslated = true
+      extractionNote = lastAiError
+        ? 'KI nicht verfügbar — Rezept wurde unverändert von der Seite übernommen.'
+        : 'Nicht übersetzt — API-Key im Profil fehlt.'
+    }
+
+    if (!recipe) {
+      if (lastAiError) {
+        return { ok: false, error: lastAiError }
+      }
+      if (!settings.opencode_api_key && !settings.gemini_api_key) {
+        return { ok: false, error: 'OpenCode- oder Gemini-API-Key fehlt. Bitte im Profil hinterlegen.' }
+      }
+      return { ok: false, error: 'Rezept konnte nicht aus der Seite erkannt werden.' }
+    }
+
+    return {
+      ok: true,
+      recipe: {
+        ...recipe,
+        image_url: fetchResult.imageUrl,
+        remote_image_url: fetchResult.imageUrl,
+        source_url: normalizedUrl,
+        source_type: 'url' as const,
+        untranslated,
+        extractionNote,
+      },
+    }
+  } catch (err) {
+    console.error('extractFromUrlAction error:', formatSafeError(err))
+    return { ok: false, error: err instanceof Error ? err.message : 'Extrahieren von der URL fehlgeschlagen.' }
   }
 }
 

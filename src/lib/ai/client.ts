@@ -74,6 +74,12 @@ export function resolveAiBaseUrl(baseUrl?: string) {
   return normalized
 }
 
+/** True for the OpenCode Zen free endpoint, which rejects calls from outside the OpenCode app. */
+export function isOpenCodeZenFreeEndpoint(baseUrl?: string): boolean {
+  const resolved = resolveAiBaseUrl(baseUrl).replace(/\/+$/, '').toLowerCase()
+  return resolved === 'https://opencode.ai/zen/v1'
+}
+
 export function resolveAiModelId(modelId?: string) {
   return normalizeModelId(modelId || DEFAULT_MODEL_ID)
 }

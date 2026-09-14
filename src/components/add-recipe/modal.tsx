@@ -134,13 +134,20 @@ export function AddRecipeModal({
     setStreamText('Seite wird geladen...')
 
     try {
-      const recipe = await extractFromUrlAction(url)
+      const result = await extractFromUrlAction(url)
       if (gen !== extractGenRef.current) return
+
+      if (!result.ok) {
+        setProgressStage('error')
+        toast.error(result.error)
+        setPhase('input')
+        return
+      }
 
       setProgressStage('structuring')
       setStreamText('Felder werden strukturiert...')
 
-      const withImage = await runAutoImageFallback(recipe, gen)
+      const withImage = await runAutoImageFallback(result.recipe, gen)
       if (gen !== extractGenRef.current) return
 
       setExtractedRecipe(withImage)

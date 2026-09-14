@@ -49,7 +49,7 @@ export function RecipePreview({
           role="status"
           className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"
         >
-          Nicht übersetzt — API-Key im Profil fehlt.
+          {parsedRecipe.extractionNote ?? 'Nicht übersetzt — API-Key im Profil fehlt.'}
         </div>
       ) : null}
 
